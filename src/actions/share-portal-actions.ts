@@ -20,6 +20,15 @@ import { serializeDecimal } from '@/lib/serialization'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { deriveClientStatus, deriveNeedsYou, isClientFacingPhase } from '@/lib/portal-derive'
 import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
+import { cookies } from 'next/headers'
+import {
+    GUEST_COOKIE_TTL_SEC,
+    createGuestSession,
+    getGuestSession,
+    guestCookieAttrs,
+    guestCookieName,
+    resolveShareClient,
+} from '@/lib/review/share-auth'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
@@ -33,6 +42,65 @@ import { isValidReaction } from '@/lib/comment-reactions'
 import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 import type { ClientRequestPortalDTO } from '@/components/portal/calm/types'
+
+/**
+ * [Onboarding 2026-07] Carry the portal's ALREADY-VERIFIED notify email into the
+ * screening room, so the client is never asked to identify themselves twice.
+ *
+ * THE BUG THIS REPLACES: /r/[slug] pre-filled the client's name (to skip the
+ * name/email modal) even when no guest session existed. The player then believed
+ * it had an identity, never opened the modal, and posted the decision without
+ * one — so the API answered 401 "Please add your name and email to review." The
+ * only thing that could have created the session was the modal that had just been
+ * skipped, so the client was stuck in a loop with no way out. It surfaced once the
+ * 30-day guest cookie expired, on a client who had verified their email months
+ * earlier and reasonably expected that to be enough.
+ *
+ * WHY THIS IS NOT A WEAKENING: the screening room's own identity modal verifies
+ * nothing — any name and any email are accepted (see GuestReviewApp: "NO email
+ * PIN: the owner waived impersonation protection on approvals"). The portal's
+ * notify email, by contrast, passed an emailed OTP. Minting the session from it
+ * RAISES the assurance behind an approval, and attributes it to a confirmed
+ * address instead of free text.
+ *
+ * Authorization: the token is re-resolved through the usual chokepoint, and the
+ * review share must belong to a client inside that token's scope — so a link can
+ * only ever mint an identity for its own client's videos.
+ */
+export async function ensureScreeningIdentity(
+    token: string,
+    slug: string,
+): Promise<{ ok: boolean }> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { ok: false }
+
+    const share = await prisma.shareLink.findUnique({ where: { slug }, include: { items: true } })
+    if (!share || share.revokedAt) return { ok: false }
+    if (share.expiresAt && share.expiresAt.getTime() < Date.now()) return { ok: false }
+
+    const jar = await cookies()
+    // Already identified in this browser → nothing to do.
+    if (await getGuestSession(share, jar)) return { ok: true }
+
+    // The video must belong to THIS token's client (or one of its sub-brands).
+    const owner = await resolveShareClient(share)
+    if (!owner || !scope.clientIds.includes(owner.id)) return { ok: false }
+
+    const link = await prisma.clientShareLink.findUnique({
+        where: { id: scope.shareLinkId },
+        select: { notifyEmail: true, notifyEmailVerifiedAt: true },
+    })
+    // No confirmed email yet → fall through; the player still shows its modal.
+    if (!link?.notifyEmail || !link.notifyEmailVerifiedAt) return { ok: false }
+
+    const created = await createGuestSession(share, {
+        name: scope.clientName || owner.name,
+        email: link.notifyEmail.toLowerCase(),
+        userAgent: null,
+    })
+    jar.set(guestCookieName(slug), created.rawToken, guestCookieAttrs(GUEST_COOKIE_TTL_SEC))
+    return { ok: true }
+}
 
 /**
  * [Statements 2026-07] Whitelist the client-facing payment details out of an

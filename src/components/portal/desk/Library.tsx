@@ -84,7 +84,21 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
                 <h1 className="desk-display" style={{ fontSize: '1.6rem', margin: 0 }}>Files &amp; masters</h1>
                 {snap && <span className="desk-mono" style={{ fontSize: '0.7rem', color: 'var(--ink-3)' }}>{snap.summary.assetCount} FILES · {fmtBytes(snap.summary.totalBytes)}</span>}
             </div>
-            <p style={{ fontSize: '0.88rem', color: 'var(--ink-2)', margin: '0 0 20px' }}>Approved folders and delivered originals — download one file or a whole set.</p>
+            <p style={{ fontSize: '0.88rem', color: 'var(--ink-2)', margin: '0 0 14px' }}>Approved folders and delivered originals — download one file, or everything at once.</p>
+
+            {/* [Client bulk download] The headline ask from a real client: get a whole
+                project in ONE go. Streams a single .zip straight from storage, folder
+                structure preserved, nothing re-encoded. Plain <a> so the browser owns
+                the download (native progress, survives a tab switch). */}
+            {actions.zipUrl && !empty && (
+                <a
+                    href={actions.zipUrl(folderId)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid var(--hairline-strong)', background: 'var(--paper-raised)', color: 'var(--ink)', borderRadius: 999, padding: '8px 16px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none', marginBottom: 20 }}
+                >
+                    <FileArchive size={14} />
+                    {folderId ? `Download this folder as one .zip` : `Download everything as one .zip`}
+                </a>
+            )}
 
             {/* Breadcrumb */}
             {(crumbs.length > 0) && (
@@ -108,14 +122,30 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
                             <Kicker style={{ marginBottom: 10 }}>Folders · {folders.length}</Kicker>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 26 }}>
                                 {folders.map(f => (
-                                    <button key={f.id} onClick={() => setFolderId(f.id)} style={{ border: '1px solid var(--hairline)', background: 'var(--paper-raised)', padding: '16px 18px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer', textAlign: 'left', borderRadius: 4 }}>
-                                        <Folder size={20} style={{ color: 'var(--ink-2)', flexShrink: 0 }} />
-                                        <span style={{ minWidth: 0, flex: 1 }}>
-                                            <p className="desk-truncate" style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem' }}>{f.name}</p>
-                                            <p className="desk-mono" style={{ fontSize: '0.6rem', color: 'var(--ink-3)', margin: '2px 0 0' }}>{f.itemCount} item{f.itemCount === 1 ? '' : 's'} · {fmtBytes(f.totalBytes)}</p>
-                                        </span>
-                                        <ChevronRight size={14} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
-                                    </button>
+                                    // The card and its download link are SIBLINGS, not nested — an <a>
+                                    // inside a <button> is invalid HTML and swallows the anchor's click.
+                                    <div key={f.id} style={{ position: 'relative' }}>
+                                        <button onClick={() => setFolderId(f.id)} style={{ width: '100%', border: '1px solid var(--hairline)', background: 'var(--paper-raised)', padding: '16px 18px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer', textAlign: 'left', borderRadius: 4 }}>
+                                            <Folder size={20} style={{ color: 'var(--ink-2)', flexShrink: 0 }} />
+                                            <span style={{ minWidth: 0, flex: 1 }}>
+                                                <p className="desk-truncate" style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem' }}>{f.name}</p>
+                                                <p className="desk-mono" style={{ fontSize: '0.6rem', color: 'var(--ink-3)', margin: '2px 0 0' }}>{f.itemCount} item{f.itemCount === 1 ? '' : 's'} · {fmtBytes(f.totalBytes)}</p>
+                                            </span>
+                                            <ChevronRight size={14} style={{ color: 'var(--ink-3)', flexShrink: 0, marginRight: 26 }} />
+                                        </button>
+                                        {/* Grab the whole folder WITHOUT opening it — the client asked for
+                                            exactly this ("download every project as one"). */}
+                                        {actions.zipUrl && f.itemCount > 0 && (
+                                            <a
+                                                href={actions.zipUrl(f.id)}
+                                                title={`Download "${f.name}" as one .zip`}
+                                                aria-label={`Download ${f.name} as one zip`}
+                                                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: '50%', color: 'var(--ink-2)' }}
+                                            >
+                                                <Download size={14} />
+                                            </a>
+                                        )}
+                                    </div>
                                 ))}
                             </div>
                         </>

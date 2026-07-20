@@ -81,6 +81,7 @@ const actions: DeliverableActions = {
     notifyRemove: async () => ({ success: true }),
     documents: async () => DOCS,
     downloadDocuments: async (ids) => ({ success: true, files: ids.map(id => ({ versionId: id, fileName: id + '.bin', url: '#', expiresAt: iso(0) })) }),
+    zipUrl: (folderId) => `#zip-${folderId ?? 'all'}`,
 }
 
 export default function DeskHarness() {

@@ -264,6 +264,14 @@ export interface DeliverableActions {
      * the route re-authorizes the id against the token's scope server-side.
      */
     invoicePdfUrl?: (invoiceId: string) => string
+    /**
+     * [Onboarding 2026-07] Called just before the screening room opens. Mints a review
+     * guest session from the portal's already-verified notify email, so a client who
+     * confirmed their email once is never asked to identify themselves again. Awaited
+     * so the cookie exists before the iframe loads; failure is non-fatal (the player
+     * falls back to its own identity modal).
+     */
+    prepareScreening?: (reviewUrl: string) => Promise<void>
     /** Token-scoped client Document browser. Server re-checks client/workspace scope on every call. */
     documents?: () => Promise<DocumentsSnapshot | null>
     downloadDocuments?: (versionIds: string[]) => Promise<{
@@ -271,6 +279,16 @@ export interface DeliverableActions {
         error?: string
         files?: { versionId: string; fileName: string; url: string; expiresAt: string }[]
     }>
+    /**
+     * [Client bulk download 2026-07] URL of ONE streamed .zip — a whole folder, or the
+     * entire library when folderId is null. A URL rather than a Promise so the browser
+     * downloads it natively (progress bar, resumable, no blob in memory).
+     *
+     * WHY: a client asked to leave for Frame.io over exactly this — "we're not able to
+     * download every project as one … you have to click on the individual reel". The old
+     * multi-select fired one <a download> per file, which browsers throttle or block.
+     */
+    zipUrl?: (folderId: string | null) => string
 }
 
 /**

@@ -111,7 +111,15 @@ function DeskInner({
     const openDeliverable = (id: string) => setOpenDel(id)
     const openInvoice = (id: string) => { setSurface('statements'); setOpenInv(id) }
     // Open the in-portal screening room (same-origin iframe of the /r review player).
-    const openReview = (url: string, title: string) => setScreening({ url, title })
+    // AWAIT the identity handshake first: it mints the review guest session from the
+    // portal's already-verified notify email, so the client can approve/download the
+    // moment the player loads instead of hitting a second name+email prompt. It must
+    // finish BEFORE the iframe mounts, or the frame loads without the cookie. Failure
+    // is non-fatal — the player then shows its own identity modal, as it always did.
+    const openReview = async (url: string, title: string) => {
+        try { await actions.prepareScreening?.(url) } catch { /* non-fatal */ }
+        setScreening({ url, title })
+    }
 
     // ⌘K / Ctrl-K opens the search palette.
     useEffect(() => {

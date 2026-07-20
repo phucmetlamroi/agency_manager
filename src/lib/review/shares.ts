@@ -326,6 +326,45 @@ export async function getOrCreatePrimaryShareForAsset(
  * Silent: no activity / audit feed (this is a client-driven read, not a staff action).
  * Returns the slug for `/r/{slug}`.
  */
+/**
+ * [Parity review 2026-07] READ-ONLY batch companion to getOrCreateClientReviewSlug.
+ *
+ * The client Files snapshot used to call the get-or-CREATE version once per video asset,
+ * sequentially, inside its render loop — on every page load AND on every zip request,
+ * since the download route rebuilds the same snapshot. Each call is 1–2 findFirst plus a
+ * possible write, so a 300-asset library spent tens of seconds of round-trips before a
+ * single byte streamed, inside a 30 s function budget.
+ *
+ * In the steady state every asset already has a link, so one indexed query answers the
+ * whole page and nothing is written at all. Minting stays available for the misses.
+ */
+export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>()
+    if (assetIds.length === 0) return out
+    const rows = await prisma.shareLink.findMany({
+        where: {
+            revokedAt: null,
+            AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
+            items: { some: { assetId: { in: assetIds } } },
+            // Same shape as branch 1 of getOrCreateClientReviewSlug — a board already
+            // configured the way a client's own review link is.
+            allowDownload: true,
+            downloadOnlyWhenApproved: false,
+            passwordHash: null,
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { slug: true, items: { select: { assetId: true } } },
+    })
+    for (const r of rows) {
+        for (const it of r.items) {
+            // orderBy createdAt asc + first-write-wins == the oldest link, matching the
+            // single-asset lookup's `orderBy: { createdAt: 'asc' }`.
+            if (it.assetId && !out.has(it.assetId)) out.set(it.assetId, r.slug)
+        }
+    }
+    return out
+}
+
 export async function getOrCreateClientReviewSlug(asset: {
     id: string
     workspaceId: string
@@ -350,33 +389,24 @@ export async function getOrCreateClientReviewSlug(asset: {
         return alreadyEnabled.slug
     }
 
-    // 2. Try to find an existing active share that is unambiguously the client's own board
-    // (created by the asset's uploader, single-item, no password). We can safely upgrade this.
-    const upgradable = await prisma.shareLink.findFirst({
-        where: {
-            revokedAt: null,
-            AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
-            items: { some: { assetId: asset.id } },
-            createdById: asset.createdById,
-            passwordHash: null,
-        },
-        orderBy: { createdAt: 'asc' },
-        select: {
-            id: true,
-            slug: true,
-            _count: {
-                select: { items: true }
-            }
-        }
-    })
-    if (upgradable && upgradable._count.items === 1) {
-        await prisma.shareLink.update({
-            where: { id: upgradable.id },
-            data: { allowDownload: true, downloadOnlyWhenApproved: false },
-        })
-        return upgradable.slug
-    }
-
+    // 2. REMOVED — this used to find "an existing active share created by the uploader,
+    //    single-item, no password" and UPDATE it to `allowDownload: true,
+    //    downloadOnlyWhenApproved: false`, on the grounds that such a link was
+    //    "unambiguously the client's own board".
+    //
+    //    It was not. A staff member creating a deliberately view-only link through
+    //    ShareLinkModal produces exactly that shape — they are usually the uploader, it is
+    //    usually one asset, and passwords are rare. So a CLIENT merely opening their Files
+    //    tab silently stripped the "download only after approval" control an editor had
+    //    set — and that link may be in the hands of other people (a guest reviewer, a
+    //    stakeholder), so the flip widened access for everyone holding it, not just the
+    //    client. A read by one party must never rewrite another party's policy.
+    //
+    //    Branch 1 above already reuses any share that is ALREADY client-shaped, so the
+    //    only cost of dropping this is one extra row the first time a client opens a video
+    //    whose only existing link is restricted. Staff's link keeps its settings; the
+    //    client gets their own board. Nothing the client can reach here is wider than what
+    //    the portal already grants them — they can download these same bytes from Files.
     const created = await prisma.shareLink.create({
         data: {
             slug: nanoid(SLUG_LEN),

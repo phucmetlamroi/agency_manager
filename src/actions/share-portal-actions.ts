@@ -19,7 +19,7 @@ import { prisma } from '@/lib/db'
 import { serializeDecimal } from '@/lib/serialization'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { deriveClientStatus, deriveNeedsYou, isClientFacingPhase } from '@/lib/portal-derive'
-import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
+import { findClientReviewSlugs, getOrCreateClientReviewSlug } from '@/lib/review/shares'
 import { cookies } from 'next/headers'
 import {
     GUEST_COOKIE_TTL_SEC,
@@ -320,16 +320,30 @@ export async function getShareSnapshot(token: string) {
             return url.pathname.startsWith('/r/') && OWN_HOSTS.has(url.host.toLowerCase())
         } catch { return false }
     }
+    // [Parity review 2026-07] Resolve every existing review slug in ONE indexed query
+    // first. This loop used to call the get-or-CREATE helper per task on every portal
+    // page load — 1–2 reads plus a possible WRITE each. In the steady state every
+    // client-facing task already has a board, so this answers them all and writes nothing.
+    const clientFacingAssetIds = tasks
+        .filter((t) => readyAssetByTask.get(t.id) && isClientFacingPhase(t.status, t.clientReview))
+        .map((t) => readyAssetByTask.get(t.id)!.id)
+    const slugByAsset = await findClientReviewSlugs(clientFacingAssetIds)
+
     const mappedTasks = await Promise.all(tasks.map(async ({ assignedBy, ...task }) => {
         // R5 gate: only surface a review board when the task is in a CLIENT-facing phase.
         const asset = readyAssetByTask.get(task.id)
         let reviewUrl: string | null = null
         if (asset && isClientFacingPhase(task.status, task.clientReview)) {
-            try {
-                reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
-            } catch {
-                // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
-                reviewUrl = null
+            const known = slugByAsset.get(asset.id)
+            if (known) {
+                reviewUrl = `${guestBase}/r/${known}`
+            } else {
+                try {
+                    reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
+                } catch {
+                    // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
+                    reviewUrl = null
+                }
             }
         }
         // Synthesize AWAITING ONLY in-memory when a review board is surfaced but the client

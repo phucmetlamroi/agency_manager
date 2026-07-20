@@ -6,7 +6,7 @@ import { audit } from '@/lib/audit-log'
 import { clientLabelOf, isClientDeliveredPhase } from '@/lib/portal-derive'
 import { buildMediaLinks } from '@/lib/review/media-links'
 import { presignGetObject } from '@/lib/review/r2'
-import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
+import { findClientReviewSlugs, getOrCreateClientReviewSlug } from '@/lib/review/shares'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { getRequestIp, resolveShareToken, type ShareLinkScope } from '@/lib/share-link-auth'
 import type { DocumentAsset, DocumentFolder, DocumentsSnapshot } from '@/components/portal/calm/types'
@@ -302,6 +302,16 @@ async function buildClientDocuments(
     const downloadable = new Map<string, DownloadableVersion>()
     const guestBase = guestAppBaseUrl()
 
+    // [Parity review 2026-07] Resolve every review slug in ONE indexed query before the
+    // loop. This used to be a sequential get-or-create per video asset inside the loop —
+    // 1–2 reads plus a possible write, each — which the zip route then paid again on every
+    // download because it rebuilds this same snapshot. In the steady state each asset
+    // already has a link, so this answers the whole page and writes nothing.
+    const videoAssetIds = assets
+        .filter((a) => a.mediaKind === 'VIDEO' && a.currentVersionId && versionById.get(a.currentVersionId)?.muxPlaybackId)
+        .map((a) => a.id)
+    const slugByAsset = await findClientReviewSlugs(videoAssetIds)
+
     for (const asset of assets) {
         const version = asset.currentVersionId ? versionById.get(asset.currentVersionId) : null
         if (!version?.r2Key) continue
@@ -337,15 +347,23 @@ async function buildClientDocuments(
         }
         let reviewUrl: string | null = null
         if (asset.mediaKind === 'VIDEO' && version.muxPlaybackId) {
-            try {
-                reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug({
-                    id: asset.id,
-                    workspaceId: asset.workspaceId,
-                    taskId: asset.taskId ?? null,
-                    createdById: asset.createdById,
-                })}`
-            } catch {
-                reviewUrl = null
+            // Fast path: the batch read above already found this asset's board — no query,
+            // no write. Only a video whose link does not exist yet falls through to the
+            // minting call, and only once, because the next load finds what it created.
+            const known = slugByAsset.get(asset.id)
+            if (known) {
+                reviewUrl = `${guestBase}/r/${known}`
+            } else {
+                try {
+                    reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug({
+                        id: asset.id,
+                        workspaceId: asset.workspaceId,
+                        taskId: asset.taskId ?? null,
+                        createdById: asset.createdById,
+                    })}`
+                } catch {
+                    reviewUrl = null
+                }
             }
         }
 

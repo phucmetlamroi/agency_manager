@@ -111,7 +111,15 @@ function DeskInner({
     const openDeliverable = (id: string) => setOpenDel(id)
     const openInvoice = (id: string) => { setSurface('statements'); setOpenInv(id) }
     // Open the in-portal screening room (same-origin iframe of the /r review player).
-    const openReview = (url: string, title: string) => setScreening({ url, title })
+    // AWAIT the identity handshake first: it mints the review guest session from the
+    // portal's already-verified notify email, so the client can approve/download the
+    // moment the player loads instead of hitting a second name+email prompt. It must
+    // finish BEFORE the iframe mounts, or the frame loads without the cookie. Failure
+    // is non-fatal — the player then shows its own identity modal, as it always did.
+    const openReview = async (url: string, title: string) => {
+        try { await actions.prepareScreening?.(url) } catch { /* non-fatal */ }
+        setScreening({ url, title })
+    }
 
     // ⌘K / Ctrl-K opens the search palette.
     useEffect(() => {
@@ -266,7 +274,12 @@ function DeskInner({
                         />
                     )}
                     {surface === 'files' && (
-                        <Library key={'files' + wsScope + scope} actions={actions} />
+                        // [A1] The remount `key` used to be the ONLY link between the masthead
+                        // period tabs and this surface — and since Library took no scope props,
+                        // it refetched the identical payload and rendered the identical grid.
+                        // A client switching to "T6" saw July's files and concluded work had
+                        // gone missing. Pass the scope; drop the pointless remount.
+                        <Library actions={actions} wsScope={wsScope} clientScope={scope} />
                     )}
                     {surface === 'statements' && (
                         <Statements
@@ -274,6 +287,7 @@ function DeskInner({
                             invoices={scopedInvs}
                             openInvoice={openInvoice}
                             activeId={openInv}
+                            pdfUrl={actions.invoicePdfUrl}
                         />
                     )}
                     {surface === 'requests' && (

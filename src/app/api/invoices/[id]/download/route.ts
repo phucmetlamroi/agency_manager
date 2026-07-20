@@ -52,27 +52,46 @@ export async function GET(
         }
 
         const profile = invoice.billingSnapshot as any
+        // [Invoice fidelity 2026-07] Presentation overrides frozen at issue time.
+        // Before this, `clientAddress` read a column that does not exist (always ''),
+        // the custom title / due-date label / payment link were lost entirely, and the
+        // money strings went in bare — the template prints them verbatim, so a
+        // re-downloaded PDF showed "1000" with no currency symbol. Null on invoices
+        // issued earlier; the fallbacks below preserve the previous behaviour.
+        const pres = (invoice.clientSnapshot ?? {}) as Record<string, any>
+        const str = (v: unknown): string | undefined =>
+            typeof v === 'string' && v.trim() ? v.trim() : undefined
+        const cur = str(pres.currency) || str(profile?.currency) || '$'
+        // Format straight off the Prisma Decimal. Routing through Number() first rounds
+        // a stored 1.005 to "1.00" (IEEE-754) where Decimal.toFixed gives "1.01", and
+        // silently loses digits on large values. Decimal and number both expose toFixed.
+        const money = (v: { toFixed(n: number): string }) => `${cur}${v.toFixed(2)}`
 
         // 3. Construct PDF Payload
         const pdfPayload: InvoiceData = {
             invoiceNumber: invoice.invoiceNumber,
-            agencyName: (invoice.billingSnapshot as any).agencyName || 'Agency Manager',
-            clientName: invoice.client.name,
-            clientAddress: (invoice as any).clientAddress || '',
+            agencyName: str(pres.agencyName) || str(profile?.agencyName) || 'Agency Manager',
+            customTitle: str(pres.customTitle),
+            // Frozen at issue time — a later client rename must not re-label this invoice.
+            clientName: str(pres.clientName) || invoice.client.name,
+            clientAddress: str(pres.clientAddress) ?? '',
+            dueDateLabel: str(pres.dueDateLabel),
+            paymentLink: str(pres.paymentLink),
             // [L18b] The invoice is client-facing for a UK client → en-GB (dd/mm/yyyy, stays English).
             // A bare toLocaleDateString() ran under the server's en-US locale → US mm/dd/yyyy.
             issueDate: invoice.issueDate.toLocaleDateString('en-GB'),
             dueDate: invoice.dueDate ? invoice.dueDate.toLocaleDateString('en-GB') : 'On Receipt',
-            subtotal: invoice.subtotalAmount.toString(),
+            subtotal: money(invoice.subtotalAmount),
             taxPercent: Number(invoice.taxPercent),
-            taxAmount: invoice.taxAmount.toString(),
-            depositDeducted: Number(invoice.depositDeducted) > 0 ? invoice.depositDeducted.toString() : undefined,
-            totalDue: invoice.totalDue.toString(),
+            taxAmount: Number(invoice.taxAmount) > 0 ? money(invoice.taxAmount) : undefined,
+            depositDeducted: Number(invoice.depositDeducted) > 0 ? money(invoice.depositDeducted) : undefined,
+            totalDue: money(invoice.totalDue),
             items: (invoice.items || []).map(i => ({
                 description: i.description,
                 quantity: i.quantity,
-                unitPrice: i.unitPrice.toString(),
-                amount: i.amount.toString()
+                unitPrice: money(i.unitPrice),
+                // Already the extended line total (unitPrice × quantity) — never re-multiply.
+                amount: money(i.amount)
             })),
             bank: {
                 beneficiaryName: profile.beneficiaryName,
@@ -81,7 +100,10 @@ export async function GET(
                 swiftCode: profile.swiftCode,
                 address: profile.address,
                 notes: profile.notes
-            }
+            },
+            // Stamp VOID across the page: a cancelled invoice must never read as
+            // payable, whoever re-downloads it.
+            isVoid: invoice.status === 'VOID',
         }
 
         // 4. Generate PDF

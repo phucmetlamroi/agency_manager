@@ -425,11 +425,24 @@ export async function approveInternalAndSendToClient(
  * an ADMIN-approved cut. No-op when the task was never sent (clientReview not 'AWAITING'), so the
  * first-cut A1→A2 path and internal-only rounds are untouched. Best-effort: never throws.
  */
+/**
+ * Returns the status the task was pulled OUT of, when this call reset a client-facing
+ * task back to internal review — `null` when it was a no-op.
+ *
+ * [Client escalation 2026-07] The caller NEEDS this. Revoking already writes A2, so the
+ * `syncTaskFromReviewEvent(..., submitted)` that runs right after sees `task.status ===
+ * target` and reports `applied:false` — which is what gates `notifyManagerOfReviewFlip`.
+ * Net effect on the live system: an editor delivered a revision, the client's link went
+ * dead, the client's status regressed to "In progress", no email went out — AND nobody on
+ * the agency side was told there was anything to re-approve. Work sat until a human
+ * happened to look. A real client cited exactly this ("we're getting behind on changes")
+ * when asking to move back to Frame.io.
+ */
 export async function revokeClientExposureOnNewVersion(
     taskId: string,
     assetId: string,
     workspaceId: string,
-): Promise<void> {
+): Promise<{ resetFrom: string | null }> {
     try {
         const task = await prisma.task.findFirst({
             where: { id: taskId, workspaceId },
@@ -440,7 +453,7 @@ export async function revokeClientExposureOnNewVersion(
         // original guard only covered 'AWAITING', so a fresh head landing AFTER a change-request would
         // slip the un-re-approved cut straight to the client on the still-live 'CHANGES' link (R5 gap).
         // 'APPROVED'/null are settled — nothing live to revoke.
-        if (task?.clientReview !== 'AWAITING' && task?.clientReview !== 'CHANGES') return
+        if (task?.clientReview !== 'AWAITING' && task?.clientReview !== 'CHANGES') return { resetFrom: null }
 
         // [AUDIT M1-v2] Revoking the share + nulling clientReview is NOT enough: the client PORTAL derives
         // exposure from the task STATUS (isClientFacingPhase substring-matches "khách", independent of
@@ -471,7 +484,9 @@ export async function revokeClientExposureOnNewVersion(
             return r.count
         })
         reviewLog('info', 'task_sync.client_exposure_revoked', { taskId, assetId, sharesRevoked })
+        return { resetFrom: resetStatus ? task.status : null }
     } catch (e) {
         reviewLog('error', 'task_sync.revoke_exposure_failed', { taskId, assetId, error: String(e) })
+        return { resetFrom: null }
     }
 }

@@ -90,9 +90,20 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                 {!(d.reviewUrl || d.productLink) ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 16, borderRadius: 8, background: 'var(--paper-sunken)', border: '1px dashed var(--hairline-strong)' }}>
                         <span style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper-raised)', border: '1px solid var(--hairline)', color: 'var(--ink-3)' }}><Clock size={20} /></span>
+                        {/* [Client escalation 2026-07] A task that HAS client feedback on record is
+                            not un-started — the editor is working the revision, and the screening
+                            link is intentionally dark until an admin re-approves the new cut. Saying
+                            "Not uploaded yet" there told the client their delivered revision had
+                            vanished, which is exactly what they reported as work "going missing". */}
                         <div style={{ minWidth: 0 }}>
-                            <div className="desk-serif" style={{ fontSize: '1rem', color: 'var(--ink)' }}>Not uploaded yet</div>
-                            <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>The screening link appears here once editing begins.</div>
+                            <div className="desk-serif" style={{ fontSize: '1rem', color: 'var(--ink)' }}>
+                                {d.clientFeedback ? 'Your changes are being made' : 'Not uploaded yet'}
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>
+                                {d.clientFeedback
+                                    ? 'The new cut appears here as soon as it clears our check.'
+                                    : 'The screening link appears here once editing begins.'}
+                            </div>
                         </div>
                     </div>
                 ) : (

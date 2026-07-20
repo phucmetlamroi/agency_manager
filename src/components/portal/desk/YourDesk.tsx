@@ -25,7 +25,27 @@ export default function YourDesk({
     goStatements: () => void
     openInvoice: (id: string) => void
 }) {
+    const toast = useToast()
     const cuts = deliverables.filter(d => d.needsYou)
+    // [Batch approval 2026-07] Clients who commission a month of reels at once had to
+    // open and approve every single one. Tick the ones you're happy with, approve in a
+    // single action. The server re-checks each task against the same gates as the
+    // one-at-a-time approve, so this is a shortcut through CLICKS, not through review.
+    const [picked, setPicked] = useState<Set<string>>(new Set())
+    const [approving, setApproving] = useState(false)
+    const togglePick = (id: string) =>
+        setPicked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    const allPicked = cuts.length > 0 && cuts.every(d => picked.has(d.id))
+    const approvePicked = async () => {
+        if (!actions.approveMany || picked.size === 0 || approving) return
+        setApproving(true)
+        const res = await actions.approveMany(Array.from(picked))
+        setApproving(false)
+        if (res.success) {
+            toast('ok', `Approved ${res.approved} video${res.approved === 1 ? '' : 's'}.${res.skipped ? ` ${res.skipped} skipped.` : ''}`)
+            setPicked(new Set())
+        } else toast('err', res.error || 'Could not approve those.')
+    }
     const overdue = invoices.filter(i => mapInvoiceStatus(i.status) === 'Overdue')
     const delivered = deliverables.filter(d => d.clientStatus === 'Completed').length
     const inProduction = deliverables.filter(d => !d.needsYou && d.clientStatus !== 'Completed' && d.clientStatus !== 'Closed').length
@@ -47,11 +67,40 @@ export default function YourDesk({
                 <h1 className="desk-display" style={{ fontSize: '1.95rem', margin: '0 0 6px' }}>{headline}</h1>
                 <p style={{ fontSize: '0.92rem', color: 'var(--ink-2)', margin: '0 0 24px' }}>Clear the tray and you’re done — anything new lands here first.</p>
 
+                {/* Batch bar — only when there is more than one cut to decide on. A single
+                    waiting video doesn't need a selection model. */}
+                {actions.approveMany && cuts.length > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => setPicked(allPicked ? new Set() : new Set(cuts.map(d => d.id)))}
+                            className="desk-mono"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: '0.66rem', letterSpacing: '0.06em', padding: 0 }}
+                        >
+                            {allPicked ? 'CLEAR SELECTION' : `SELECT ALL ${cuts.length}`}
+                        </button>
+                        {picked.size > 0 && (
+                            <Button variant="primary" size="sm" onClick={approvePicked} disabled={approving}>
+                                {approving ? 'Approving…' : `Approve ${picked.size} video${picked.size === 1 ? '' : 's'}`}
+                            </Button>
+                        )}
+                    </div>
+                )}
+
                 <div style={{ display: 'grid', gap: 12 }}>
                     {cuts.map(d => {
                         const rel = relDeadline(d.deadline)
+                        const on = picked.has(d.id)
                         return (
-                            <div key={d.id} className="desk-tray-card" style={{ display: 'flex', gap: 18, alignItems: 'center', background: 'var(--paper-raised)', border: '1px solid var(--hairline)', borderLeft: '3px solid var(--accent)', padding: '16px 20px', borderRadius: 4 }}>
+                            <div key={d.id} className="desk-tray-card" style={{ display: 'flex', gap: 18, alignItems: 'center', background: on ? 'var(--accent-tint)' : 'var(--paper-raised)', border: '1px solid ' + (on ? 'var(--accent)' : 'var(--hairline)'), borderLeft: '3px solid var(--accent)', padding: '16px 20px', borderRadius: 4 }}>
+                                {actions.approveMany && cuts.length > 1 && (
+                                    <input
+                                        type="checkbox"
+                                        checked={on}
+                                        onChange={() => togglePick(d.id)}
+                                        aria-label={`Select ${d.title} for approval`}
+                                        style={{ flex: 'none', width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                                    />
+                                )}
                                 <button onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title) : openDeliverable(d.id))} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
                                     <Play size={18} fill="#f7f2e9" color="#f7f2e9" />
                                     {d.duration && <span className="desk-mono" style={{ position: 'absolute', right: 6, bottom: 5, fontSize: '0.56rem', color: '#eae5d9', background: 'rgba(9,9,11,.65)', padding: '1px 5px' }}>{d.duration}</span>}

@@ -19,7 +19,17 @@ import { prisma } from '@/lib/db'
 import { serializeDecimal } from '@/lib/serialization'
 import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { deriveClientStatus, deriveNeedsYou, isClientFacingPhase } from '@/lib/portal-derive'
-import { getOrCreateClientReviewSlug } from '@/lib/review/shares'
+import { findClientReviewSlugs, getOrCreateClientReviewSlug } from '@/lib/review/shares'
+import { cookies } from 'next/headers'
+import {
+    GUEST_COOKIE_TTL_SEC,
+    createGuestSession,
+    getGuestSession,
+    guestCookieAttrs,
+    guestCookieName,
+    resolveShareClient,
+    resolveShareOwnerClientIds,
+} from '@/lib/review/share-auth'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
@@ -33,6 +43,111 @@ import { isValidReaction } from '@/lib/comment-reactions'
 import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 import type { ClientRequestPortalDTO } from '@/components/portal/calm/types'
+
+/**
+ * [Onboarding 2026-07] Carry the portal's ALREADY-VERIFIED notify email into the
+ * screening room, so the client is never asked to identify themselves twice.
+ *
+ * THE BUG THIS REPLACES: /r/[slug] pre-filled the client's name (to skip the
+ * name/email modal) even when no guest session existed. The player then believed
+ * it had an identity, never opened the modal, and posted the decision without
+ * one — so the API answered 401 "Please add your name and email to review." The
+ * only thing that could have created the session was the modal that had just been
+ * skipped, so the client was stuck in a loop with no way out. It surfaced once the
+ * 30-day guest cookie expired, on a client who had verified their email months
+ * earlier and reasonably expected that to be enough.
+ *
+ * WHY THIS IS NOT A WEAKENING: the screening room's own identity modal verifies
+ * nothing — any name and any email are accepted (see GuestReviewApp: "NO email
+ * PIN: the owner waived impersonation protection on approvals"). The portal's
+ * notify email, by contrast, passed an emailed OTP. Minting the session from it
+ * RAISES the assurance behind an approval, and attributes it to a confirmed
+ * address instead of free text.
+ *
+ * Authorization: the token is re-resolved through the usual chokepoint, and the
+ * review share must belong to a client inside that token's scope — so a link can
+ * only ever mint an identity for its own client's videos.
+ */
+export async function ensureScreeningIdentity(
+    token: string,
+    slug: string,
+): Promise<{ ok: boolean }> {
+    const scope = await resolveShareToken(token)
+    if (!scope) return { ok: false }
+
+    const share = await prisma.shareLink.findUnique({ where: { slug }, include: { items: true } })
+    if (!share || share.revokedAt) return { ok: false }
+    if (share.expiresAt && share.expiresAt.getTime() < Date.now()) return { ok: false }
+
+    const jar = await cookies()
+    // Already identified in this browser → nothing to do.
+    if (await getGuestSession(share, jar)) return { ok: true }
+
+    // The video must belong to THIS token's client (or one of its sub-brands).
+    // [Codex review 2026-07] Authorize on the OWNING client ids, NOT on the display
+    // name. resolveShareClient walks UP to the top-level client so comments read
+    // "Jack" instead of the sub-brand "MotoHalo" — using that id as the access check
+    // rejected the rightful owner (a sub-brand token never contains its parent's id,
+    // and a task-less multi-asset share resolves to null), sending a client who had
+    // already verified their email straight back to the Name/Email modal. That false
+    // rejection is friction the owner explicitly asked us to remove.
+    const ownerIds = await resolveShareOwnerClientIds(share)
+    if (!ownerIds.some((id) => scope.clientIds.includes(id))) return { ok: false }
+
+    const link = await prisma.clientShareLink.findUnique({
+        where: { id: scope.shareLinkId },
+        select: { notifyEmail: true, notifyEmailVerifiedAt: true },
+    })
+    // No confirmed email yet → fall through; the player still shows its modal.
+    if (!link?.notifyEmail || !link.notifyEmailVerifiedAt) return { ok: false }
+
+    // Display name only — never an access decision.
+    const owner = await resolveShareClient(share)
+    const created = await createGuestSession(share, {
+        name: scope.clientName || owner?.name || 'Client',
+        email: link.notifyEmail.toLowerCase(),
+        userAgent: null,
+    })
+    jar.set(guestCookieName(slug), created.rawToken, guestCookieAttrs(GUEST_COOKIE_TTL_SEC))
+    return { ok: true }
+}
+
+/**
+ * [Statements 2026-07] Whitelist the client-facing payment details out of an
+ * Invoice.billingSnapshot Json blob.
+ *
+ * Every field below is one the generated invoice PDF ALREADY prints for this
+ * client (invoice-generator.ts bank block + footer) — so surfacing them in the
+ * portal discloses nothing new; it just means the client no longer has to open
+ * a PDF to find out where to send the money. The blob is untyped and written by
+ * the issuing flow, so we copy field-by-field: any key added to it later stays
+ * server-side unless someone deliberately adds it here.
+ */
+function pickClientFacingBank(snapshot: unknown): {
+    agencyName: string | null
+    beneficiaryName: string | null
+    bankName: string | null
+    accountNumber: string | null
+    swiftCode: string | null
+    address: string | null
+    notes: string | null
+} | null {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null
+    const s = snapshot as Record<string, unknown>
+    const str = (v: unknown): string | null =>
+        typeof v === 'string' && v.trim() ? v.trim() : null
+    const out = {
+        agencyName: str(s.agencyName),
+        beneficiaryName: str(s.beneficiaryName),
+        bankName: str(s.bankName),
+        accountNumber: str(s.accountNumber),
+        swiftCode: str(s.swiftCode),
+        address: str(s.address),
+        notes: str(s.notes),
+    }
+    // All-empty snapshot → null so the UI can skip the block entirely.
+    return Object.values(out).some(Boolean) ? out : null
+}
 
 /* ───────────────────────────────────────────────────────────────────────────
    Reads
@@ -110,12 +225,21 @@ export async function getShareSnapshot(token: string) {
                 invoiceNumber: true,
                 issueDate: true,
                 dueDate: true,
+                // [Statements 2026-07] The money breakdown the client needs to reconcile
+                // the lines against the total. Without subtotal/tax/deposit an invoice
+                // carrying VAT or a deposit deduction can NEVER add up on screen.
+                subtotalAmount: true,
+                taxPercent: true,
+                taxAmount: true,
+                depositDeducted: true,
                 totalDue: true,
                 status: true,
                 filePath: true,
+                // Read for the bank block ONLY — never forwarded raw (see mappedInvoices).
+                billingSnapshot: true,
                 clientId: true,
                 workspaceId: true,
-                items: { select: { description: true, amount: true, quantity: true } },
+                items: { select: { description: true, quantity: true, unitPrice: true, amount: true } },
             },
         }),
     ])
@@ -196,16 +320,30 @@ export async function getShareSnapshot(token: string) {
             return url.pathname.startsWith('/r/') && OWN_HOSTS.has(url.host.toLowerCase())
         } catch { return false }
     }
+    // [Parity review 2026-07] Resolve every existing review slug in ONE indexed query
+    // first. This loop used to call the get-or-CREATE helper per task on every portal
+    // page load — 1–2 reads plus a possible WRITE each. In the steady state every
+    // client-facing task already has a board, so this answers them all and writes nothing.
+    const clientFacingAssetIds = tasks
+        .filter((t) => readyAssetByTask.get(t.id) && isClientFacingPhase(t.status, t.clientReview))
+        .map((t) => readyAssetByTask.get(t.id)!.id)
+    const slugByAsset = await findClientReviewSlugs(clientFacingAssetIds)
+
     const mappedTasks = await Promise.all(tasks.map(async ({ assignedBy, ...task }) => {
         // R5 gate: only surface a review board when the task is in a CLIENT-facing phase.
         const asset = readyAssetByTask.get(task.id)
         let reviewUrl: string | null = null
         if (asset && isClientFacingPhase(task.status, task.clientReview)) {
-            try {
-                reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
-            } catch {
-                // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
-                reviewUrl = null
+            const known = slugByAsset.get(asset.id)
+            if (known) {
+                reviewUrl = `${guestBase}/r/${known}`
+            } else {
+                try {
+                    reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
+                } catch {
+                    // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
+                    reviewUrl = null
+                }
             }
         }
         // Synthesize AWAITING ONLY in-memory when a review board is surfaced but the client
@@ -244,11 +382,17 @@ export async function getShareSnapshot(token: string) {
         }
     }))
 
-    const mappedInvoices = invoices.map((inv) => ({
+    // [Statements 2026-07] `billingSnapshot` is an untyped Json blob frozen at issue
+    // time; it holds the agency's payment details but may also accrete unrelated
+    // internal keys. NEVER spread it into the client payload — destructure it OUT and
+    // forward an explicit whitelist of the six fields the PDF's bank block already
+    // shows the client anyway. Anything not listed here stays server-side by default.
+    const mappedInvoices = invoices.map(({ billingSnapshot, ...inv }) => ({
         ...inv,
         issueDate: iso(inv.issueDate)!,
         dueDate: iso(inv.dueDate),
         workspaceName: inv.workspaceId ? wsNameById.get(inv.workspaceId) ?? null : null,
+        bank: pickClientFacingBank(billingSnapshot),
     }))
 
     // [Trial P3 — white-label] The agency's brand for the client portal lockup:
@@ -567,6 +711,122 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
         } catch { /* best-effort */ }
     }
     return { success: true }
+}
+
+/**
+ * [Batch approval 2026-07] Approve MANY deliverables in one action.
+ *
+ * WHY: clients who commission in batches (a month of reels at once) had to open and
+ * approve every single video by hand — and in the review room the Download button only
+ * unlocks after approval, so a 20-video month meant 20 round trips before they could
+ * take delivery. That, plus one-file-at-a-time downloads, is what a paying client meant
+ * by "really hard to navigate … we're getting behind".
+ *
+ * SAFETY: this is NOT a shortcut around the review gate. Every task goes through the
+ * SAME three checks as approveDeliverableViaToken — token scope (findScopedTask's
+ * where-clause, replicated here for one round trip), not-already-approved, and
+ * isClientFacingPhase (an admin actually sent it to this client). Anything failing a
+ * check is silently skipped and reported in `skipped`, never approved. Approval writes
+ * 'Hoàn tất', which drives editor payroll, so a partial batch must never guess.
+ */
+const MAX_BULK_APPROVE = 50
+
+export async function approveDeliverablesViaToken(
+    token: string,
+    taskIds: string[],
+): Promise<{ success: boolean; approved: number; skipped: number; error?: string }> {
+    const ids = [...new Set((taskIds || []).filter((t): t is string => typeof t === 'string' && !!t))]
+    if (ids.length === 0) return { success: false, approved: 0, skipped: 0, error: 'Please select at least one video.' }
+    if (ids.length > MAX_BULK_APPROVE) {
+        return { success: false, approved: 0, skipped: 0, error: `You can approve up to ${MAX_BULK_APPROVE} videos at a time.` }
+    }
+
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, approved: 0, skipped: 0, error: 'This link is invalid.' }
+
+    // Same where-clause as findScopedTask — token scope + not archived.
+    const tasks = await prisma.task.findMany({
+        where: {
+            id: { in: ids },
+            clientId: { in: scope.clientIds },
+            workspaceId: { in: scope.workspaceIds },
+            isArchived: false,
+        },
+        select: {
+            id: true, title: true, status: true, assigneeId: true, assignedById: true,
+            clientReview: true, workspaceId: true,
+        },
+    })
+
+    const eligible = tasks.filter(
+        (t) =>
+            t.status !== 'Hoàn tất' &&
+            t.clientReview !== 'APPROVED' &&
+            isClientFacingPhase(t.status, t.clientReview),
+    )
+    const skipped = ids.length - eligible.length
+    if (eligible.length === 0) {
+        return { success: false, approved: 0, skipped, error: 'None of those are awaiting your review.' }
+    }
+
+    // One transaction: a half-applied batch would leave the client unsure what they
+    // approved, and payroll reading a partial month.
+    await prisma.$transaction(
+        eligible.map((t) =>
+            prisma.task.update({
+                where: { id: t.id },
+                data: {
+                    status: 'Hoàn tất',
+                    deadline: null,
+                    clientReview: 'APPROVED',
+                    clientReviewedAt: new Date(),
+                    version: { increment: 1 },
+                },
+            }),
+        ),
+    )
+
+    // ONE notification for the batch — 20 separate bells for one client action is noise
+    // that gets muted, which is how a change request goes unnoticed in the first place.
+    const titles = eligible.map((t) => t.title).filter(Boolean)
+    const preview = titles.slice(0, 3).join(', ') + (titles.length > 3 ? `, +${titles.length - 3} nữa` : '')
+    const recipients = new Set<string>()
+    for (const t of eligible) {
+        if (t.assigneeId) recipients.add(t.assigneeId)
+        if (t.assignedById) recipients.add(t.assignedById)
+    }
+    const body = `Khách hàng "${scope.clientName}" đã duyệt ${eligible.length} video qua link chia sẻ: ${preview}. Các task được đánh dấu Hoàn tất.`
+    // Every editor/manager touched by the batch gets exactly ONE summary. notifyStaff
+    // fans out to a task's assignee+manager, so drive it once per unique recipient
+    // rather than once per task — 20 bells for one client click is noise people mute,
+    // and a muted bell is how the next change request goes unseen.
+    for (const uid of recipients) {
+        await notifyStaff(
+            { assigneeId: uid, assignedById: null, title: eligible[0].title },
+            eligible[0].id,
+            'Khách đã duyệt nhiều sản phẩm 🎉',
+            body,
+        )
+    }
+
+    for (const t of eligible) {
+        void audit({
+            workspaceId: t.workspaceId, actorUserId: null, action: 'task.client_approved',
+            targetType: 'Task', targetId: t.id,
+            before: { status: t.status },
+            after: { status: 'Hoàn tất', clientReview: 'APPROVED', viaShareLinkId: scope.shareLinkId, bulk: true },
+        })
+    }
+
+    const workspaces = new Set(eligible.map((t) => t.workspaceId).filter(Boolean) as string[])
+    for (const ws of workspaces) {
+        try {
+            revalidatePath(`/${ws}/admin`)
+            revalidatePath(`/${ws}/dashboard`)
+        } catch { /* best-effort */ }
+    }
+
+    return { success: true, approved: eligible.length, skipped }
 }
 
 /** Client requests changes via the public link → task 'Revision' + feedback. */

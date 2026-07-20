@@ -53,7 +53,16 @@ export interface GuestShareContent {
         showAllVersions: boolean
     }
     items: GuestAssetView[]
+    /**
+     * A REAL guest session ONLY. The player treats this as "already identified" and
+     * skips the name/email modal, so it must never be populated from a guessed name:
+     * the API authorizes on the session cookie, and a guessed name made the player
+     * skip the very modal that creates that cookie — every write then 401'd, with no
+     * way for the guest to recover. See ensureScreeningIdentity in share-portal-actions.
+     */
     guest: { name: string } | null
+    /** Display-only hint used to PRE-FILL the identity modal. Grants nothing. */
+    suggestedName: string | null
 }
 
 // ─────────────────────────── scope resolution ───────────────────────────
@@ -166,7 +175,10 @@ export async function assertVersionInShare(
 
 export async function buildGuestShareContent(
     share: ShareWithItems,
+    /** Name from a REAL guest session, or null. Never a guess — see GuestShareContent.guest. */
     guestName: string | null,
+    /** Optional pre-fill for the identity modal. Purely cosmetic. */
+    suggestedName: string | null = null,
 ): Promise<GuestShareContent> {
     const assets = await resolveShareAssets(share)
     const ttl = shareTokenTtlSec(share)
@@ -221,5 +233,6 @@ export async function buildGuestShareContent(
         },
         items,
         guest: guestName ? { name: guestName } : null,
+        suggestedName,
     }
 }

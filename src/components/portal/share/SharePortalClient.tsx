@@ -14,6 +14,7 @@ import { useMemo } from 'react'
 import DeskApp from '@/components/portal/desk/DeskApp'
 import {
     approveDeliverableViaToken,
+    approveDeliverablesViaToken,
     requestChangesViaToken,
     submitRatingViaToken,
     getActivityViaToken,
@@ -28,6 +29,7 @@ import {
     requestPortalNotifyEmail,
     verifyPortalNotifyEmail,
     removePortalNotifyEmail,
+    ensureScreeningIdentity,
 } from '@/actions/share-portal-actions'
 import { downloadDocumentsViaToken, getDocumentsViaToken } from '@/actions/share-document-actions'
 import type { Deliverable, Invoice, Workspace, DeliverableActions } from '@/components/portal/calm/types'
@@ -45,6 +47,7 @@ export default function SharePortalClient({ token, clientName, profileName, bran
 }) {
     const actions: DeliverableActions = useMemo(() => ({
         approve: (taskId) => approveDeliverableViaToken(token, taskId),
+        approveMany: (taskIds) => approveDeliverablesViaToken(token, taskIds),
         requestChanges: (taskId, notes) => requestChangesViaToken(token, taskId, notes),
         rate: (taskId, cq, rs, cm, fb) => submitRatingViaToken(token, taskId, cq, rs, cm, fb),
         activity: (taskId) => getActivityViaToken(token, taskId),
@@ -61,6 +64,30 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         notifyRemove: () => removePortalNotifyEmail(token),
         documents: () => getDocumentsViaToken(token),
         downloadDocuments: (versionIds) => downloadDocumentsViaToken(token, versionIds),
+        // The route re-resolves this token server-side and re-checks the invoice id
+        // against the SAME client/workspace scope as getShareSnapshot, so the URL is
+        // no more powerful than the ledger the client is already looking at.
+        // Carry the portal's verified identity into the screening room. The slug is the
+        // only thing that leaves this closure; the token stays here and is re-resolved
+        // server-side, which also re-checks the video belongs to this client.
+        prepareScreening: async (reviewUrl) => {
+            const slug = reviewUrl.split('/r/')[1]?.split(/[/?#]/)[0]
+            if (slug) await ensureScreeningIdentity(token, slug)
+        },
+        invoicePdfUrl: (invoiceId) =>
+            `/api/share/${encodeURIComponent(token)}/invoices/${encodeURIComponent(invoiceId)}/pdf`,
+        // [Client bulk download] One .zip for a whole folder — or the whole library when
+        // folderId is null. The route re-resolves this token and rebuilds the SAME snapshot
+        // the Library is showing, so it can only ever bundle files already on screen.
+        zipUrl: (folderId) =>
+            `/api/share/${encodeURIComponent(token)}/download-zip` +
+            (folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''),
+        zipUrlForAssets: (assetIds, folderIds) => {
+            const qs = new URLSearchParams()
+            if (assetIds.length) qs.set('assetIds', assetIds.join(','))
+            if (folderIds?.length) qs.set('folderIds', folderIds.join(','))
+            return `/api/share/${encodeURIComponent(token)}/download-zip?${qs.toString()}`
+        },
     }), [token])
 
     return (

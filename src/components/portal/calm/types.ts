@@ -63,9 +63,30 @@ export interface Invoice {
     status: string
     filePath: string | null
     clientId: number | null
-    items: { description: string; amount: number; quantity: number }[]
+    /**
+     * `amount` is the LINE TOTAL already (unitPrice × quantity — see InvoiceModal's
+     * `const amount = unitPrice * quantity`, and the admin subtotal which sums
+     * `amount` directly). Render it AS-IS: multiplying by `quantity` again inflates
+     * every line and makes them stop summing to `totalDue`.
+     */
+    items: { description: string; amount: number; quantity: number; unitPrice?: number }[]
     workspaceId: string | null
     workspaceName: string | null
+    /** [Statements 2026-07] Money breakdown. Optional — only the share portal selects these. */
+    subtotalAmount?: number
+    taxPercent?: number
+    taxAmount?: number
+    depositDeducted?: number
+    /** Client-facing payment details, whitelisted server-side out of billingSnapshot. */
+    bank?: {
+        agencyName: string | null
+        beneficiaryName: string | null
+        bankName: string | null
+        accountNumber: string | null
+        swiftCode: string | null
+        address: string | null
+        notes: string | null
+    } | null
 }
 
 /** A period the work was booked under — mirrors the admin's workspace switcher. */
@@ -236,6 +257,21 @@ export interface DeliverableActions {
     notifyRemove?: () => Promise<{ success: boolean; error?: string }>
     /** [The Desk] Token-scoped read of the client's own work requests + studio reply (Correspondence). */
     getRequests?: () => Promise<ClientRequestPortalDTO[] | null>
+    /**
+     * [Statements 2026-07] Build the href for an invoice PDF. Returns a URL rather
+     * than a Promise so the UI can render a plain <a download> (no blob juggling).
+     * Only the share portal supplies it — the token stays inside that closure, and
+     * the route re-authorizes the id against the token's scope server-side.
+     */
+    invoicePdfUrl?: (invoiceId: string) => string
+    /**
+     * [Onboarding 2026-07] Called just before the screening room opens. Mints a review
+     * guest session from the portal's already-verified notify email, so a client who
+     * confirmed their email once is never asked to identify themselves again. Awaited
+     * so the cookie exists before the iframe loads; failure is non-fatal (the player
+     * falls back to its own identity modal).
+     */
+    prepareScreening?: (reviewUrl: string) => Promise<void>
     /** Token-scoped client Document browser. Server re-checks client/workspace scope on every call. */
     documents?: () => Promise<DocumentsSnapshot | null>
     downloadDocuments?: (versionIds: string[]) => Promise<{
@@ -243,6 +279,31 @@ export interface DeliverableActions {
         error?: string
         files?: { versionId: string; fileName: string; url: string; expiresAt: string }[]
     }>
+    /**
+     * [Client bulk download 2026-07] URL of ONE streamed .zip — a whole folder, or the
+     * entire library when folderId is null. A URL rather than a Promise so the browser
+     * downloads it natively (progress bar, resumable, no blob in memory).
+     *
+     * WHY: a client asked to leave for Frame.io over exactly this — "we're not able to
+     * download every project as one … you have to click on the individual reel". The old
+     * multi-select fired one <a download> per file, which browsers throttle or block.
+     */
+    zipUrl?: (folderId: string | null) => string
+    /**
+     * [Client bulk download 2026-07] URL of ONE archive holding exactly the ticked
+     * files — the Frame.io behaviour: select many, press Download once, get one file.
+     * The old adapter (downloadDocuments) returned N presigned URLs and the UI fired
+     * one <a download> per file, which browsers throttle or block outright.
+     */
+    zipUrlForAssets?: (assetIds: string[], folderIds?: string[]) => string
+    /**
+     * [Batch approval 2026-07] Approve many deliverables at once. Clients who commission
+     * a month of reels in one go had to approve each video by hand — and the review
+     * room's Download only unlocks after approval, so 20 videos meant 20 round trips
+     * before they could take delivery. Server re-checks EVERY task against the same
+     * gates as the single approve; ineligible ones come back in `skipped`, never approved.
+     */
+    approveMany?: (taskIds: string[]) => Promise<{ success: boolean; approved: number; skipped: number; error?: string }>
 }
 
 /**

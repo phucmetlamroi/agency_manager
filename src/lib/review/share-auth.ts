@@ -221,6 +221,84 @@ export async function resolveShareClient(share: ShareLink): Promise<{ id: number
 }
 
 /**
+ * [Codex review 2026-07] EVERY client id this share could legitimately belong to —
+ * for AUTHORIZATION only. `resolveShareClient` above is a DISPLAY helper: it walks UP
+ * to the top-level ancestor so comments read "Jack" rather than the sub-brand "MotoHalo".
+ * Using that single top-level id as an access check rejects the rightful owner twice:
+ *
+ *   1. A token issued for the SUB-BRAND has clientIds = [MotoHalo, …descendants] — it
+ *      never contains the parent Jack, so comparing against Jack fails and MotoHalo's
+ *      own client is told to identify themselves again.
+ *   2. Multi-asset / folder shares carry taskId = null by design (shares.ts), so the
+ *      display helper returns null immediately and the same false rejection happens.
+ *
+ * Widening is safe here: these ids are only ever INTERSECTED with the caller's token
+ * scope. Returning more candidates can never grant access the token did not already
+ * carry — it only stops us denying an owner who is plainly in scope.
+ */
+export async function resolveShareOwnerClientIds(share: ShareLink): Promise<number[]> {
+    const out = new Set<number>()
+
+    const addChain = async (rootId: number | null) => {
+        let cur = rootId
+        let guard = 0
+        while (cur != null && guard++ < 10) {
+            if (out.has(cur)) break // already walked this chain
+            out.add(cur)
+            const c: { parentId: number | null } | null = await prisma.client.findUnique({
+                where: { id: cur },
+                select: { parentId: true },
+            })
+            cur = c?.parentId ?? null
+        }
+    }
+
+    // The task's OWN client (plus ancestors, so a root-level token still matches).
+    if (share.taskId) {
+        const task = await prisma.task.findUnique({
+            where: { id: share.taskId },
+            select: { clientId: true },
+        })
+        await addChain(task?.clientId ?? null)
+    }
+
+    // Task-less shares (multi-asset / folder): fall back to the items themselves.
+    // An item is EITHER an asset or a folder — cover both, or folder shares keep
+    // resolving to nothing and the client is asked to identify themselves again.
+    // NOTE: ReviewAsset.taskId is a bare scalar (no Prisma relation), and both
+    // clientId columns are denormalized STRINGS, so resolve them in stages.
+    const items = await prisma.shareLinkItem.findMany({
+        where: { shareLinkId: share.id },
+        select: { assetId: true, folderId: true },
+    })
+    const assetIds = items.map((i) => i.assetId).filter((v): v is string => !!v)
+    const folderIds = items.map((i) => i.folderId).filter((v): v is string => !!v)
+
+    const [assets, folders] = await Promise.all([
+        assetIds.length
+            ? prisma.reviewAsset.findMany({ where: { id: { in: assetIds } }, select: { clientId: true, taskId: true } })
+            : Promise.resolve([]),
+        folderIds.length
+            ? prisma.reviewFolder.findMany({ where: { id: { in: folderIds } }, select: { clientId: true } })
+            : Promise.resolve([]),
+    ])
+
+    const denormIds = [...assets.map((a) => a.clientId), ...folders.map((f) => f.clientId)]
+    for (const raw of denormIds) {
+        const n = Number(raw)
+        if (raw != null && raw !== '' && Number.isFinite(n)) await addChain(n)
+    }
+
+    const taskIds = assets.map((a) => a.taskId).filter((v): v is string => !!v)
+    if (taskIds.length) {
+        const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } }, select: { clientId: true } })
+        for (const t of tasks) await addChain(t.clientId ?? null)
+    }
+
+    return [...out]
+}
+
+/**
  * [P5, owner opt-in] For a share tied to a known client, provision a GuestSession
  * identified AS that client — so the agency's own clients never see the Name/Email modal
  * (only external share-link recipients do). The email is a synthetic, non-routable address

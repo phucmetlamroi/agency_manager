@@ -98,10 +98,15 @@ async function withClientNameLock<T>(
     workspaceId: string,
     fn: (tx: any) => Promise<T>,
 ): Promise<T> {
+    // Prisma's interactive default is 5s and db.ts sets none. deleteClient and restoreClient run
+    // a level-by-level tree walk INSIDE this lock — one round-trip per level — so a deep client
+    // hierarchy could blow the default and roll back, showing the admin nothing but the generic
+    // "could not" message on perfectly valid data. 20s is the same budget the bulk-approve
+    // transaction uses; maxWait covers contention with another CRM write holding the lock.
     return wp.$transaction(async (tx: any) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${String(profileId ?? workspaceId)}, 0))`
         return fn(tx)
-    })
+    }, { timeout: 20_000, maxWait: 10_000 })
 }
 
 
@@ -210,11 +215,20 @@ export async function createFeedback(_data: any, _workspaceId: string) {
 // --- SOFT-DELETE / TRASH / RESTORE ---
 
 /**
- * [Soft-delete] Collect a client's full descendant subtree (root + all
- * subsidiaries, bounded depth) so soft-delete / restore cascade the whole tree
- * the way the old hard-delete cascade did — but reversibly. Status is NOT
- * filtered here, so it works for soft-delete (children ACTIVE) AND restore
- * (children SOFT_DELETED). Uses the workspace-scoped client.
+ * [Soft-delete] Collect a client's full descendant subtree (root + all subsidiaries) so
+ * soft-delete / restore cascade the whole tree the way the old hard-delete cascade did — but
+ * reversibly. Uses the workspace-scoped client.
+ *
+ * `status` is OPTIONAL and each caller passes what it means:
+ *   deleteClient  -> 'ACTIVE'        (a trashed descendant is already trashed)
+ *   restoreClient -> 'SOFT_DELETED'  (an ACTIVE descendant is NOT ours to reactivate — and
+ *                                     including it made the collision check exclude the very
+ *                                     rows it existed to catch)
+ *   permanentlyDeleteClient -> omitted, every status, because it removes the lot.
+ *
+ * Depth is NOT capped. The old `guard < 8` stopped descending while the caller updated
+ * everything already collected, which partially trashed and partially restored deep trees.
+ * Termination comes from the visited set, so a corrupt parent cycle also ends.
  */
 async function collectClientSubtreeIds(wp: any, rootId: number, status?: 'ACTIVE' | 'SOFT_DELETED'): Promise<number[]> {
     const all = new Set<number>([rootId])

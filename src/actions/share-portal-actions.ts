@@ -1438,12 +1438,15 @@ export async function createSubClientViaToken(token: string, input: { name: stri
     const name = sanitizeClientText(input.name || '', TITLE_MAX_LEN)
     if (!name) return { success: false, error: 'Please enter a brand name.' }
 
-    // Parent must belong to the link's profile (defense-in-depth beyond scope).
+    // Parent must belong to the link's profile (defense-in-depth beyond scope). This read is a
+    // fast rejection only — it is NOT the authorization. `parentAt` is carried into the locked
+    // section below, which re-proves the parent has not moved or been trashed since.
     const parent = await prisma.client.findFirst({
         where: { id: input.parentId, profileId: scope.profileId, status: 'ACTIVE' },
-        select: { id: true },
+        select: { id: true, parentId: true },
     })
     if (!parent) return { success: false, error: 'Invalid parent brand.' }
+    const parentAt = parent.parentId
 
     const existing = await prisma.client.count({
         where: { parentId: input.parentId, status: 'ACTIVE' },
@@ -1484,6 +1487,35 @@ export async function createSubClientViaToken(token: string, input: { name: stri
         const outcome: { ok: true; row: { id: number; name: string } } | { ok: false; error: string } =
             await prisma.$transaction(async (tx) => {
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope.profileId}, 0))`
+
+                // [round 5 review] The parent's authorization and state are re-proved HERE, not
+                // just in the pre-flight read. Everything above ran unlocked, so an admin could
+                // detach or trash the parent in between and this write would still land:
+                //   • detach -> the parent becomes an independent root that this token no longer
+                //     owns on its next request, and we would have written into someone else's
+                //     hierarchy while reporting success;
+                //   • delete  -> an ACTIVE brand created under a SOFT_DELETED parent, invisible
+                //     in the active tree and outside any trashed subtree, so nothing surfaces or
+                //     cleans it up.
+                // Pinning parentId to the value read a moment ago catches BOTH without having to
+                // re-derive the whole token scope: any re-parenting changes it.
+                const freshParent = await tx.client.findFirst({
+                    where: { id: input.parentId, profileId: scope.profileId, status: 'ACTIVE', parentId: parentAt },
+                    select: { id: true },
+                })
+                if (!freshParent) {
+                    return { ok: false as const, error: 'That brand has just changed. Please reload and try again.' }
+                }
+
+                // Recounted inside the lock as well: two concurrent creates with DIFFERENT names
+                // both read 19 outside it and both committed, taking the parent to 21.
+                const liveCount = await tx.client.count({
+                    where: { parentId: input.parentId, status: 'ACTIVE' },
+                })
+                if (liveCount >= SUBCLIENT_CAP) {
+                    return { ok: false as const, error: 'You have reached the maximum number of sub-brands.' }
+                }
+
                 const norm = (s: string) => (s ?? '').normalize('NFC').trim().toLowerCase()
                 const siblings = await tx.client.findMany({
                     where: { parentId: input.parentId, status: 'ACTIVE' },

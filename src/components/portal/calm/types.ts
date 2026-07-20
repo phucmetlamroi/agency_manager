@@ -289,6 +289,21 @@ export interface DeliverableActions {
      * multi-select fired one <a download> per file, which browsers throttle or block.
      */
     zipUrl?: (folderId: string | null) => string
+    /**
+     * [Client bulk download 2026-07] URL of ONE archive holding exactly the ticked
+     * files — the Frame.io behaviour: select many, press Download once, get one file.
+     * The old adapter (downloadDocuments) returned N presigned URLs and the UI fired
+     * one <a download> per file, which browsers throttle or block outright.
+     */
+    zipUrlForAssets?: (assetIds: string[]) => string
+    /**
+     * [Batch approval 2026-07] Approve many deliverables at once. Clients who commission
+     * a month of reels in one go had to approve each video by hand — and the review
+     * room's Download only unlocks after approval, so 20 videos meant 20 round trips
+     * before they could take delivery. Server re-checks EVERY task against the same
+     * gates as the single approve; ineligible ones come back in `skipped`, never approved.
+     */
+    approveMany?: (taskIds: string[]) => Promise<{ success: boolean; approved: number; skipped: number; error?: string }>
 }
 
 /**

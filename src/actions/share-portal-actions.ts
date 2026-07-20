@@ -699,6 +699,122 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
     return { success: true }
 }
 
+/**
+ * [Batch approval 2026-07] Approve MANY deliverables in one action.
+ *
+ * WHY: clients who commission in batches (a month of reels at once) had to open and
+ * approve every single video by hand — and in the review room the Download button only
+ * unlocks after approval, so a 20-video month meant 20 round trips before they could
+ * take delivery. That, plus one-file-at-a-time downloads, is what a paying client meant
+ * by "really hard to navigate … we're getting behind".
+ *
+ * SAFETY: this is NOT a shortcut around the review gate. Every task goes through the
+ * SAME three checks as approveDeliverableViaToken — token scope (findScopedTask's
+ * where-clause, replicated here for one round trip), not-already-approved, and
+ * isClientFacingPhase (an admin actually sent it to this client). Anything failing a
+ * check is silently skipped and reported in `skipped`, never approved. Approval writes
+ * 'Hoàn tất', which drives editor payroll, so a partial batch must never guess.
+ */
+const MAX_BULK_APPROVE = 50
+
+export async function approveDeliverablesViaToken(
+    token: string,
+    taskIds: string[],
+): Promise<{ success: boolean; approved: number; skipped: number; error?: string }> {
+    const ids = [...new Set((taskIds || []).filter((t): t is string => typeof t === 'string' && !!t))]
+    if (ids.length === 0) return { success: false, approved: 0, skipped: 0, error: 'Please select at least one video.' }
+    if (ids.length > MAX_BULK_APPROVE) {
+        return { success: false, approved: 0, skipped: 0, error: `You can approve up to ${MAX_BULK_APPROVE} videos at a time.` }
+    }
+
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, approved: 0, skipped: 0, error: 'This link is invalid.' }
+
+    // Same where-clause as findScopedTask — token scope + not archived.
+    const tasks = await prisma.task.findMany({
+        where: {
+            id: { in: ids },
+            clientId: { in: scope.clientIds },
+            workspaceId: { in: scope.workspaceIds },
+            isArchived: false,
+        },
+        select: {
+            id: true, title: true, status: true, assigneeId: true, assignedById: true,
+            clientReview: true, workspaceId: true,
+        },
+    })
+
+    const eligible = tasks.filter(
+        (t) =>
+            t.status !== 'Hoàn tất' &&
+            t.clientReview !== 'APPROVED' &&
+            isClientFacingPhase(t.status, t.clientReview),
+    )
+    const skipped = ids.length - eligible.length
+    if (eligible.length === 0) {
+        return { success: false, approved: 0, skipped, error: 'None of those are awaiting your review.' }
+    }
+
+    // One transaction: a half-applied batch would leave the client unsure what they
+    // approved, and payroll reading a partial month.
+    await prisma.$transaction(
+        eligible.map((t) =>
+            prisma.task.update({
+                where: { id: t.id },
+                data: {
+                    status: 'Hoàn tất',
+                    deadline: null,
+                    clientReview: 'APPROVED',
+                    clientReviewedAt: new Date(),
+                    version: { increment: 1 },
+                },
+            }),
+        ),
+    )
+
+    // ONE notification for the batch — 20 separate bells for one client action is noise
+    // that gets muted, which is how a change request goes unnoticed in the first place.
+    const titles = eligible.map((t) => t.title).filter(Boolean)
+    const preview = titles.slice(0, 3).join(', ') + (titles.length > 3 ? `, +${titles.length - 3} nữa` : '')
+    const recipients = new Set<string>()
+    for (const t of eligible) {
+        if (t.assigneeId) recipients.add(t.assigneeId)
+        if (t.assignedById) recipients.add(t.assignedById)
+    }
+    const body = `Khách hàng "${scope.clientName}" đã duyệt ${eligible.length} video qua link chia sẻ: ${preview}. Các task được đánh dấu Hoàn tất.`
+    // Every editor/manager touched by the batch gets exactly ONE summary. notifyStaff
+    // fans out to a task's assignee+manager, so drive it once per unique recipient
+    // rather than once per task — 20 bells for one client click is noise people mute,
+    // and a muted bell is how the next change request goes unseen.
+    for (const uid of recipients) {
+        await notifyStaff(
+            { assigneeId: uid, assignedById: null, title: eligible[0].title },
+            eligible[0].id,
+            'Khách đã duyệt nhiều sản phẩm 🎉',
+            body,
+        )
+    }
+
+    for (const t of eligible) {
+        void audit({
+            workspaceId: t.workspaceId, actorUserId: null, action: 'task.client_approved',
+            targetType: 'Task', targetId: t.id,
+            before: { status: t.status },
+            after: { status: 'Hoàn tất', clientReview: 'APPROVED', viaShareLinkId: scope.shareLinkId, bulk: true },
+        })
+    }
+
+    const workspaces = new Set(eligible.map((t) => t.workspaceId).filter(Boolean) as string[])
+    for (const ws of workspaces) {
+        try {
+            revalidatePath(`/${ws}/admin`)
+            revalidatePath(`/${ws}/dashboard`)
+        } catch { /* best-effort */ }
+    }
+
+    return { success: true, approved: eligible.length, skipped }
+}
+
 /** Client requests changes via the public link → task 'Revision' + feedback. */
 export async function requestChangesViaToken(token: string, taskId: string, feedback: string) {
     const clean = sanitizeClientText(feedback || '', FEEDBACK_MAX_LEN)

@@ -96,7 +96,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     const snap = await getDocumentsViaToken(token)
     if (!snap) return NOT_FOUND()
 
-    const rootId = new URL(req.url).searchParams.get('folderId') || null
+    const sp = new URL(req.url).searchParams
+    const rootId = sp.get('folderId') || null
+    // Explicit tick-selection (Frame.io style): the client picked individual files.
+    // Ids are only ever INTERSECTED with the authorized snapshot below, never trusted.
+    const pickedIds = new Set(
+        (sp.get('assetIds') ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    )
     const byId = new Map(snap.folders.map((f) => [f.id, f]))
     if (rootId && !byId.has(rootId)) return NOT_FOUND() // unknown/out-of-scope folder → same bare 404
 
@@ -130,7 +136,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         return segs.join('/')
     }
 
-    const picked = snap.assets.filter((a) => inScope.has(a.folderId))
+    const picked = pickedIds.size
+        ? snap.assets.filter((a) => pickedIds.has(a.id))
+        : snap.assets.filter((a) => inScope.has(a.folderId))
     if (picked.length === 0) return new NextResponse('Nothing to download', { status: 409 })
 
     const wanted = picked.slice(0, MAX_ZIP_FILES)
@@ -157,7 +165,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     dedupe(entries)
 
     const archiveName = sanitizeSegment(
-        rootId ? byId.get(rootId)?.name || 'files' : scope.clientName || 'files',
+        pickedIds.size
+            ? `${scope.clientName || 'files'} (${entries.length} files)`
+            : rootId
+              ? byId.get(rootId)?.name || 'files'
+              : scope.clientName || 'files',
     ) + '.zip'
 
     void audit({

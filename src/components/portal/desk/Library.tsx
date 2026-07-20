@@ -45,14 +45,37 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
         return out
     }, [snap, folderId])
 
-    const toggle = (versionId: string) => {
-        setSel(prev => { const n = new Set(prev); n.has(versionId) ? n.delete(versionId) : n.add(versionId); return n })
+    // `sel` holds ASSET ids (what the client ticks). The legacy adapter wants version
+    // ids, so map only on that fallback path.
+    const toggle = (assetId: string) => {
+        setSel(prev => { const n = new Set(prev); n.has(assetId) ? n.delete(assetId) : n.add(assetId); return n })
+    }
+    const allShown = assets.length > 0 && assets.every(a => sel.has(a.id))
+    const toggleAll = () => {
+        setSel(prev => {
+            const n = new Set(prev)
+            if (allShown) assets.forEach(a => n.delete(a.id))
+            else assets.forEach(a => n.add(a.id))
+            return n
+        })
     }
 
     const download = async () => {
-        if (!actions.downloadDocuments || sel.size === 0 || downloading) return
+        if (sel.size === 0 || downloading) return
+        // Frame.io behaviour: ticking many and pressing Download once yields ONE file.
+        // The old path asked the server for N presigned URLs and fired N <a download>
+        // clicks — browsers throttle or silently block those past a handful, which is
+        // precisely what the client hit ("you have to click on the individual reel").
+        if (actions.zipUrlForAssets) {
+            window.location.href = actions.zipUrlForAssets(Array.from(sel))
+            toast('ok', `Preparing ${sel.size} file${sel.size === 1 ? '' : 's'}…`)
+            setSel(new Set())
+            return
+        }
+        if (!actions.downloadDocuments) return
         setDownloading(true)
-        const res = await actions.downloadDocuments(Array.from(sel))
+        const versionIds = assets.filter(a => sel.has(a.id)).map(a => a.currentVersion.id)
+        const res = await actions.downloadDocuments(versionIds)
         setDownloading(false)
         if (res.success && res.files) {
             for (const f of res.files) {
@@ -95,8 +118,8 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
                     href={actions.zipUrl(folderId)}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid var(--hairline-strong)', background: 'var(--paper-raised)', color: 'var(--ink)', borderRadius: 999, padding: '8px 16px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none', marginBottom: 20 }}
                 >
-                    <FileArchive size={14} />
-                    {folderId ? `Download this folder as one .zip` : `Download everything as one .zip`}
+                    <Download size={14} />
+                    {folderId ? 'Download this folder' : 'Download all'}
                 </a>
             )}
 
@@ -138,8 +161,8 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
                                         {actions.zipUrl && f.itemCount > 0 && (
                                             <a
                                                 href={actions.zipUrl(f.id)}
-                                                title={`Download "${f.name}" as one .zip`}
-                                                aria-label={`Download ${f.name} as one zip`}
+                                                title={`Download everything in "${f.name}"`}
+                                                aria-label={`Download everything in ${f.name}`}
                                                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: '50%', color: 'var(--ink-2)' }}
                                             >
                                                 <Download size={14} />
@@ -153,13 +176,18 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
 
                     {assets.length > 0 && (
                         <>
-                            <Kicker style={{ marginBottom: 10 }}>Files · {assets.length}</Kicker>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
+                                <Kicker>Files · {assets.length}</Kicker>
+                                <button onClick={toggleAll} className="desk-mono" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: '0.66rem', letterSpacing: '0.06em', padding: 0 }}>
+                                    {allShown ? 'CLEAR SELECTION' : 'SELECT ALL'}
+                                </button>
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
                                 {assets.map(a => {
-                                    const on = sel.has(a.currentVersion.id)
+                                    const on = sel.has(a.id)
                                     const Icon = a.mediaKind === 'video' ? FileVideo : a.mediaKind === 'image' ? FileImage : FileArchive
                                     return (
-                                        <div key={a.id} onClick={() => toggle(a.currentVersion.id)} style={{ border: '1px solid ' + (on ? 'var(--accent)' : 'var(--hairline)'), background: on ? 'var(--accent-tint)' : 'var(--paper-raised)', cursor: 'pointer', borderRadius: 4, overflow: 'hidden' }}>
+                                        <div key={a.id} onClick={() => toggle(a.id)} style={{ border: '1px solid ' + (on ? 'var(--accent)' : 'var(--hairline)'), background: on ? 'var(--accent-tint)' : 'var(--paper-raised)', cursor: 'pointer', borderRadius: 4, overflow: 'hidden' }}>
                                             <div style={{ position: 'relative', aspectRatio: '16/9', background: a.currentVersion.posterUrl ? '#09090b' : 'var(--paper-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 {a.currentVersion.posterUrl
                                                     ? <span style={{ position: 'absolute', inset: 0, backgroundImage: `url(${a.currentVersion.posterUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.82 }} />
@@ -191,7 +219,7 @@ export default function Library({ actions }: { actions: DeliverableActions }) {
                 <div style={{ position: 'fixed', left: '50%', bottom: 20, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 14, background: 'var(--ink)', color: 'var(--ink-invert)', borderRadius: 999, padding: '10px 10px 10px 22px', boxShadow: 'var(--shadow-modal)', zIndex: 40 }} className="desk-rise">
                     <span style={{ fontSize: '0.84rem', fontWeight: 500 }}>{sel.size} selected</span>
                     <button onClick={download} disabled={downloading} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--paper)', color: 'var(--ink)', border: 'none', borderRadius: 999, padding: '7px 16px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
-                        <Download size={13} /> {downloading ? 'Preparing…' : 'Download selected'}
+                        <Download size={13} /> {downloading ? 'Preparing…' : 'Download'}
                     </button>
                     <button onClick={() => setSel(new Set())} style={{ background: 'none', border: 'none', fontSize: '0.78rem', color: 'rgba(247,242,233,.6)', cursor: 'pointer', paddingRight: 8 }}>Clear</button>
                 </div>

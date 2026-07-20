@@ -14,6 +14,7 @@ import { useMemo } from 'react'
 import DeskApp from '@/components/portal/desk/DeskApp'
 import {
     approveDeliverableViaToken,
+    approveDeliverablesViaToken,
     requestChangesViaToken,
     submitRatingViaToken,
     getActivityViaToken,
@@ -46,6 +47,7 @@ export default function SharePortalClient({ token, clientName, profileName, bran
 }) {
     const actions: DeliverableActions = useMemo(() => ({
         approve: (taskId) => approveDeliverableViaToken(token, taskId),
+        approveMany: (taskIds) => approveDeliverablesViaToken(token, taskIds),
         requestChanges: (taskId, notes) => requestChangesViaToken(token, taskId, notes),
         rate: (taskId, cq, rs, cm, fb) => submitRatingViaToken(token, taskId, cq, rs, cm, fb),
         activity: (taskId) => getActivityViaToken(token, taskId),
@@ -80,6 +82,8 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         zipUrl: (folderId) =>
             `/api/share/${encodeURIComponent(token)}/download-zip` +
             (folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''),
+        zipUrlForAssets: (assetIds) =>
+            `/api/share/${encodeURIComponent(token)}/download-zip?assetIds=${encodeURIComponent(assetIds.join(','))}`,
     }), [token])
 
     return (

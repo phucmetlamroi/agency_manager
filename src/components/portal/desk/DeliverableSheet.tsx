@@ -101,7 +101,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                             </div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>
                                 {d.clientFeedback
-                                    ? 'The new cut appears here as soon as it clears our check.'
+                                    ? 'The new video appears here as soon as it clears our check.'
                                     : 'The screening link appears here once editing begins.'}
                             </div>
                         </div>
@@ -122,7 +122,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--hairline)'; e.currentTarget.style.background = 'var(--paper-raised)' }}>
                         <span style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', color: 'var(--accent)' }}>{done ? <FolderOpen size={21} /> : <Play size={21} style={{ marginLeft: 2 }} />}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="desk-serif" style={{ fontSize: '1.02rem', color: 'var(--ink)' }}>{done ? 'View delivered files' : 'Open the screening desk'}</div>
+                            <div className="desk-serif" style={{ fontSize: '1.02rem', color: 'var(--ink)' }}>{done ? 'View delivered files' : 'Open the screening room'}</div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>{done ? 'Final masters & exports' : 'Watch, comment and approve'}{d.duration ? <> · <span className="desk-mono">{d.duration}</span></> : null}</div>
                         </div>
                         <ExternalLink size={17} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
@@ -167,7 +167,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                 {/* Contextual action */}
                 {d.needsYou && mode === null && (
                     <div style={{ padding: 16, borderRadius: 8, background: 'var(--accent-tint)', border: '1px solid var(--accent-line)' }}>
-                        <p className="desk-serif" style={{ margin: '0 0 12px', fontSize: '1.02rem', color: 'var(--ink)' }}>This cut is ready for your review.</p>
+                        <p className="desk-serif" style={{ margin: '0 0 12px', fontSize: '1.02rem', color: 'var(--ink)' }}>This video is ready for your review.</p>
                         <div style={{ display: 'flex', gap: 10 }}>
                             <Button variant="primary" full disabled={busy} onClick={approve}><Check size={16} /> Approve</Button>
                             <Button variant="quiet" full disabled={busy} onClick={() => setMode('changes')}><RotateCcw size={15} /> Request changes</Button>

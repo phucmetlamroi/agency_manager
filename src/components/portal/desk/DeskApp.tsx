@@ -172,7 +172,7 @@ function DeskInner({
                     color: 'var(--ink-3)', cursor: 'pointer', fontFamily: 'var(--font-body)',
                 }}>
                     <Search size={14} style={{ flexShrink: 0 }} />
-                    <span className="desk-search__label desk-truncate" style={{ fontSize: '0.84rem' }}>Search productions, statements, requests…</span>
+                    <span className="desk-search__label desk-truncate" style={{ fontSize: '0.84rem' }}>Search videos, statements, requests…</span>
                     <span className="desk-mono desk-search__kbd" style={{ marginLeft: 'auto', fontSize: '0.6rem', border: '1px solid var(--hairline)', borderRadius: 2, padding: '1px 5px' }}>⌘K</span>
                 </button>
 
@@ -207,10 +207,10 @@ function DeskInner({
                     <Kicker style={{ padding: '0 12px', marginBottom: 6 }}>Your desk</Kicker>
                     <NavItem icon={Inbox} label="Action tray" active={surface === 'tray'} badge={trayCount || undefined} onClick={() => go('tray')} />
 
-                    <Kicker style={{ padding: '0 12px', margin: '16px 0 6px' }}>Productions</Kicker>
+                    <Kicker style={{ padding: '0 12px', margin: '16px 0 6px' }}>Videos</Kicker>
                     <NavItem
                         icon={LayoutGrid}
-                        label="All productions"
+                        label="All videos"
                         active={surface === 'productions' && scope === 'all'}
                         count={periodDels.length}
                         chevron={brands.length > 0 ? prodOpen : undefined}

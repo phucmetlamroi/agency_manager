@@ -54,14 +54,14 @@ export function toneColor(tone: DeskTone): string {
 export function statusSentence(clientStatus: string): string {
     switch (clientStatus) {
         case 'Awaiting your review':
-        case 'Ready for your review': return 'A cut is ready — watch and decide in the screening desk.'
+        case 'Ready for your review': return 'A video is ready — watch and decide in the screening room.'
         case 'Revising':
         case 'In revision': return 'We’re working through your requested changes.'
-        case 'In review': return 'Your reviewed cut is back with our team.'
+        case 'In review': return 'Your reviewed video is back with our team.'
         case 'Received': return 'We’ve received this and it’s queued to start.'
         case 'In production': return 'We’re lining this up to start editing.'
         case 'In progress': return 'Our team is editing this right now.'
-        case 'Revisions delivered': return 'Your changes are in — a fresh cut is on the way.'
+        case 'Revisions delivered': return 'Your changes are in — a fresh version is on the way.'
         case 'On hold': return 'This is paused for now.'
         case 'Completed': return 'Approved and delivered.'
         case 'Closed': return 'This project was closed.'

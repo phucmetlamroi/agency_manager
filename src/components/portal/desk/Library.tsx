@@ -498,7 +498,7 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
             )}
 
             {nothingAtAll ? (
-                <Empty icon={Folder} title="Nothing here yet" sub="Files appear the moment a cut is delivered — originals, not previews." />
+                <Empty icon={Folder} title="Nothing here yet" sub="Files appear the moment a video is delivered — originals, not previews." />
             ) : emptyHere ? (
                 searching
                     ? <Empty icon={Search} title={`No file matches “${q.trim()}”`} sub="Try a shorter word, or clear the period filter." />

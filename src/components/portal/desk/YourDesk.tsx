@@ -57,7 +57,7 @@ export default function YourDesk({
     const headline = trayEmpty
         ? 'You’re all caught up.'
         : needsYouCount > 0
-            ? `${needsYouCount} ${needsYouCount === 1 ? 'cut is' : 'cuts are'} waiting on you.`
+            ? `${needsYouCount} ${needsYouCount === 1 ? 'video is' : 'videos are'} waiting on you.`
             : 'A couple of things need a look.'
 
     return (
@@ -113,7 +113,7 @@ export default function YourDesk({
                                     <p className="desk-mono" style={{ fontSize: '0.64rem', letterSpacing: '0.08em', color: 'var(--ink-3)', margin: '5px 0 0', textTransform: 'uppercase' }}>
                                         {(d.client?.name || 'Production')}{d.deadline ? ` · ${rel.text || 'Target ' + fmtDate(d.deadline, false)}` : ''}
                                     </p>
-                                    <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>A new cut is ready for your review.</p>
+                                    <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>A new video is ready for your review.</p>
                                 </span>
                                 <Button variant="primary" size="sm" className="desk-tray-cta" onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title) : openDeliverable(d.id))} style={{ flex: 'none' }}>Watch &amp; decide</Button>
                             </div>
@@ -141,7 +141,7 @@ export default function YourDesk({
                 {trayEmpty && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 30, color: 'var(--ink-3)' }}>
                         <ShieldCheck size={15} style={{ color: 'var(--sage)' }} />
-                        <span style={{ fontSize: '0.84rem' }}>Every cut is decided — the tray clears itself as you act.</span>
+                        <span style={{ fontSize: '0.84rem' }}>Every video is decided — the tray clears itself as you act.</span>
                     </div>
                 )}
             </main>
@@ -266,7 +266,7 @@ function WelcomeCard() {
                 <button onClick={() => setOpen(false)} className="desk-iconbtn" style={{ marginLeft: 'auto', width: 24, height: 24 }} aria-label="Dismiss"><X size={12} /></button>
             </div>
             <div style={{ display: 'grid', gap: 9, fontSize: '0.8rem', color: 'var(--ink-2)' }}>
-                <Bullet on>Cuts open right here — watch and decide in the screening desk.</Bullet>
+                <Bullet on>Videos open right here — watch and decide in the screening room.</Bullet>
                 <Bullet>Notes pin to exact frames — the editor sees what you see.</Bullet>
                 <Bullet>Statements carry a matching payment reference.</Bullet>
             </div>

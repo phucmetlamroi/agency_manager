@@ -63,13 +63,13 @@ export default function Productions({
         return out
     }, [filtered, brands])
 
-    const scopeName = scope === 'all' ? 'All productions' : (brands.find(b => b.id === scope)?.name || 'Channel')
+    const scopeName = scope === 'all' ? 'All videos' : (brands.find(b => b.id === scope)?.name || 'Channel')
 
     return (
         <main style={{ padding: '26px 30px', minHeight: 'calc(100vh - 58px)' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 16 }}>
                 <h1 className="desk-display" style={{ fontSize: '1.6rem', margin: 0 }}>{scopeName}</h1>
-                <span className="desk-mono" style={{ fontSize: '0.7rem', color: 'var(--ink-3)' }}>{deliverables.length} {deliverables.length === 1 ? 'PRODUCTION' : 'PRODUCTIONS'} · {periodLabel.toUpperCase()}</span>
+                <span className="desk-mono" style={{ fontSize: '0.7rem', color: 'var(--ink-3)' }}>{deliverables.length} {deliverables.length === 1 ? 'VIDEO' : 'VIDEOS'} · {periodLabel.toUpperCase()}</span>
                 {scope !== 'all' && (
                     <button onClick={() => setScope('all')} className="desk-btn desk-btn--ghost desk-btn--sm" style={{ marginLeft: 'auto' }}>All channels</button>
                 )}
@@ -96,7 +96,7 @@ export default function Productions({
                 <>
                     <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, padding: '0 14px 8px' }} className="desk-mono desk-prod-grid">
                         <span className="desk-col-opt" style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--ink-3)' }}>№</span>
-                        <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--ink-3)' }}>PRODUCTION</span>
+                        <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--ink-3)' }}>VIDEO</span>
                         <span className="desk-col-opt" style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--ink-3)' }}>DEADLINE</span>
                         <span className="desk-col-opt" style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--ink-3)', textAlign: 'right' }}>PRICE</span>
                         <span style={{ fontSize: '0.6rem', letterSpacing: '0.1em', color: 'var(--ink-3)', textAlign: 'right' }}>STATUS</span>

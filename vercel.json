@@ -11,6 +11,12 @@
         },
         "src/app/api/review/uploads/**/*.ts": {
             "maxDuration": 60
+        },
+        "src/app/api/review/download-zip/route.ts": {
+            "maxDuration": 300
+        },
+        "src/app/api/share/[token]/download-zip/route.ts": {
+            "maxDuration": 300
         }
     },
     "crons": [

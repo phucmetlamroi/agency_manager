@@ -1472,17 +1472,39 @@ export async function createSubClientViaToken(token: string, input: { name: stri
         return { success: false, error: 'This brand is already nested as deeply as we allow. Ask the studio to add it for you.' }
     }
 
+    // [Authz 2026-07 round 4] THE DUPLICATE GUARD, and the same profile lock the CRM writers
+    // take. This path was missed entirely: it creates an ACTIVE Client and had no name check at
+    // all, so a client could type a brand name that already exists under their parent and get a
+    // second ACTIVE row at the same (profile, parent, name) position — no race required. Two
+    // rows on one name path collapse into ONE share scope in resolveShareToken, so either
+    // client's link then reads the other's tasks, invoices and files. Six locked CRM actions
+    // count for nothing while a public, unauthenticated-by-session endpoint writes past them.
     let client: { id: number; name: string }
     try {
-        client = await prisma.client.create({
-            data: {
-                name,
-                parentId: input.parentId,
-                profileId: scope.profileId,   // forced from scope, never client input
-                status: 'ACTIVE',
-            },
-            select: { id: true, name: true },
-        })
+        const outcome: { ok: true; row: { id: number; name: string } } | { ok: false; error: string } =
+            await prisma.$transaction(async (tx) => {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope.profileId}, 0))`
+                const norm = (s: string) => (s ?? '').normalize('NFC').trim().toLowerCase()
+                const siblings = await tx.client.findMany({
+                    where: { parentId: input.parentId, status: 'ACTIVE' },
+                    select: { name: true },
+                })
+                if (siblings.some((s) => norm(s.name) === norm(name))) {
+                    return { ok: false as const, error: `You already have a brand called "${name.trim()}".` }
+                }
+                const row = await tx.client.create({
+                    data: {
+                        name,
+                        parentId: input.parentId,
+                        profileId: scope.profileId,   // forced from scope, never client input
+                        status: 'ACTIVE',
+                    },
+                    select: { id: true, name: true },
+                })
+                return { ok: true as const, row }
+            })
+        if (!outcome.ok) return { success: false, error: outcome.error }
+        client = outcome.row
     } catch (err) {
         console.error('[createSubClientViaToken] create failed', err)
         return { success: false, error: 'Could not create the brand. Please try again.' }

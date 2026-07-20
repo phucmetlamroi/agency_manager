@@ -216,13 +216,17 @@ export async function createFeedback(_data: any, _workspaceId: string) {
  * filtered here, so it works for soft-delete (children ACTIVE) AND restore
  * (children SOFT_DELETED). Uses the workspace-scoped client.
  */
-async function collectClientSubtreeIds(wp: any, rootId: number): Promise<number[]> {
+async function collectClientSubtreeIds(wp: any, rootId: number, status?: 'ACTIVE' | 'SOFT_DELETED'): Promise<number[]> {
     const all = new Set<number>([rootId])
     let frontier: number[] = [rootId]
-    let guard = 0
-    while (frontier.length > 0 && guard < 8) {
+    // [round 4 review] The old `guard < 8` stopped DESCENDING at depth 8 while the caller went
+    // on to update every id it HAD collected — so a 9-deep tree was partially soft-deleted
+    // (leaving ACTIVE children under a trashed parent) and partially restored. Depth is bounded
+    // by the visited set now: every node is enqueued at most once, so the loop terminates on a
+    // cycle too, and a real hierarchy is never silently truncated.
+    while (frontier.length > 0) {
         const children: { id: number }[] = await wp.client.findMany({
-            where: { parentId: { in: frontier } },
+            where: { parentId: { in: frontier }, ...(status ? { status } : {}) },
             select: { id: true },
         })
         const next: number[] = []
@@ -230,7 +234,6 @@ async function collectClientSubtreeIds(wp: any, rootId: number): Promise<number[
             if (!all.has(c.id)) { all.add(c.id); next.push(c.id) }
         }
         frontier = next
-        guard++
     }
     return Array.from(all)
 }
@@ -250,7 +253,7 @@ export async function deleteClient(id: number, workspaceId: string) {
         // an unlocked soft-delete landing in that window leaves an ACTIVE child hanging under a
         // trashed parent — gone from the active tree, and not inside any deleted subtree either.
         const ids = await withClientNameLock(wp, profileId, workspaceId, async (tx) => {
-            const subtree = await collectClientSubtreeIds(tx, id)
+            const subtree = await collectClientSubtreeIds(tx, id, 'ACTIVE')
             await tx.client.updateMany({
                 where: { id: { in: subtree } },
                 data: { status: 'SOFT_DELETED', deletedAt: new Date() },
@@ -292,30 +295,47 @@ export async function restoreClient(id: number, workspaceId: string) {
         // link then reads the other's tasks, invoices and files. Every node is checked, and the
         // subtree is recollected INSIDE the lock so it cannot shift underneath the check.
         const restored: { success: boolean; error?: string; ids?: number[] } = await withClientNameLock(wp, profileId, workspaceId, async (tx) => {
-            const subtree = await collectClientSubtreeIds(tx, id)
+            // SOFT_DELETED only. The previous version walked the tree without a status filter, so
+            // an ACTIVE client already sitting at a name position INSIDE the tree was pulled into
+            // the subtree set — and then excluded from the collision check as "one of ours". The
+            // two rows it was supposed to catch were the two it silently allowed.
+            const subtree = await collectClientSubtreeIds(tx, id, 'SOFT_DELETED')
             const rows: { id: number; name: string; parentId: number | null }[] = await tx.client.findMany({
-                where: { id: { in: subtree } },
+                where: { id: { in: subtree }, status: 'SOFT_DELETED' },
                 select: { id: true, name: true, parentId: true },
             })
-            if (rows.length === 0) return { success: false, error: 'Không tìm thấy khách hàng.' }
-            const inSubtree = new Set(subtree)
-            const parents = Array.from(new Set(rows.map((r) => r.parentId)))
-            // One query for every ACTIVE client sitting at any destination level, then compare in
-            // memory — the collision can be with a row inside the subtree's own parent OR with a
-            // row created under a trashed node while the subtree was in the Trash.
-            const occupants: { id: number; name: string; parentId: number | null }[] = await tx.client.findMany({
-                where: { status: 'ACTIVE', parentId: { in: parents } },
-                select: { id: true, name: true, parentId: true },
-            })
+            if (rows.length === 0) return { success: false, error: 'Không tìm thấy khách hàng trong Thùng rác.' }
+
+            const parentIds = Array.from(new Set(rows.map((r) => r.parentId)))
+            const nonNullParents = parentIds.filter((v): v is number => v !== null)
+            // `in: [null, 10, 11]` is not a legal Prisma filter for a nullable Int — it is
+            // rejected at validation, which turned EVERY ordinary root restore into the generic
+            // "Không thể khôi phục" catch. Root level has to be its own OR branch.
+            const parentWhere = parentIds.includes(null)
+                ? { OR: [{ parentId: null }, ...(nonNullParents.length ? [{ parentId: { in: nonNullParents } }] : [])] }
+                : { parentId: { in: nonNullParents } }
+            const occupants: { id: number; name: string; parentId: number | null }[] = nonNullParents.length || parentIds.includes(null)
+                ? await tx.client.findMany({
+                    where: { status: 'ACTIVE', ...parentWhere },
+                    select: { id: true, name: true, parentId: true },
+                })
+                : []
+
             const norm = (s: string) => (s ?? '').normalize('NFC').trim().toLowerCase()
-            const taken = new Set(
-                occupants.filter((o) => !inSubtree.has(o.id)).map((o) => `${o.parentId ?? -1}\u0000${norm(o.name)}`),
-            )
+            const key = (parentId: number | null, name: string) => `${parentId ?? -1}\u0000${norm(name)}`
+            const taken = new Set(occupants.map((o) => key(o.parentId, o.name)))
             for (const r of rows) {
-                if (taken.has(`${r.parentId ?? -1}\u0000${norm(r.name)}`)) {
-                    return { success: false, error: `Không thể khôi phục: đã có khách hàng "${r.name.trim()}" ở cùng cấp. Đổi tên khách hàng đang hoạt động trước, rồi khôi phục lại.` }
+                const k = key(r.parentId, r.name)
+                // Against what is already live...
+                if (taken.has(k)) {
+                    return { success: false, error: `Không thể khôi phục: đã có khách hàng "${r.name.trim()}" đang hoạt động ở cùng cấp. Đổi tên nó trước, rồi khôi phục lại.` }
                 }
+                // ...AND against the rest of this restore. Two soft-deleted siblings can share a
+                // name (updateClient renames a trashed row without an ACTIVE-status check), and
+                // reactivating both in one updateMany would create the collision by itself.
+                taken.add(k)
             }
+
             await tx.client.updateMany({
                 where: { id: { in: subtree } },
                 data: { status: 'ACTIVE', deletedAt: null, hardDeleteAfter: null },

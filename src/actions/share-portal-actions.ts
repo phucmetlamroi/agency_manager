@@ -1447,10 +1447,6 @@ export async function createSubClientViaToken(token: string, input: { name: stri
     })
     if (!parent) return { success: false, error: 'Invalid parent brand.' }
 
-    const existing = await prisma.client.count({
-        where: { parentId: input.parentId, status: 'ACTIVE' },
-    })
-    if (existing >= SUBCLIENT_CAP) return { success: false, error: 'You have reached the maximum number of sub-brands.' }
 
     // [Authz 2026-07 round 6] EVERYTHING THAT DECIDES now happens under the lock, and the
     // authorization is re-derived from the canonical source rather than approximated.
@@ -1469,10 +1465,20 @@ export async function createSubClientViaToken(token: string, input: { name: stri
             await prisma.$transaction(async (tx) => {
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope.profileId}, 0))`
 
-                // Re-derived AFTER the lock, so it reflects every CRM write that has committed —
-                // they all take this same key, so none can be mid-flight. Covers ancestor detach,
-                // ancestor rename, branch merge, and a profile that has since been deactivated.
-                const fresh = await resolveShareToken(token)
+                // Re-derived AFTER the lock, on the TRANSACTION'S OWN connection. Two reasons:
+                //   • the global client would check out a second connection while this one holds
+                //     the first, and N concurrent creates can then all wait for a connection that
+                //     never frees — pool starvation, which Postgres cannot see as a deadlock;
+                //   • skipRateLimit, because this request was already charged for its first
+                //     resolution. Charging again could spend the final allowance and then deny
+                //     the request its own write while reporting "that brand has just changed".
+                //
+                // It covers ancestor detach, ancestor rename and branch merge, because every CRM
+                // writer takes this same lock key so none can be mid-flight. It does NOT cover
+                // profile deactivation — deleteProfileAction takes no such lock. That race leaves
+                // an inert row in a profile whose token no longer resolves at all, so nothing can
+                // read it; saying so here beats claiming a guarantee this does not give.
+                const fresh = await resolveShareToken(token, { db: tx, skipRateLimit: true })
                 if (!fresh || !fresh.clientIds.includes(input.parentId)) {
                     return { ok: false as const, error: 'That brand has just changed. Please reload and try again.' }
                 }

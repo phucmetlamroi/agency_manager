@@ -72,7 +72,27 @@ export async function getRequestIp(): Promise<string> {
  */
 export async function resolveShareToken(
     rawToken: string | undefined | null,
-    opts?: { recordAccess?: boolean },
+    opts?: {
+        recordAccess?: boolean
+        /**
+         * [round 7] Run every query on THIS client instead of the module-level `prisma`.
+         *
+         * Exists for exactly one caller: re-deriving scope INSIDE an interactive transaction
+         * that already holds the profile advisory lock. Using the global client there would
+         * check out a SECOND connection while the transaction holds the first — under load, N
+         * concurrent transactions can each hold a connection and then all wait for one that will
+         * never come free. That is client-side pool starvation, invisible to Postgres deadlock
+         * detection, and it resolves only when timeouts fire.
+         */
+        db?: Pick<typeof prisma, 'clientShareLink' | 'client' | 'workspace'>
+        /**
+         * Skip BOTH limiter tiers. Only legitimate when the same request already resolved this
+         * token once (and was charged for it): re-validating inside a transaction must not spend
+         * a second allowance, because burning the last one would deny the request its own write
+         * and report it as "that brand has just changed" — a lie.
+         */
+        skipRateLimit?: boolean
+    },
 ): Promise<ShareLinkScope | null> {
     if (!rawToken || !TOKEN_RX.test(rawToken)) return null
     const tokenHash = hashShareToken(rawToken)
@@ -98,13 +118,16 @@ export async function resolveShareToken(
     //           one NAT egress is not one shared bucket.
     //
     // Both fail OPEN: a limiter outage must never present every client with a dead link.
-    const ip = await getRequestIp()
-    if (ip !== 'unknown') {
-        const ipRl = await limitDb(`share-token-ip:${ip}`, 240, 60, { failClosed: false })
-        if (!ipRl.success) return null
+    const db = opts?.db ?? prisma
+    if (!opts?.skipRateLimit) {
+        const ip = await getRequestIp()
+        if (ip !== 'unknown') {
+            const ipRl = await limitDb(`share-token-ip:${ip}`, 240, 60, { failClosed: false })
+            if (!ipRl.success) return null
+        }
     }
 
-    const link = await prisma.clientShareLink.findUnique({
+    const link = await db.clientShareLink.findUnique({
         where: { tokenHash },
         select: {
             id: true,
@@ -138,8 +161,10 @@ export async function resolveShareToken(
     // set where a single abusive source trips ITSELF first (240/min is ~20-60 ordinary page
     // loads from one address), and this ceiling sits far above any honest usage, catching only a
     // genuinely distributed flood.
-    const rl = await limitDb(`share-token:${tokenHash}`, 2000, 60, { failClosed: false })
-    if (!rl.success) return null
+    if (!opts?.skipRateLimit) {
+        const rl = await limitDb(`share-token:${tokenHash}`, 2000, 60, { failClosed: false })
+        if (!rl.success) return null
+    }
 
     // ── Scope: the client's FULL history across the whole profile ──────────
     // [Canonical Clients 2026-06] The merge migration may not have run yet, so
@@ -156,7 +181,7 @@ export async function resolveShareToken(
     //   - keeps a different logical client out: link path "jacob" matches the
     //     root "Jacob" rows + "jacob/<sub>" sub-brands, but NOT "josh/jacob"
     //     (Josh's sub-brand) nor "acme".
-    const profileClients = await prisma.client.findMany({
+    const profileClients = await db.client.findMany({
         where: { profileId: link.profileId, status: 'ACTIVE' },
         select: { id: true, name: true, parentId: true },
     })
@@ -223,7 +248,7 @@ export async function resolveShareToken(
     // monthly workspaces — so the client sees their full history ("sổ workspace
     // đã làm trước đó"). clientId-scoping already confines tasks to this
     // profile, so this filter is a defensive belt, not the security boundary.
-    const workspaces = await prisma.workspace.findMany({
+    const workspaces = await db.workspace.findMany({
         where: { profileId: link.profileId },
         select: { id: true },
     })

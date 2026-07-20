@@ -24,14 +24,13 @@ import { audit } from '@/lib/audit-log'
  *   3. Every failure (bad token / unknown id / out of scope) returns the SAME
  *      bare 404, so probing ids or tokens leaks nothing.
  *
- * KNOWN FIDELITY GAP (pre-existing, shared with /api/invoices/[id]/download):
- * Invoice rows do not persist the presentation-only fields the issuing modal
- * supports — customTitle, clientAddress, dueDateLabel, paymentLink. A PDF
- * rebuilt from columns therefore uses the default title and omits those. Closing
- * it properly means persisting a presentation snapshot at issue time (schema
- * change), so BOTH regeneration routes stay equally faithful until then. Where a
- * real PDF file was uploaded we hand THAT over instead, so the document of
- * record wins whenever one exists.
+ * FIDELITY: the issuing modal lets staff override presentation-only fields
+ * (title, client address, due-date label, payment link, currency). Those are now
+ * frozen into Invoice.clientSnapshot at issue time, so a rebuilt PDF reproduces
+ * the document the client was actually sent. Invoices issued BEFORE that never
+ * recorded them and cannot — the reads below fall back to the derived values,
+ * which is exactly the old behaviour. Where a real PDF file was uploaded we hand
+ * THAT over instead, so the document of record wins whenever one exists.
  */
 
 export const dynamic = 'force-dynamic'
@@ -113,18 +112,31 @@ export async function GET(
     }
 
     const snap = (invoice.billingSnapshot ?? {}) as Record<string, any>
+    // Presentation overrides frozen at issue time. Null for invoices issued before
+    // that was added — those still fall back to the derived values below, which is
+    // the old behaviour.
+    const pres = (invoice.clientSnapshot ?? {}) as Record<string, any>
+    const str = (v: unknown): string | undefined =>
+        typeof v === 'string' && v.trim() ? v.trim() : undefined
 
     // The Handlebars template prints these strings verbatim — it adds no currency
-    // symbol of its own. Passing a bare `.toString()` (what the staff download
-    // route does) renders "1000" with no unit. billingSnapshot freezes the
-    // currency at issue time, so use it.
-    const cur = typeof snap.currency === 'string' && snap.currency.trim() ? snap.currency.trim() : '$'
-    const money = (v: { toString(): string }) => `${cur}${(Number(v.toString()) || 0).toFixed(2)}`
+    // symbol of its own. A bare `.toString()` renders "1000" with no unit.
+    const cur = str(pres.currency) || str(snap.currency) || '$'
+    // Format straight off the Prisma Decimal. Routing through Number() first rounds
+    // a stored 1.005 to "1.00" (IEEE-754) where Decimal.toFixed gives "1.01", and
+    // silently loses digits on large values. Decimal and number both expose toFixed,
+    // so this one signature covers both.
+    const money = (v: { toFixed(n: number): string }) => `${cur}${v.toFixed(2)}`
 
     const payload: InvoiceData = {
         invoiceNumber: invoice.invoiceNumber,
-        agencyName: snap.agencyName || scope.profileName || 'Agency',
-        clientName: invoice.client.name,
+        agencyName: str(pres.agencyName) || str(snap.agencyName) || scope.profileName || 'Agency',
+        customTitle: str(pres.customTitle),
+        clientAddress: str(pres.clientAddress) ?? '',
+        dueDateLabel: str(pres.dueDateLabel),
+        paymentLink: str(pres.paymentLink),
+        // Frozen at issue time — a later client rename must not re-label this invoice.
+        clientName: str(pres.clientName) || invoice.client.name,
         // en-GB to match /api/invoices/[id]/download — a bare toLocaleDateString()
         // renders US mm/dd/yyyy under the server locale. [L18b]
         issueDate: invoice.issueDate.toLocaleDateString('en-GB'),

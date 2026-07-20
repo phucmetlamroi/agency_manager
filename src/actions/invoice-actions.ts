@@ -325,6 +325,24 @@ export async function createInvoiceRecord(data: {
     taxAmount: number,
     totalDue: number,
     billingSnapshot: any,
+    /**
+     * [Invoice fidelity 2026-07] Presentation-only fields the issuing modal lets staff
+     * override (title, client address, due-date label, payment link, currency symbol).
+     * The Invoice table has no columns for them, so before this they lived only inside
+     * the one-shot PDF payload — any PDF rebuilt afterwards (the client's own download,
+     * or the staff re-download route) fell back to defaults and produced a document
+     * that did not match the invoice the client was actually sent.
+     */
+    presentationSnapshot?: {
+        agencyName?: string
+        /** Who was billed, frozen — clients can be renamed after the fact. */
+        clientName?: string
+        clientAddress?: string
+        customTitle?: string
+        dueDateLabel?: string
+        paymentLink?: string
+        currency?: string
+    },
     items: any[],
     taskIds: string[]
 }, workspaceId: string) {
@@ -395,6 +413,13 @@ export async function createInvoiceRecord(data: {
                     taxAmount: data.taxAmount,
                     totalDue: data.totalDue,
                     billingSnapshot: data.billingSnapshot,
+                    // [Invoice fidelity 2026-07] Freeze the presentation overrides so a PDF
+                    // rebuilt later reproduces the document the client was actually sent.
+                    // Reuses the pre-existing, previously-unwritten `clientSnapshot` Json
+                    // column — no schema change, no migration against production. Null on
+                    // invoices issued before this, and both PDF routes fall back to the old
+                    // derived values in that case.
+                    clientSnapshot: data.presentationSnapshot ?? undefined,
                     status: 'SENT', // Default to SENT for now
                     items: {
                         create: data.items.map((item: any) => ({

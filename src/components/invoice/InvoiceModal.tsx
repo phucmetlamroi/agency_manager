@@ -346,6 +346,27 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 clientDepositDeducted: depositDeducted,
                 totalDue: finalTotalDue,
                 billingSnapshot: profile,
+                // [Invoice fidelity 2026-07] Freeze the presentation-only fields that the
+                // Invoice table has no columns for. Without this they existed ONLY inside
+                // `pdfPayload` below — i.e. for the single render that produced the PDF we
+                // emailed — so any PDF rebuilt later (the client's own download, or the
+                // staff re-download route) silently fell back to defaults and shipped a
+                // document that did not match the one the client was actually sent.
+                // `agencyName`/`clientAddress` were being passed to createInvoiceRecord
+                // already, but it accepts neither and no column exists, so they were
+                // dropped without a word.
+                presentationSnapshot: {
+                    agencyName: customAgencyName,
+                    // Freeze WHO was billed. Clients can be renamed (crm-actions
+                    // updateClient), and without this a rebuilt PDF would re-label a
+                    // historical invoice with the client's current name.
+                    clientName,
+                    clientAddress: customClientAddress,
+                    customTitle,
+                    dueDateLabel,
+                    paymentLink,
+                    currency,
+                },
                 taskIds: selectedTaskIds
             }
 
@@ -364,10 +385,16 @@ export function InvoiceModal({ isOpen, onClose, clientId, clientName, clientAddr
                 issueDate: issueDate || new Date().toLocaleDateString(),
 
                 dueDate: dueDate || 'Upon receipt',
-                subtotal: activeSubtotal.toFixed(2),
-                taxAmount: activeTaxAmount.toFixed(2),
-                depositDeducted: totalDeducted > 0 ? totalDeducted.toFixed(2) : undefined,
-                totalDue: finalTotalDue.toFixed(2),
+                // [Invoice fidelity 2026-07] The template prints these verbatim and adds no
+                // currency symbol, so the totals block used to read a bare "1998" while the
+                // line items right above it read "$1,998.00". Prefix the symbol here, and
+                // drop the tax row entirely at 0 instead of emitting a pointless
+                // "Tax (0%) 0.00" — the regeneration routes do exactly the same, so the PDF
+                // a client is sent and the PDF either side re-downloads now match.
+                subtotal: `${currency}${activeSubtotal.toFixed(2)}`,
+                taxAmount: activeTaxAmount > 0 ? `${currency}${activeTaxAmount.toFixed(2)}` : undefined,
+                depositDeducted: totalDeducted > 0 ? `${currency}${totalDeducted.toFixed(2)}` : undefined,
+                totalDue: `${currency}${finalTotalDue.toFixed(2)}`,
                 items: activeItems.map(i => ({
                     description: i.description,
                     note: i.note,

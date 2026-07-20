@@ -399,19 +399,27 @@ export async function unmergeClient(clientId: number, workspaceId: string) {
         // into a SINGLE scope and either one's link reads the other's tasks, invoices and
         // files. "Bob > Michael" alongside a root "Michael" is legal (the unique index keys on
         // profile + parent + name), which makes detaching the way that pair gets created.
-        const target = await workspacePrisma.client.findUnique({
-            where: { id: clientId },
-            select: { name: true, parentId: true },
+        // Guard and write in ONE transaction behind a per-profile advisory lock. Checking then
+        // updating as two statements let two concurrent detaches — "A > Acme" and "B > Acme",
+        // no root Acme yet — each see no conflict and both land, producing exactly the pair of
+        // same-named ACTIVE roots that resolveShareToken then reads as a SINGLE client scope.
+        // The database index that would catch this lives in a MANUAL migration whose own header
+        // says it may not be applied, and postinstall runs `prisma db push`, which does not
+        // create it — so the lock is the real guarantee here, not a belt over a braces.
+        const result: { success: boolean; error?: string } = await workspacePrisma.$transaction(async (tx: any) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${String(profileId ?? workspaceId)}, 0))`
+            const target = await tx.client.findUnique({
+                where: { id: clientId },
+                select: { name: true, parentId: true },
+            })
+            if (!target) return { success: false, error: 'Không tìm thấy khách hàng.' }
+            if (target.parentId !== null && await findDuplicateName(tx, target.name, null, clientId)) {
+                return { success: false, error: `Không thể tách: đã có khách hàng "${target.name.trim()}" ở cấp gốc. Đổi tên một trong hai trước khi tách.` }
+            }
+            await tx.client.update({ where: { id: clientId }, data: { parentId: null } })
+            return { success: true }
         })
-        if (!target) return { success: false, error: 'Không tìm thấy khách hàng.' }
-        if (target.parentId !== null && await findDuplicateName(workspacePrisma, target.name, null, clientId)) {
-            return { success: false, error: `Không thể tách: đã có khách hàng "${target.name.trim()}" ở cấp gốc. Đổi tên một trong hai trước khi tách.` }
-        }
-
-        await workspacePrisma.client.update({
-            where: { id: clientId },
-            data: { parentId: null }
-        })
+        if (!result.success) return result
 
         revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }

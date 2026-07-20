@@ -45,10 +45,14 @@ const MAX_ZIP_FILES = 1000
 /** Bound on how many ids we will even PARSE out of the query string, before any
  *  intersection work. MAX_ZIP_FILES only bounds the result, not the input. */
 const MAX_IDS = 500
-/** Byte ceiling for ONE archive. STORE mode streams masters uncompressed, so the file count
- *  alone says nothing about the work: 40 4K masters is ~200 GB through a 300-second function.
- *  60 GB is generous for a real month of deliverables and still finishes inside the budget. */
-const MAX_ZIP_BYTES = 60 * 1024 * 1024 * 1024
+/** Byte ceiling for ONE archive. STORE mode streams masters uncompressed, so the file COUNT
+ *  says nothing about the work: 40 4K masters is ~200 GB through a 300-second function.
+ *  Sized against the clock, not against generosity — the stream is paced to the browser, so
+ *  even a sustained 100 MB/s moves only ~30 GB inside maxDuration, and a function killed
+ *  mid-stream hands the client a truncated zip with no receipt (the exact failure the receipt
+ *  exists to make visible). 20 GB leaves real headroom on an ordinary connection; bigger
+ *  libraries come down a folder at a time, and the receipt says so. */
+const MAX_ZIP_BYTES = 20 * 1024 * 1024 * 1024
 
 const NOT_FOUND = () => new NextResponse('Not found', { status: 404 })
 

@@ -39,12 +39,21 @@ export default function YourDesk({
     const approvePicked = async () => {
         if (!actions.approveMany || picked.size === 0 || approving) return
         setApproving(true)
-        const res = await actions.approveMany(Array.from(picked))
-        setApproving(false)
-        if (res.success) {
-            toast('ok', `Approved ${res.approved} video${res.approved === 1 ? '' : 's'}.${res.skipped ? ` ${res.skipped} skipped.` : ''}`)
-            setPicked(new Set())
-        } else toast('err', res.error || 'Could not approve those.')
+        // try/finally, because this server action CAN reject rather than resolve — a database
+        // transaction timeout on a large batch throws. Without it the rejection unwound the
+        // handler before setApproving(false) ran, leaving a permanently disabled "Approving…"
+        // button on a batch that approved nothing, and no message either way.
+        try {
+            const res = await actions.approveMany(Array.from(picked))
+            if (res.success) {
+                toast('ok', `Approved ${res.approved} video${res.approved === 1 ? '' : 's'}.${res.skipped ? ` ${res.skipped} skipped.` : ''}`)
+                setPicked(new Set())
+            } else toast('err', res.error || 'Could not approve those.')
+        } catch {
+            toast('err', 'That took too long and nothing was approved — none of your videos changed. Try again, or approve a few at a time.')
+        } finally {
+            setApproving(false)
+        }
     }
     const overdue = invoices.filter(i => mapInvoiceStatus(i.status) === 'Overdue')
     const delivered = deliverables.filter(d => d.clientStatus === 'Completed').length

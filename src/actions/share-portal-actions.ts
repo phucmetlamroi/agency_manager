@@ -528,13 +528,31 @@ function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
  * provider (universally a same-inbox alias); dots are stripped only for Gmail, which is the one
  * major provider that ignores them.
  */
+const PLUS_ALIAS_DOMAINS = new Set([
+    'gmail.com', 'googlemail.com',
+    'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+    'yahoo.com', 'ymail.com',
+    'icloud.com', 'me.com', 'mac.com',
+    'protonmail.com', 'proton.me', 'pm.me',
+    'fastmail.com', 'zoho.com', 'aol.com',
+])
+
 function notifyInboxKey(email: string): string {
     const at = email.lastIndexOf('@')
     if (at < 1) return email
     let local = email.slice(0, at)
     const domain = email.slice(at + 1)
-    const plus = local.indexOf('+')
-    if (plus > 0) local = local.slice(0, plus)
+    // [Review round 2] Only for providers that DEFINITELY treat +tag as an alias of one
+    // mailbox. Stripping it everywhere was wrong: a company running its own mail server can
+    // provision ops@ and ops+vip@ as two real, separate mailboxes, and collapsing them meant
+    // three code requests to the first told the second "Too many attempts for this email"
+    // before it had ever asked for one. Unknown domains keep their local part intact — the
+    // worst case there is a cap that is merely per-address, which is where it started.
+    if (PLUS_ALIAS_DOMAINS.has(domain)) {
+        const plus = local.indexOf('+')
+        if (plus > 0) local = local.slice(0, plus)
+    }
+    // Dots are ignored by Gmail only.
     if (domain === 'gmail.com' || domain === 'googlemail.com') local = local.replace(/\./g, '')
     return `${local}@${domain}`
 }
@@ -858,6 +876,23 @@ export async function approveDeliverablesViaToken(
     // status. updateMany with the same conditions makes the check and the write one atomic
     // step; a row that stopped qualifying reports count 0 and is counted as skipped instead
     // of clobbered. Interactive transaction so a mid-batch failure still rolls back whole.
+    //
+    // [Review round 2] The first version of this precondition was still incomplete, and one
+    // gap was serious. It pinned `status: { not: 'Hoàn tất' }` rather than the status actually
+    // READ, so a task seen at 'Đã gửi video (khách)' with clientReview null — the ordinary
+    // awaiting-client state — could be moved BACK to 'Đã nộp video (nội bộ)' by a re-upload
+    // (a documented A5→A2 transition) and this write would still stamp it 'Hoàn tất':
+    // approving an internal cut the client never saw, and creating payroll for it. It also
+    // omitted clientId/workspaceId, so a task reassigned to another client mid-request stayed
+    // writable by the old client's token. Every field the eligibility test relied on is now
+    // restated, including the tenancy scope.
+    //
+    // Still ONE STATEMENT PER TASK, deliberately: updateMany reports only a count, and both the
+    // honest approved/skipped figures and the per-recipient notifications need to know exactly
+    // WHICH ids landed. What changed is the budget. Prisma's interactive-transaction default is
+    // 5s and db.ts configures none, so 50 sequential round-trips to Neon could blow it and roll
+    // the WHOLE batch back, leaving the client staring at "Approving..." having approved
+    // nothing. 20s covers 50 round-trips several times over.
     const approvedIds = await prisma.$transaction(async (tx) => {
         const done: string[] = []
         for (const t of eligible) {
@@ -865,8 +900,13 @@ export async function approveDeliverablesViaToken(
                 where: {
                     id: t.id,
                     isArchived: false,
-                    status: { not: 'Hoàn tất' },
+                    // Pin the status that was READ, not merely "not completed" - see above.
+                    status: t.status,
                     clientReview: t.clientReview,
+                    // Tenancy, restated: a task reassigned to another client mid-request must
+                    // stop being writable by this token.
+                    clientId: { in: scope.clientIds },
+                    workspaceId: { in: scope.workspaceIds },
                 },
                 data: {
                     status: 'Hoàn tất',
@@ -879,7 +919,7 @@ export async function approveDeliverablesViaToken(
             if (res.count > 0) done.push(t.id)
         }
         return done
-    })
+    }, { timeout: 20_000, maxWait: 10_000 })
 
     const approvedSet = new Set(approvedIds)
     const applied = eligible.filter((t) => approvedSet.has(t.id))

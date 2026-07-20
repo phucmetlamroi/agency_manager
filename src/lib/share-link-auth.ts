@@ -77,28 +77,32 @@ export async function resolveShareToken(
     if (!rawToken || !TOKEN_RX.test(rawToken)) return null
     const tokenHash = hashShareToken(rawToken)
 
-    // [Authz 2026-07] Throttle keyed on the TOKEN, not the caller's IP.
+    // [Authz 2026-07, revised after review] TWO tiers, and the order matters.
     //
-    // This is the only throttle on ~15 portal server actions — getShareSnapshot,
-    // getDocumentsViaToken, approve/approveMany, requestChanges, the comment feed and the
-    // rest all rely on it — and it was broken three ways at once:
-    //   • the key was the LEFT-most x-forwarded-for token, which the caller picks, so
-    //     rotating one header opened a fresh bucket on every request and the limit never
-    //     fired (each request then runs the full ~8-query library build);
-    //   • the limiter was the in-memory Map, one bucket per lambda instance, so on Vercel
-    //     it barely applies even to an honest caller;
-    //   • when NO forwarding header exists (direct connection — the standalone/desktop
-    //     target this repo also builds for) every visitor of every agency collapsed into a
-    //     single `share-token:unknown` bucket of 30/min, and visitor 31 was shown "this
-    //     link is no longer valid".
+    // This is the only throttle on ~15 portal server actions, and the version it replaced was
+    // broken three ways: keyed on the LEFT-most x-forwarded-for (caller-chosen, so rotating one
+    // header opened a fresh bucket every request), backed by the in-memory Map (one bucket per
+    // lambda, so on Vercel it barely applied), and collapsing every visitor of every agency into
+    // a single `share-token:unknown` bucket whenever no forwarding header existed.
     //
-    // The token hash fixes all three: it is server-derived (unspoofable), stable per link
-    // (so one agency office behind one NAT egress is not one shared bucket), and DB-backed
-    // via limitDb, so the ceiling is real across instances. Enumeration is not what this
-    // defends — a 256-bit keyspace is that wall; this bounds hammering with a VALID token.
-    // Fail-OPEN: a limiter outage must not present every client with a dead link.
-    const rl = await limitDb(`share-token:${tokenHash}`, 120, 60, { failClosed: false })
-    if (!rl.success) return null
+    // Keying on the token hash fixed all three -- and introduced a new hole, caught in review:
+    // the bucket was charged BEFORE the link lookup, so any random 10-char string minted a
+    // permanent RateLimitBucket row. An unauthenticated caller could grow that table without
+    // limit, holding no token at all. So:
+    //
+    //   tier 1, per trusted IP, charged first -- bounds guessing at UNKNOWN tokens, and creates
+    //           no row keyed on attacker-controlled input. Skipped entirely when the platform
+    //           gives us no IP, because one shared 'unknown' bucket is the lockout bug above.
+    //   tier 2, per token hash, charged only AFTER the token proves real -- bounds hammering
+    //           with a VALID token, unspoofable, and stable per link so one agency office behind
+    //           one NAT egress is not one shared bucket.
+    //
+    // Both fail OPEN: a limiter outage must never present every client with a dead link.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`share-token-ip:${ip}`, 600, 60, { failClosed: false })
+        if (!ipRl.success) return null
+    }
 
     const link = await prisma.clientShareLink.findUnique({
         where: { tokenHash },
@@ -122,6 +126,13 @@ export async function resolveShareToken(
     // cũ không cần tạo lại"). SOFT_DELETED / trashed / missing still 404.
     if (!link.client || (link.client.status !== 'ACTIVE' && link.client.status !== 'MERGED')) return null
     if (!link.profile || link.profile.status !== 'ACTIVE') return null
+
+    // Tier 2, charged only now that the token is proven real — so a random string can never
+    // create a bucket row. Generous enough for a busy client: one page load costs ~3
+    // resolutions and each extra tab a few more, so 600/min is many tabs refreshing hard,
+    // while still bounding a valid-token flood long before the DB feels it.
+    const rl = await limitDb(`share-token:${tokenHash}`, 600, 60, { failClosed: false })
+    if (!rl.success) return null
 
     // ── Scope: the client's FULL history across the whole profile ──────────
     // [Canonical Clients 2026-06] The merge migration may not have run yet, so
@@ -165,12 +176,13 @@ export async function resolveShareToken(
                 // to end the path silently — which RE-ROOTED the descendant under its own name.
                 // "bob > … > acme" then read as ["acme"] and matched a root client literally
                 // named "Acme", pulling an unrelated customer's tasks, invoices and files into
-                // this token's scope. Record the break as an unforgeable segment instead. Real
-                // segments are `.trim().toLowerCase()`, so none can begin with a space — this
-                // marker is unspellable as a client name, and a truncated path can therefore
-                // only match ANOTHER descendant of the SAME missing ancestor, which is exactly
-                // the sibling relationship it really has.
-                names.push(` #${cur}`)
+                // this token's scope. Record the break as an unforgeable segment instead: a NUL,
+                // written as an explicit escape so it is visible in review and no raw control
+                // byte sits in the source. Postgres text cannot hold a NUL, so this marker is
+                // unspellable as a client name, and a truncated path can therefore only match
+                // ANOTHER descendant of the SAME missing ancestor — exactly the sibling
+                // relationship it really has.
+                names.push(`\u0000#${cur}`)
                 break
             }
             names.push((c.name ?? '').normalize('NFC').trim().toLowerCase())

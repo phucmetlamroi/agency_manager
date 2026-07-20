@@ -274,7 +274,12 @@ function DeskInner({
                         />
                     )}
                     {surface === 'files' && (
-                        <Library key={'files' + wsScope + scope} actions={actions} />
+                        // [A1] The remount `key` used to be the ONLY link between the masthead
+                        // period tabs and this surface — and since Library took no scope props,
+                        // it refetched the identical payload and rendered the identical grid.
+                        // A client switching to "T6" saw July's files and concluded work had
+                        // gone missing. Pass the scope; drop the pointless remount.
+                        <Library actions={actions} wsScope={wsScope} clientScope={scope} />
                     )}
                     {surface === 'statements' && (
                         <Statements

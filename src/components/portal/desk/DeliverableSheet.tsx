@@ -42,7 +42,15 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
     const [showActivity, setShowActivity] = useState(false)
 
     const brandName = d.client?.name || '—'
-    const rel = d.clientStatus === 'Completed' ? null : relDeadline(d.deadline)
+    /* [Tombstone] A cancelled production comes back to the portal as clientStatus 'Closed'
+       instead of vanishing retroactively. Every line below that describes work IN FLIGHT
+       has to be suppressed for it: cancelling deliberately keeps the old deadline on the
+       row, and this sheet's copy was written for live jobs. Unguarded, a closed job showed
+       an overdue date, "Your changes are being made", and "We're on it — you'll get a note
+       the moment this is ready", i.e. it told the client a cancelled video was being edited.
+       That is the same phantom-work failure the readmission was supposed to end. */
+    const closed = d.clientStatus === 'Closed'
+    const rel = d.clientStatus === 'Completed' || closed ? null : relDeadline(d.deadline)
     const done = d.clientStatus === 'Completed'
 
     useEffect(() => {
@@ -95,14 +103,19 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                             link is intentionally dark until an admin re-approves the new cut. Saying
                             "Not uploaded yet" there told the client their delivered revision had
                             vanished, which is exactly what they reported as work "going missing". */}
+                        {/* A closed job is checked FIRST: it can carry clientFeedback from before it
+                            was cancelled, which would otherwise promise a revision that will never
+                            arrive. */}
                         <div style={{ minWidth: 0 }}>
                             <div className="desk-serif" style={{ fontSize: '1rem', color: 'var(--ink)' }}>
-                                {d.clientFeedback ? 'Your changes are being made' : 'Not uploaded yet'}
+                                {closed ? 'This project was closed' : d.clientFeedback ? 'Your changes are being made' : 'Not uploaded yet'}
                             </div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>
-                                {d.clientFeedback
-                                    ? 'The new video appears here as soon as it clears our check.'
-                                    : 'The screening link appears here once editing begins.'}
+                                {closed
+                                    ? 'It is kept here for your records. Nothing further is in progress — message us if that looks wrong.'
+                                    : d.clientFeedback
+                                        ? 'The new video appears here as soon as it clears our check.'
+                                        : 'The screening link appears here once editing begins.'}
                             </div>
                         </div>
                     </div>
@@ -193,7 +206,9 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                         {d.productLink && <a href={safeHref(d.productLink)} target="_blank" rel="noopener noreferrer" className="desk-btn desk-btn--quiet" style={{ width: '100%' }}><Download size={15} /> Download files</a>}
                     </div>
                 )}
-                {!d.needsYou && !done && (
+                {/* needsYou is forced false for a closed job, so without the !closed guard this
+                    reassurance ("we're on it") is exactly what a cancelled production renders. */}
+                {!d.needsYou && !done && !closed && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 15px', borderRadius: 6, background: 'var(--paper-sunken)', border: '1px solid var(--hairline)' }}>
                         <Info size={16} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
                         <span style={{ fontSize: '0.88rem', color: 'var(--ink-2)' }}>We&apos;re on it — you&apos;ll get a note the moment this is ready for your review.</span>
@@ -208,14 +223,15 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px' }}>
                         <DetailItem label="Format" value={d.type} />
                         <DetailItem label="Runtime" value={d.duration || '—'} />
-                        <DetailItem label={done ? 'Delivered' : 'Target date'} value={fmtDate(done ? d.clientReviewedAt : d.deadline)} valueColor={rel && rel.urgent ? 'var(--brick)' : undefined} />
+                        {/* "Target date" on a closed job reads as a live commitment. */}
+                        <DetailItem label={closed ? 'Was due' : done ? 'Delivered' : 'Target date'} value={fmtDate(done ? d.clientReviewedAt : d.deadline)} valueColor={rel && rel.urgent ? 'var(--brick)' : undefined} />
                         <DetailItem label="Channel" value={brandName} />
                         {d.manager && <DetailItem label="Managed by" value={d.manager} />}
                     </div>
                 </div>
 
                 {/* Comments */}
-                <DeskComments taskId={d.id} actions={actions} />
+                <DeskComments taskId={d.id} actions={actions} closed={closed} />
 
                 {/* Activity */}
                 {activity.length > 0 && (
@@ -314,7 +330,7 @@ function Stars({ label, value, onChange }: { label: string; value: number; onCha
 
 /* ── Comments (CLIENT-visibility, token-scoped) ──────────────────────────── */
 type Feed = Awaited<ReturnType<NonNullable<DeliverableActions['getCommentFeed']>>>
-function DeskComments({ taskId, actions }: { taskId: string; actions: DeliverableActions }) {
+function DeskComments({ taskId, actions, closed }: { taskId: string; actions: DeliverableActions; closed?: boolean }) {
     const [feed, setFeed] = useState<Feed>([])
     const [body, setBody] = useState('')
     const [busy, setBusy] = useState(false)
@@ -342,8 +358,15 @@ function DeskComments({ taskId, actions }: { taskId: string; actions: Deliverabl
         <div>
             <p className="kicker" style={{ marginBottom: 12 }}>Messages</p>
             <div ref={scrollRef} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 12 }}>
+                {/* A closed job's feed always comes back empty — every read routes through
+                    findScopedTask, which refuses archived rows. "No messages yet" would then
+                    claim a conversation the client remembers having never happened. */}
                 {loaded && feed.length === 0 && (
-                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-3)' }}>No messages yet — say hello to the studio.</p>
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-3)' }}>
+                        {closed
+                            ? 'Messages on a closed project aren’t shown here. Ask us and we’ll dig them out.'
+                            : 'No messages yet — say hello to the studio.'}
+                    </p>
                 )}
                 {feed.map(item => item.kind === 'event' ? (
                     <div key={item.id} className="desk-mono" style={{ fontSize: '0.66rem', letterSpacing: '0.04em', color: 'var(--ink-3)', textAlign: 'center' }}>
@@ -367,12 +390,19 @@ function DeskComments({ taskId, actions }: { taskId: string; actions: Deliverabl
                     </div>
                 ))}
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                <textarea value={body} onChange={e => setBody(e.target.value)} rows={1} placeholder="Message the studio…" className="desk-input"
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-                    style={{ minHeight: 40, maxHeight: 120 }} />
-                <Button variant="primary" disabled={busy || !body.trim()} onClick={send} aria-label="Send"><Send size={15} /></Button>
-            </div>
+            {/* postComment routes through findScopedTask too, so on a closed job Send is a
+                button that silently does nothing. Say the thread is shut rather than let the
+                client type a message that quietly evaporates. */}
+            {closed ? (
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-3)' }}>This thread is closed. Reply to your last email and we&apos;ll pick it up there.</p>
+            ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <textarea value={body} onChange={e => setBody(e.target.value)} rows={1} placeholder="Message the studio…" className="desk-input"
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                        style={{ minHeight: 40, maxHeight: 120 }} />
+                    <Button variant="primary" disabled={busy || !body.trim()} onClick={send} aria-label="Send"><Send size={15} /></Button>
+                </div>
+            )}
         </div>
     )
 }

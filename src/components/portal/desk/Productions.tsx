@@ -111,7 +111,10 @@ export default function Productions({
                                 <span className="desk-mono" style={{ fontSize: '0.62rem', color: 'var(--ink-3)' }}>{g.rows.length}</span>
                             </div>
                             {g.rows.map((d, i) => {
-                                const rel = d.clientStatus === 'Completed' ? null : relDeadline(d.deadline)
+                                // 'Closed' = a cancelled production, readmitted as a tombstone. It keeps
+                                // its old deadline, so without this it renders a red "3 weeks overdue"
+                                // against work that is not being done at all.
+                                const rel = d.clientStatus === 'Completed' || d.clientStatus === 'Closed' ? null : relDeadline(d.deadline)
                                 const s = deskStatus(d.clientStatus)
                                 return (
                                     <div key={d.id} onClick={() => openDeliverable(d.id)} className="desk-prod-grid" style={{ display: 'grid', gridTemplateColumns: COLS, gap: 16, alignItems: 'center', padding: '11px 14px', borderTop: '1px solid var(--hairline-faint)', cursor: 'pointer', background: d.needsYou ? 'var(--accent-tint)' : 'transparent' }}

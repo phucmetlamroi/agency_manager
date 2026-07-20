@@ -382,7 +382,13 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
         )
     }
 
-    const nothingAtAll = !snap || (allFolders.length === 0 && allAssets.length === 0)
+    // Deliberately measured on the UNFILTERED snapshot. processingCount/inProgressCount are
+    // computed server-side across the whole token scope, so pairing them with a period- or
+    // brand-filtered emptiness attributes one month's work to another: pick June, which has
+    // nothing, and July's three in-progress videos are announced as June's. When the library
+    // has content and only this view is empty, the "Nothing in this period" branch below is
+    // the honest answer.
+    const nothingAtAll = !snap || ((snap.folders?.length ?? 0) === 0 && (snap.assets?.length ?? 0) === 0)
     const emptyHere = folders.length === 0 && shown.length === 0
     const filtered = wsScope !== 'all' || clientScope !== 'all'
 

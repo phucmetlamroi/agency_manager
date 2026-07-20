@@ -178,9 +178,18 @@ export function CommentsPanel({
      *
      * Purely client-side over comments already loaded: no new query, no new endpoint, and
      * it lands for STAFF and CLIENT at once, which is the parity the owner asked for. */
-    const openCount = parents.filter((c) => !c.completedAt).length
+    /* A thread is open if the note OR ANY REPLY under it is unresolved. Judging the parent
+     * alone loses the single most costly message in the system: the client replying "this is
+     * still wrong" under a note staff already ticked off. Replies are rendered only through
+     * their parent, and resolving does not lock the Reply button, so that reply would sit in
+     * the default Open view as literally nothing — staff sees "Open (0), every note here has
+     * been marked done" while new client feedback waits underneath a resolved note. That is
+     * "we're getting behind on changes", manufactured by the filter itself. */
+    const isOpenThread = (c: CommentDto) =>
+        !c.completedAt || (repliesByParent.get(c.id) ?? []).some((r) => !r.completedAt)
+    const openCount = parents.filter(isOpenThread).length
     const doneCount = parents.length - openCount
-    const shown = onlyOpen ? parents.filter((c) => !c.completedAt) : parents
+    const shown = onlyOpen ? parents.filter(isOpenThread) : parents
 
     return (
         <div className="flex h-full flex-col">

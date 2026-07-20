@@ -184,7 +184,12 @@ async function buildClientDocuments(
             workspaceId: { in: scope.workspaceIds },
             deletedAt: null,
             taskId: { in: visibleTaskIds },
-            currentVersionId: { not: null },
+            // Deliberately NOT filtered on `currentVersionId: { not: null }`. An asset whose head
+            // link never got written (initiateUpload succeeds, the follow-up update fails and is
+            // swallowed) is delivered work the client cannot see — exactly the "stuff is going
+            // missing" case. Excluding it here made processingCount blind to it, so the library
+            // fell back to a generic "Nothing to download yet", potentially forever. The filter
+            // below still drops it from `assets` exactly as before; now it is also counted.
         },
         select: {
             id: true,

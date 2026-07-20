@@ -42,6 +42,9 @@ import { audit } from '@/lib/audit-log'
 
 /** Mirrors MAX_ZIP_FILES on the staff route — a bulk download of thousands is a mistake. */
 const MAX_ZIP_FILES = 1000
+/** Bound on how many ids we will even PARSE out of the query string, before any
+ *  intersection work. MAX_ZIP_FILES only bounds the result, not the input. */
+const MAX_IDS = 500
 
 const NOT_FOUND = () => new NextResponse('Not found', { status: 404 })
 
@@ -97,16 +100,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     if (!snap) return NOT_FOUND()
 
     const sp = new URL(req.url).searchParams
+    /** Guard the PARSED id lists too — MAX_ZIP_FILES only bounds the result. */
+    const idList = (key: string) =>
+        (sp.get(key) ?? '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, MAX_IDS)
+
     const rootId = sp.get('folderId') || null
-    // Explicit tick-selection (Frame.io style): the client picked individual files.
+    // Explicit tick-selection: the client picked individual files and/or whole folders.
     // Ids are only ever INTERSECTED with the authorized snapshot below, never trusted.
-    const pickedIds = new Set(
-        (sp.get('assetIds') ?? '').split(',').map((s) => s.trim()).filter(Boolean),
-    )
+    const pickedIds = new Set(idList('assetIds'))
+    const pickedFolderIds = idList('folderIds')
+
     const byId = new Map(snap.folders.map((f) => [f.id, f]))
     if (rootId && !byId.has(rootId)) return NOT_FOUND() // unknown/out-of-scope folder → same bare 404
 
-    // Collect the selected folder and every descendant (null root = the whole library).
     const childrenOf = new Map<string | null, string[]>()
     for (const f of snap.folders) {
         const list = childrenOf.get(f.parentId) ?? []
@@ -119,8 +125,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         inScope.add(id)
         for (const child of childrenOf.get(id) ?? []) walk(child)
     }
-    if (rootId) walk(rootId)
-    else for (const f of snap.folders) inScope.add(f.id)
+
+    // THREE EXPLICIT BRANCHES, never a fallthrough.
+    //
+    // The obvious way to add folderIds — union it into the existing `if (rootId) walk()
+    // else everything` — is a trap: with no `folderId` in the query the else-branch adds
+    // EVERY folder, so a client ticking three files would silently download the entire
+    // multi-GB library. Whole-library must be something the caller asks for by supplying
+    // nothing at all, not something they fall into by supplying the wrong thing.
+    const hasSelection = pickedIds.size > 0 || pickedFolderIds.length > 0
+    if (rootId) {
+        walk(rootId)
+    } else if (hasSelection) {
+        // Only VALIDATED roots. An unknown folder id is ignored rather than walked —
+        // walk() would happily seed inScope with an id that is not in the snapshot.
+        for (const id of pickedFolderIds) if (byId.has(id)) walk(id)
+    } else {
+        for (const f of snap.folders) inScope.add(f.id)
+    }
 
     // Relative zip path of a folder, measured from the selected root (root itself = '').
     const relPathOf = (folderId: string): string => {
@@ -136,8 +158,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         return segs.join('/')
     }
 
-    const picked = pickedIds.size
-        ? snap.assets.filter((a) => pickedIds.has(a.id))
+    // Mixed selection: ticked files PLUS everything inside ticked folders.
+    const picked = hasSelection && !rootId
+        ? snap.assets.filter((a) => pickedIds.has(a.id) || inScope.has(a.folderId))
         : snap.assets.filter((a) => inScope.has(a.folderId))
     if (picked.length === 0) return new NextResponse('Nothing to download', { status: 409 })
 
@@ -195,18 +218,62 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     // hold many open connections and archiver's backpressure paces us to the client's speed
     // (bounded memory even for a multi-GB production).
     const pump = async () => {
+        const included: string[] = []
+        const failed: string[] = []
         for (const entry of entries) {
             let body: Readable
             try {
                 body = await getObjectStream(entry.r2Key)
             } catch (err) {
+                // Do NOT swallow this. Silently dropping a file is how "a lot of stuff is
+                // kind of going missing" happens — the client gets a smaller archive and no
+                // reason. It is recorded and reported inside the archive instead.
                 reviewLog('warn', 'client_zip.skip_missing', { key: entry.r2Key, error: String(err) })
+                failed.push(entry.zipPath)
                 continue
             }
             const entryDone = new Promise<void>((resolve) => archive.once('entry', () => resolve()))
             archive.append(body, { name: entry.zipPath })
             await entryDone
+            included.push(entry.zipPath)
         }
+
+        // The receipt, written LAST and built from what ACTUALLY got packed.
+        //
+        // Two reasons it is last, and both matter. First, a manifest computed up-front
+        // certifies the plan, not the delivery — it would list files the loop above had
+        // just skipped, which turns "stuff went missing" into "stuff went missing and we
+        // handed them a receipt saying it shipped". Second, this response is chunked with
+        // no Content-Length, so a truncated stream arrives at the browser as a COMPLETED
+        // download of a corrupt archive; a receipt at the end is the one cheap way for
+        // anyone to tell a whole zip from a cut-off one.
+        //
+        // Plain text, not CSV: every name here is free text (file names, folder names),
+        // and a value starting with = + - or @ executes as a formula when a CSV is opened
+        // in Excel or Sheets.
+        const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+        const lines = [
+            `Downloaded from ${scope.clientName || 'your library'} — ${stamp}`,
+            '',
+            `FILES IN THIS ARCHIVE (${included.length})`,
+            ...included.map((p) => `  ${p}`),
+        ]
+        if (failed.length) {
+            lines.push(
+                '',
+                `COULD NOT BE INCLUDED (${failed.length})`,
+                '  These were listed for download but could not be read from storage.',
+                '  Nothing has been lost — please tell the studio and they will re-send them.',
+                ...failed.map((p) => `  ${p}`),
+            )
+        }
+        if (skipped > 0) {
+            lines.push('', `NOT REQUESTED (${skipped})`, `  This download was capped at ${MAX_ZIP_FILES} files. Download the remaining files separately, or a folder at a time.`)
+        }
+        const receiptDone = new Promise<void>((resolve) => archive.once('entry', () => resolve()))
+        archive.append(Buffer.from(lines.join('\r\n'), 'utf8'), { name: '_contents.txt' })
+        await receiptDone
+
         await archive.finalize()
     }
     pump().catch((err: unknown) => {

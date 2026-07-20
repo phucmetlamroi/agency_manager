@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/db'
-import { rateLimit } from '@/lib/rate-limit'
+import { limitDb } from '@/lib/review/rate-limit-db'
 import { audit } from '@/lib/audit-log'
 import { clientLabelOf, isClientDeliveredPhase } from '@/lib/portal-derive'
 import { buildMediaLinks } from '@/lib/review/media-links'
@@ -431,9 +431,13 @@ export async function downloadDocumentsViaToken(
         return { success: false, error: `You can download up to ${MAX_DOWNLOAD_BATCH} files at a time.` }
     }
 
-    const ip = await getRequestIp()
-    const rl = await rateLimit(`portal-doc-download:${built.scope.shareLinkId}:${ip}`, 60, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many downloads. Please try again later.' }
+    // [Parity review 2026-07] Was rateLimit(), a per-process in-memory Map: on serverless
+    // every cold instance starts at zero, so in aggregate it capped nothing — and its key
+    // mixed in an IP read from client-supplied X-Forwarded-For. The zip route next door
+    // already rejected that design for exactly these bytes; same door, same lock now:
+    // DB-backed, keyed on the share link, unspoofable.
+    const rl = await limitDb(`portal-doc-download:${built.scope.shareLinkId}`, 60, 60 * 60, { failClosed: true })
+    if (!rl.success) return { success: false, error: 'Too many downloads. Please try again in a little while.' }
 
     const allowed = cleaned
         .map((id) => built.downloadable.get(id))

@@ -82,8 +82,12 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         zipUrl: (folderId) =>
             `/api/share/${encodeURIComponent(token)}/download-zip` +
             (folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''),
-        zipUrlForAssets: (assetIds) =>
-            `/api/share/${encodeURIComponent(token)}/download-zip?assetIds=${encodeURIComponent(assetIds.join(','))}`,
+        zipUrlForAssets: (assetIds, folderIds) => {
+            const qs = new URLSearchParams()
+            if (assetIds.length) qs.set('assetIds', assetIds.join(','))
+            if (folderIds?.length) qs.set('folderIds', folderIds.join(','))
+            return `/api/share/${encodeURIComponent(token)}/download-zip?${qs.toString()}`
+        },
     }), [token])
 
     return (

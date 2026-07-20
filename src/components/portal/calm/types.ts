@@ -295,7 +295,7 @@ export interface DeliverableActions {
      * The old adapter (downloadDocuments) returned N presigned URLs and the UI fired
      * one <a download> per file, which browsers throttle or block outright.
      */
-    zipUrlForAssets?: (assetIds: string[]) => string
+    zipUrlForAssets?: (assetIds: string[], folderIds?: string[]) => string
     /**
      * [Batch approval 2026-07] Approve many deliverables at once. Clients who commission
      * a month of reels in one go had to approve each video by hand — and the review

@@ -143,6 +143,10 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
     const [failed, setFailed] = useState(false)          // C9 — a real error state
     const [folderId, setFolderId] = useState<string | null>(null)
     const [sel, setSel] = useState<Set<string>>(new Set())
+    /** Ticked FOLDERS. Staff can select folders and files together, so a client can too —
+     *  the zip route expands each selected folder's whole subtree server-side, which also
+     *  keeps a hundred-file folder out of the URL. */
+    const [selFolders, setSelFolders] = useState<Set<string>>(new Set())
     const [anchor, setAnchor] = useState<string | null>(null)   // shift-click range origin
     const [downloading, setDownloading] = useState(false)
     const [q, setQ] = useState('')
@@ -281,7 +285,7 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
         const onKey = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null
             const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
-            if (e.key === 'Escape' && !typing) { setSel(new Set()); setDetail(null); return }
+            if (e.key === 'Escape' && !typing) { clearAll(); setDetail(null); return }
             if (typing) return
             if (e.key === '/') { e.preventDefault(); searchRef.current?.focus(); return }
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
@@ -296,14 +300,17 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
     }, [orderedIds])
 
     /* ── download ─────────────────────────────────────────────────────────── */
+    const picked = sel.size + selFolders.size
+    const clearAll = () => { setSel(new Set()); setSelFolders(new Set()) }
     const download = async () => {
-        if (sel.size === 0 || downloading) return
+        if (picked === 0 || downloading) return
         if (actions.zipUrlForAssets) {
-            window.location.href = actions.zipUrlForAssets(Array.from(sel))
-            toast('ok', `Preparing ${sel.size} file${sel.size === 1 ? '' : 's'}…`)
-            setSel(new Set())
+            window.location.href = actions.zipUrlForAssets(Array.from(sel), Array.from(selFolders))
+            toast('ok', `Preparing your download…`)
+            clearAll()
             return
         }
+        if (selFolders.size) { toast('err', 'Open a folder to download its files.'); return }
         if (!actions.downloadDocuments) return
         setDownloading(true)
         const versionIds = allAssets.filter(a => sel.has(a.id)).map(a => a.currentVersion.id)
@@ -332,9 +339,12 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
         { label: 'Details', icon: Info, onClick: () => setDetail(a) },
         { label: sel.has(a.id) ? 'Deselect' : 'Select', icon: Check, onClick: () => toggle(a.id) },
     ]
+    const toggleFolder = (id: string) =>
+        setSelFolders(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
     const folderMenu = (f: DocumentFolder): MenuItem[] => [
         { label: 'Open', icon: Folder, onClick: () => setFolderId(f.id) },
         ...(actions.zipUrl ? [{ label: 'Download this folder', icon: Download, onClick: () => { window.location.href = actions.zipUrl!(f.id) } }] : []),
+        { label: selFolders.has(f.id) ? 'Deselect' : 'Select', icon: Check, onClick: () => toggleFolder(f.id) },
     ]
     const canvasMenu = (): MenuItem[] => [
         { label: 'Select all', icon: Check, onClick: () => setSel(new Set(orderedIds.slice(0, SEL_CAP))) },
@@ -506,7 +516,7 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                                     const Glyph = f.kind === 'client' ? Building2 : Folder
                                     return (
                                         <div key={f.id} style={{ position: 'relative' }} onContextMenu={e => openMenu(e, folderMenu(f))}>
-                                            <button onClick={() => setFolderId(f.id)} style={{ width: '100%', border: '1px solid var(--hairline)', background: 'var(--paper-raised)', padding: '16px 18px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer', textAlign: 'left', borderRadius: 4 }}>
+                                            <button onClick={() => setFolderId(f.id)} style={{ width: '100%', border: '1px solid ' + (selFolders.has(f.id) ? 'var(--accent)' : 'var(--hairline)'), background: selFolders.has(f.id) ? 'var(--accent-tint)' : 'var(--paper-raised)', padding: '16px 18px 16px 44px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer', textAlign: 'left', borderRadius: 4 }}>
                                                 <Glyph size={20} style={{ color: 'var(--ink-2)', flexShrink: 0 }} />
                                                 <span style={{ minWidth: 0, flex: 1 }}>
                                                     <p className="desk-truncate" style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem' }}>{f.name}</p>
@@ -514,6 +524,11 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                                                 </span>
                                                 <ChevronRight size={14} style={{ color: 'var(--ink-3)', flexShrink: 0, marginRight: 26 }} />
                                             </button>
+                                            {/* Sibling, not nested — a <button> inside a <button> is invalid
+                                                HTML and the inner one stops receiving clicks. */}
+                                            <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', display: 'flex' }}>
+                                                <Tick on={selFolders.has(f.id)} onClick={() => toggleFolder(f.id)} title={selFolders.has(f.id) ? 'Deselect' : 'Select'} />
+                                            </span>
                                             {actions.zipUrl && f.itemCount > 0 && (
                                                 <a
                                                     href={actions.zipUrl(f.id)}
@@ -584,15 +599,16 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                 </>
             )}
 
-            {sel.size > 0 && (
+            {picked > 0 && (
                 <div style={{ position: 'fixed', left: '50%', bottom: 92, transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 14, background: 'var(--ink)', color: 'var(--ink-invert)', borderRadius: 999, padding: '10px 10px 10px 22px', boxShadow: 'var(--shadow-modal)', zIndex: 40 }} className="desk-rise">
                     <span style={{ fontSize: '0.84rem', fontWeight: 500 }}>
-                        {sel.size} selected{sel.size >= SEL_CAP ? ` · ${SEL_CAP}-file limit` : ''}
+                        {[sel.size ? `${sel.size} file${sel.size === 1 ? '' : 's'}` : '', selFolders.size ? `${selFolders.size} folder${selFolders.size === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')} selected
+                        {sel.size >= SEL_CAP ? ` · ${SEL_CAP}-file limit` : ''}
                     </span>
                     <Button variant="secondary" size="sm" onClick={download} disabled={downloading}>
                         <Download size={13} style={{ marginRight: 6 }} /> {downloading ? 'Preparing…' : 'Download'}
                     </Button>
-                    <button onClick={() => setSel(new Set())} style={{ background: 'none', border: 'none', fontSize: '0.78rem', color: 'rgba(247,242,233,.6)', cursor: 'pointer', paddingRight: 8 }}>Clear</button>
+                    <button onClick={clearAll} style={{ background: 'none', border: 'none', fontSize: '0.78rem', color: 'rgba(247,242,233,.6)', cursor: 'pointer', paddingRight: 8 }}>Clear</button>
                 </div>
             )}
 

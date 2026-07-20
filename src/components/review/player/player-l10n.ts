@@ -32,6 +32,9 @@ const vi = {
         nextImage: 'Ảnh sau',
         // panel
         emptyNoComments: 'Chưa có bình luận cho phiên bản này.',
+        filterOpen: (n: number) => `Chưa xử lý (${n})`,
+        filterAll: (n: number) => `Tất cả (${n})`,
+        emptyNoOpen: 'Mọi góp ý đã được xử lý.',
         emptyOtherVersions: (n: number) => `Phiên bản này chưa có bình luận. Có ${n} bình luận ở phiên bản khác.`,
         viewVersion: (v: number) => `Xem v${v}`,
         // composer
@@ -116,6 +119,9 @@ const en: PlayerL10n = {
         prevImage: 'Previous image',
         nextImage: 'Next image',
         emptyNoComments: 'No comments yet — be the first to leave feedback.',
+        filterOpen: (n: number) => `Open (${n})`,
+        filterAll: (n: number) => `All (${n})`,
+        emptyNoOpen: 'Every note here has been marked done.',
         emptyOtherVersions: (n: number) => `No comments on this version yet. There ${n === 1 ? 'is' : 'are'} ${n} on another version.`,
         viewVersion: (v: number) => `View v${v}`,
         placeholder: 'Leave your feedback…',

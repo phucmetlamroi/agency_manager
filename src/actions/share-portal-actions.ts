@@ -1438,77 +1438,77 @@ export async function createSubClientViaToken(token: string, input: { name: stri
     const name = sanitizeClientText(input.name || '', TITLE_MAX_LEN)
     if (!name) return { success: false, error: 'Please enter a brand name.' }
 
-    // Parent must belong to the link's profile (defense-in-depth beyond scope). This read is a
-    // fast rejection only — it is NOT the authorization. `parentAt` is carried into the locked
-    // section below, which re-proves the parent has not moved or been trashed since.
+    // Everything from here to the lock is a CHEAP EARLY REJECTION, not the authorization — the
+    // decision that matters is re-derived inside the transaction below. Kept so an obviously bad
+    // request costs one indexed read instead of a lock acquisition.
     const parent = await prisma.client.findFirst({
         where: { id: input.parentId, profileId: scope.profileId, status: 'ACTIVE' },
-        select: { id: true, parentId: true },
+        select: { id: true },
     })
     if (!parent) return { success: false, error: 'Invalid parent brand.' }
-    const parentAt = parent.parentId
 
     const existing = await prisma.client.count({
         where: { parentId: input.parentId, status: 'ACTIVE' },
     })
     if (existing >= SUBCLIENT_CAP) return { success: false, error: 'You have reached the maximum number of sub-brands.' }
 
-    // [Authz 2026-07] SUBCLIENT_CAP bounds the WIDTH of one parent, not the DEPTH of the tree —
-    // and depth is the expensive dimension. resolveShareToken rebuilds a name path for every
-    // ACTIVE client in the profile on EVERY portal request, walking parentId upward each time,
-    // so cost is O(clients × depth). A client could chain sub-brand inside sub-brand without
-    // limit and permanently slow every page load for that agency, from the public side, with no
-    // staff action. Four levels is deeper than any real brand hierarchy here.
-    let depth = 0
-    let cursor: number | null = input.parentId
-    const walked = new Set<number>()
-    while (cursor != null && depth < MAX_SUBCLIENT_DEPTH && !walked.has(cursor)) {
-        walked.add(cursor)
-        const row: { parentId: number | null } | null = await prisma.client.findUnique({
-            where: { id: cursor },
-            select: { parentId: true },
-        })
-        depth++
-        cursor = row?.parentId ?? null
-    }
-    if (cursor != null || depth >= MAX_SUBCLIENT_DEPTH) {
-        return { success: false, error: 'This brand is already nested as deeply as we allow. Ask the studio to add it for you.' }
-    }
-
-    // [Authz 2026-07 round 4] THE DUPLICATE GUARD, and the same profile lock the CRM writers
-    // take. This path was missed entirely: it creates an ACTIVE Client and had no name check at
-    // all, so a client could type a brand name that already exists under their parent and get a
-    // second ACTIVE row at the same (profile, parent, name) position — no race required. Two
-    // rows on one name path collapse into ONE share scope in resolveShareToken, so either
-    // client's link then reads the other's tasks, invoices and files. Six locked CRM actions
-    // count for nothing while a public, unauthenticated-by-session endpoint writes past them.
+    // [Authz 2026-07 round 6] EVERYTHING THAT DECIDES now happens under the lock, and the
+    // authorization is re-derived from the canonical source rather than approximated.
+    //
+    // Round 5 pinned the parent's own (profileId, status, parentId). Review showed that is one
+    // EDGE, while the scope is a whole PATH: with Root > Division > Parent, an admin detaching
+    // Division moves Parent out of this token's scope entirely, yet Parent's own parentId is
+    // still Division, so the pin matched and the write landed in a hierarchy the client no
+    // longer owns. Renaming an ancestor, merging a branch, or soft-deleting the PROFILE do the
+    // same. Rather than reimplement path derivation here and get it subtly wrong a fourth time,
+    // ask the function that defines it. One extra token resolution on a rare action is cheap;
+    // being approximately right about who owns a client is not.
     let client: { id: number; name: string }
     try {
         const outcome: { ok: true; row: { id: number; name: string } } | { ok: false; error: string } =
             await prisma.$transaction(async (tx) => {
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope.profileId}, 0))`
 
-                // [round 5 review] The parent's authorization and state are re-proved HERE, not
-                // just in the pre-flight read. Everything above ran unlocked, so an admin could
-                // detach or trash the parent in between and this write would still land:
-                //   • detach -> the parent becomes an independent root that this token no longer
-                //     owns on its next request, and we would have written into someone else's
-                //     hierarchy while reporting success;
-                //   • delete  -> an ACTIVE brand created under a SOFT_DELETED parent, invisible
-                //     in the active tree and outside any trashed subtree, so nothing surfaces or
-                //     cleans it up.
-                // Pinning parentId to the value read a moment ago catches BOTH without having to
-                // re-derive the whole token scope: any re-parenting changes it.
+                // Re-derived AFTER the lock, so it reflects every CRM write that has committed —
+                // they all take this same key, so none can be mid-flight. Covers ancestor detach,
+                // ancestor rename, branch merge, and a profile that has since been deactivated.
+                const fresh = await resolveShareToken(token)
+                if (!fresh || !fresh.clientIds.includes(input.parentId)) {
+                    return { ok: false as const, error: 'That brand has just changed. Please reload and try again.' }
+                }
+
                 const freshParent = await tx.client.findFirst({
-                    where: { id: input.parentId, profileId: scope.profileId, status: 'ACTIVE', parentId: parentAt },
+                    where: { id: input.parentId, profileId: fresh.profileId, status: 'ACTIVE' },
                     select: { id: true },
                 })
                 if (!freshParent) {
                     return { ok: false as const, error: 'That brand has just changed. Please reload and try again.' }
                 }
 
-                // Recounted inside the lock as well: two concurrent creates with DIFFERENT names
-                // both read 19 outside it and both committed, taking the parent to 21.
+                // DEPTH, also decided here. SUBCLIENT_CAP bounds the WIDTH of one parent; depth is
+                // the expensive dimension, because resolveShareToken rebuilds a name path for every
+                // ACTIVE client in the profile on EVERY portal request — cost is O(clients x depth).
+                // Unbounded chaining would let the public side permanently slow an agency's every
+                // page load with no staff action. Measured under the lock because an admin merging
+                // this branch under another root deepens it after any earlier measurement.
+                let depth = 0
+                let cursor: number | null = input.parentId
+                const walked = new Set<number>()
+                while (cursor != null && depth < MAX_SUBCLIENT_DEPTH && !walked.has(cursor)) {
+                    walked.add(cursor)
+                    const row: { parentId: number | null } | null = await tx.client.findUnique({
+                        where: { id: cursor },
+                        select: { parentId: true },
+                    })
+                    depth++
+                    cursor = row?.parentId ?? null
+                }
+                if (cursor != null || depth >= MAX_SUBCLIENT_DEPTH) {
+                    return { ok: false as const, error: 'This brand is already nested as deeply as we allow. Ask the studio to add it for you.' }
+                }
+
+                // Recounted here too: two concurrent creates with DIFFERENT names both read 19
+                // outside the lock and both committed, taking the parent to 21.
                 const liveCount = await tx.client.count({
                     where: { parentId: input.parentId, status: 'ACTIVE' },
                 })
@@ -1524,17 +1524,22 @@ export async function createSubClientViaToken(token: string, input: { name: stri
                 if (siblings.some((s) => norm(s.name) === norm(name))) {
                     return { ok: false as const, error: `You already have a brand called "${name.trim()}".` }
                 }
+
                 const row = await tx.client.create({
                     data: {
                         name,
                         parentId: input.parentId,
-                        profileId: scope.profileId,   // forced from scope, never client input
+                        profileId: fresh.profileId,   // forced from scope, never client input
                         status: 'ACTIVE',
                     },
                     select: { id: true, name: true },
                 })
                 return { ok: true as const, row }
-            })
+            // A deep delete/restore in the same profile can hold this lock; the wait is spent
+            // INSIDE the advisory-lock statement, which bills the transaction `timeout`, not
+            // `maxWait`. The 5s default would have failed a perfectly valid create under
+            // ordinary CRM contention.
+            }, { timeout: 20_000, maxWait: 10_000 })
         if (!outcome.ok) return { success: false, error: outcome.error }
         client = outcome.row
     } catch (err) {

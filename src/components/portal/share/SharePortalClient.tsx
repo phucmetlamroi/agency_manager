@@ -61,6 +61,11 @@ export default function SharePortalClient({ token, clientName, profileName, bran
         notifyRemove: () => removePortalNotifyEmail(token),
         documents: () => getDocumentsViaToken(token),
         downloadDocuments: (versionIds) => downloadDocumentsViaToken(token, versionIds),
+        // The route re-resolves this token server-side and re-checks the invoice id
+        // against the SAME client/workspace scope as getShareSnapshot, so the URL is
+        // no more powerful than the ledger the client is already looking at.
+        invoicePdfUrl: (invoiceId) =>
+            `/api/share/${encodeURIComponent(token)}/invoices/${encodeURIComponent(invoiceId)}/pdf`,
     }), [token])
 
     return (

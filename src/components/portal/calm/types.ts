@@ -63,9 +63,30 @@ export interface Invoice {
     status: string
     filePath: string | null
     clientId: number | null
-    items: { description: string; amount: number; quantity: number }[]
+    /**
+     * `amount` is the LINE TOTAL already (unitPrice × quantity — see InvoiceModal's
+     * `const amount = unitPrice * quantity`, and the admin subtotal which sums
+     * `amount` directly). Render it AS-IS: multiplying by `quantity` again inflates
+     * every line and makes them stop summing to `totalDue`.
+     */
+    items: { description: string; amount: number; quantity: number; unitPrice?: number }[]
     workspaceId: string | null
     workspaceName: string | null
+    /** [Statements 2026-07] Money breakdown. Optional — only the share portal selects these. */
+    subtotalAmount?: number
+    taxPercent?: number
+    taxAmount?: number
+    depositDeducted?: number
+    /** Client-facing payment details, whitelisted server-side out of billingSnapshot. */
+    bank?: {
+        agencyName: string | null
+        beneficiaryName: string | null
+        bankName: string | null
+        accountNumber: string | null
+        swiftCode: string | null
+        address: string | null
+        notes: string | null
+    } | null
 }
 
 /** A period the work was booked under — mirrors the admin's workspace switcher. */
@@ -236,6 +257,13 @@ export interface DeliverableActions {
     notifyRemove?: () => Promise<{ success: boolean; error?: string }>
     /** [The Desk] Token-scoped read of the client's own work requests + studio reply (Correspondence). */
     getRequests?: () => Promise<ClientRequestPortalDTO[] | null>
+    /**
+     * [Statements 2026-07] Build the href for an invoice PDF. Returns a URL rather
+     * than a Promise so the UI can render a plain <a download> (no blob juggling).
+     * Only the share portal supplies it — the token stays inside that closure, and
+     * the route re-authorizes the id against the token's scope server-side.
+     */
+    invoicePdfUrl?: (invoiceId: string) => string
     /** Token-scoped client Document browser. Server re-checks client/workspace scope on every call. */
     documents?: () => Promise<DocumentsSnapshot | null>
     downloadDocuments?: (versionIds: string[]) => Promise<{

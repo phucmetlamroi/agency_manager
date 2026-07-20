@@ -34,6 +34,43 @@ import { audit } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 import type { ClientRequestPortalDTO } from '@/components/portal/calm/types'
 
+/**
+ * [Statements 2026-07] Whitelist the client-facing payment details out of an
+ * Invoice.billingSnapshot Json blob.
+ *
+ * Every field below is one the generated invoice PDF ALREADY prints for this
+ * client (invoice-generator.ts bank block + footer) — so surfacing them in the
+ * portal discloses nothing new; it just means the client no longer has to open
+ * a PDF to find out where to send the money. The blob is untyped and written by
+ * the issuing flow, so we copy field-by-field: any key added to it later stays
+ * server-side unless someone deliberately adds it here.
+ */
+function pickClientFacingBank(snapshot: unknown): {
+    agencyName: string | null
+    beneficiaryName: string | null
+    bankName: string | null
+    accountNumber: string | null
+    swiftCode: string | null
+    address: string | null
+    notes: string | null
+} | null {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null
+    const s = snapshot as Record<string, unknown>
+    const str = (v: unknown): string | null =>
+        typeof v === 'string' && v.trim() ? v.trim() : null
+    const out = {
+        agencyName: str(s.agencyName),
+        beneficiaryName: str(s.beneficiaryName),
+        bankName: str(s.bankName),
+        accountNumber: str(s.accountNumber),
+        swiftCode: str(s.swiftCode),
+        address: str(s.address),
+        notes: str(s.notes),
+    }
+    // All-empty snapshot → null so the UI can skip the block entirely.
+    return Object.values(out).some(Boolean) ? out : null
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
    Reads
    ─────────────────────────────────────────────────────────────────────────── */
@@ -110,12 +147,21 @@ export async function getShareSnapshot(token: string) {
                 invoiceNumber: true,
                 issueDate: true,
                 dueDate: true,
+                // [Statements 2026-07] The money breakdown the client needs to reconcile
+                // the lines against the total. Without subtotal/tax/deposit an invoice
+                // carrying VAT or a deposit deduction can NEVER add up on screen.
+                subtotalAmount: true,
+                taxPercent: true,
+                taxAmount: true,
+                depositDeducted: true,
                 totalDue: true,
                 status: true,
                 filePath: true,
+                // Read for the bank block ONLY — never forwarded raw (see mappedInvoices).
+                billingSnapshot: true,
                 clientId: true,
                 workspaceId: true,
-                items: { select: { description: true, amount: true, quantity: true } },
+                items: { select: { description: true, quantity: true, unitPrice: true, amount: true } },
             },
         }),
     ])
@@ -244,11 +290,17 @@ export async function getShareSnapshot(token: string) {
         }
     }))
 
-    const mappedInvoices = invoices.map((inv) => ({
+    // [Statements 2026-07] `billingSnapshot` is an untyped Json blob frozen at issue
+    // time; it holds the agency's payment details but may also accrete unrelated
+    // internal keys. NEVER spread it into the client payload — destructure it OUT and
+    // forward an explicit whitelist of the six fields the PDF's bank block already
+    // shows the client anyway. Anything not listed here stays server-side by default.
+    const mappedInvoices = invoices.map(({ billingSnapshot, ...inv }) => ({
         ...inv,
         issueDate: iso(inv.issueDate)!,
         dueDate: iso(inv.dueDate),
         workspaceName: inv.workspaceId ? wsNameById.get(inv.workspaceId) ?? null : null,
+        bank: pickClientFacingBank(billingSnapshot),
     }))
 
     // [Trial P3 — white-label] The agency's brand for the client portal lockup:

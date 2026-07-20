@@ -274,6 +274,7 @@ function DeskInner({
                             invoices={scopedInvs}
                             openInvoice={openInvoice}
                             activeId={openInv}
+                            pdfUrl={actions.invoicePdfUrl}
                         />
                     )}
                     {surface === 'requests' && (

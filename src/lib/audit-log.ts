@@ -116,6 +116,7 @@ export type AuditAction =
     | 'share_link.created'      // profile OWNER/ADMIN generated a public client link
     | 'share_link.revoked'      // link revoked — effective immediately
     | 'share_link.accessed'     // public page opened with a valid token (page-level, not per action)
+    | 'share_link.invoice_downloaded' // client pulled an invoice PDF through their share link
     // [Video Review] Frame.io-style review portal on Cloudflare Stream
     | 'video.version_uploaded'   // editor uploaded a new cut (V1/V2/V3) → VideoVersion row
     | 'video.review_approved'    // client approved a version via the token portal

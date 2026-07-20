@@ -12,10 +12,12 @@ import type { Invoice } from '../calm/types'
 
 const ORDER: Record<string, number> = { Overdue: 0, Due: 1, Paid: 2, Void: 3 }
 
-export default function Statements({ invoices, activeId, openInvoice }: {
+export default function Statements({ invoices, activeId, openInvoice, pdfUrl }: {
     invoices: Invoice[]
     activeId: string | null
     openInvoice: (id: string) => void
+    /** Share-portal only: builds a token-scoped PDF href. Absent in account mode. */
+    pdfUrl?: (invoiceId: string) => string
 }) {
     const toast = useToast()
     const rows = useMemo(() =>
@@ -74,7 +76,7 @@ export default function Statements({ invoices, activeId, openInvoice }: {
             </main>
 
             <aside style={{ padding: '26px 28px', background: 'var(--paper-raised)', overflowY: 'auto' }}>
-                {active ? <StatementDetail inv={active} onCopy={(t) => { navigator.clipboard?.writeText(t).then(() => toast('ok', 'Copied.')).catch(() => {}) }} /> : (
+                {active ? <StatementDetail inv={active} pdfUrl={pdfUrl} onCopy={(t) => { navigator.clipboard?.writeText(t).then(() => toast('ok', 'Copied.')).catch(() => {}) }} /> : (
                     <p style={{ fontSize: '0.86rem', color: 'var(--ink-3)' }}>Select a statement.</p>
                 )}
             </aside>
@@ -82,11 +84,49 @@ export default function Statements({ invoices, activeId, openInvoice }: {
     )
 }
 
-function StatementDetail({ inv, onCopy }: { inv: Invoice; onCopy: (t: string) => void }) {
+/** One right-aligned money row in the totals ladder. */
+function MoneyRow({ label, value, strong, muted }: { label: string; value: string; strong?: boolean; muted?: boolean }) {
+    return (
+        <span style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: strong ? 600 : 400, color: muted ? 'var(--ink-2)' : undefined }}>
+            <span>{label}</span>
+            <span className="desk-num" style={{ fontSize: strong ? '0.8rem' : '0.74rem', flex: 'none' }}>{value}</span>
+        </span>
+    )
+}
+
+/** One labelled line in the bank block. */
+function BankRow({ label, value, onCopy }: { label: string; value: string; onCopy?: () => void }) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: '1px solid var(--hairline-faint)' }}>
+            <span className="desk-mono" style={{ width: 104, fontSize: '0.56rem', letterSpacing: '0.1em', color: 'var(--ink-3)', flex: 'none' }}>{label}</span>
+            <span className="desk-mono" style={{ fontSize: '0.72rem', minWidth: 0, wordBreak: 'break-word' }}>{value}</span>
+            {onCopy && (
+                <button onClick={onCopy} className="desk-iconbtn" style={{ marginLeft: 'auto', width: 26, height: 26, flex: 'none' }} aria-label={`Copy ${label.toLowerCase()}`}><Copy size={12} /></button>
+            )}
+        </div>
+    )
+}
+
+function StatementDetail({ inv, onCopy, pdfUrl }: { inv: Invoice; onCopy: (t: string) => void; pdfUrl?: (invoiceId: string) => string }) {
     const st = mapInvoiceStatus(inv.status)
     const s = deskStatus(st)
     const items = inv.items || []
-    const showPdf = inv.filePath && /^https?:\/\//i.test(inv.filePath)
+    const bank = inv.bank ?? null
+
+    // Money ladder. Only render a row that actually exists on this invoice, so a
+    // simple no-tax no-deposit statement stays as clean as it was before.
+    const subtotal = inv.subtotalAmount != null ? Number(inv.subtotalAmount) : null
+    const taxAmt = Number(inv.taxAmount ?? 0)
+    const taxPct = Number(inv.taxPercent ?? 0)
+    const deposit = Number(inv.depositDeducted ?? 0)
+    const showLadder = subtotal != null && (taxAmt > 0 || deposit > 0 || Math.abs(subtotal - Number(inv.totalDue)) > 0.005)
+
+    // In share mode the token-scoped route always works (it redirects to the stored
+    // file when there is one). Account mode has no token, so fall back to the stored
+    // absolute URL — the pre-existing behaviour.
+    const storedPdf = inv.filePath && /^https?:\/\//i.test(inv.filePath) ? inv.filePath : null
+    const href = pdfUrl ? pdfUrl(inv.id) : storedPdf
+
     return (
         <div className="desk-rise">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -103,30 +143,50 @@ function StatementDetail({ inv, onCopy }: { inv: Invoice; onCopy: (t: string) =>
                 <div style={{ display: 'grid', gap: 8, fontSize: '0.85rem', borderTop: '1px solid var(--hairline)', paddingTop: 12, marginBottom: 18 }}>
                     {items.map((it, i) => (
                         <span key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                            <span style={{ minWidth: 0 }}>{it.description}{it.quantity > 1 ? <span className="desk-muted"> × {it.quantity}</span> : null}</span>
-                            <span className="desk-num" style={{ fontSize: '0.74rem', flex: 'none' }}>{fmtMoney(Number(it.amount) * (it.quantity || 1))}</span>
+                            <span style={{ minWidth: 0 }}>
+                                {it.description}
+                                {it.quantity > 1 ? (
+                                    <span className="desk-muted">
+                                        {' '}× {it.quantity}
+                                        {it.unitPrice != null ? ` @ ${fmtMoney(Number(it.unitPrice))}` : ''}
+                                    </span>
+                                ) : null}
+                            </span>
+                            {/* `amount` is ALREADY unitPrice × quantity (see the Invoice type). Do not
+                                multiply by quantity again — that inflated every line by up to 16× and
+                                made the lines stop summing to the total the client is asked to pay. */}
+                            <span className="desk-num" style={{ fontSize: '0.74rem', flex: 'none' }}>{fmtMoney(Number(it.amount))}</span>
                         </span>
                     ))}
-                    <span style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--hairline-strong)', paddingTop: 9, fontWeight: 600 }}>
-                        <span>Total</span><span className="desk-num" style={{ fontSize: '0.8rem' }}>{fmtMoney(inv.totalDue)}</span>
-                    </span>
+                    <div style={{ display: 'grid', gap: 7, borderTop: '1px solid var(--hairline-strong)', paddingTop: 9 }}>
+                        {showLadder && <MoneyRow label="Subtotal" value={fmtMoney(subtotal!)} muted />}
+                        {taxAmt > 0 && <MoneyRow label={taxPct > 0 ? `VAT (${taxPct}%)` : 'VAT'} value={fmtMoney(taxAmt)} muted />}
+                        {deposit > 0 && <MoneyRow label="Deposit already paid" value={`− ${fmtMoney(deposit)}`} muted />}
+                        <MoneyRow label="Total" value={fmtMoney(inv.totalDue)} strong />
+                    </div>
                 </div>
             )}
 
             {st !== 'Paid' && st !== 'Void' && (
                 <div style={{ background: 'var(--paper-sunken)', border: '1px solid var(--hairline)', padding: '16px 18px', marginBottom: 16, borderRadius: 4 }}>
                     <Kicker style={{ marginBottom: 12 }}>How to pay — bank transfer</Kicker>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--hairline-faint)' }}>
-                        <span className="desk-mono" style={{ width: 104, fontSize: '0.56rem', letterSpacing: '0.1em', color: 'var(--ink-3)', flex: 'none' }}>REFERENCE</span>
-                        <span className="desk-mono" style={{ fontSize: '0.72rem' }}>{inv.invoiceNumber}</span>
-                        <button onClick={() => onCopy(inv.invoiceNumber)} className="desk-iconbtn" style={{ marginLeft: 'auto', width: 26, height: 26 }} aria-label="Copy reference"><Copy size={12} /></button>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
-                        <span className="desk-mono" style={{ width: 104, fontSize: '0.56rem', letterSpacing: '0.1em', color: 'var(--ink-3)', flex: 'none' }}>AMOUNT</span>
-                        <span className="desk-mono" style={{ fontSize: '0.72rem' }}>{fmtMoney(inv.totalDue)}</span>
-                        <button onClick={() => onCopy(String(inv.totalDue))} className="desk-iconbtn" style={{ marginLeft: 'auto', width: 26, height: 26 }} aria-label="Copy amount"><Copy size={12} /></button>
-                    </div>
-                    <p style={{ fontSize: '0.74rem', color: 'var(--ink-2)', marginTop: 10 }}>Bank details are on the PDF. Include the reference and we match transfers the same day — this flips to <strong style={{ color: 'var(--sage)' }}>Paid</strong>.</p>
+                    <BankRow label="REFERENCE" value={inv.invoiceNumber} onCopy={() => onCopy(inv.invoiceNumber)} />
+                    {/* Copy the RAW number, not the formatted string — it goes straight into a bank form. */}
+                    <BankRow label="AMOUNT" value={fmtMoney(inv.totalDue)} onCopy={() => onCopy(String(inv.totalDue))} />
+                    {/* The account details the client actually needs. These used to live ONLY in the
+                        PDF — which the client had no way to download — so "bank details are on the
+                        PDF" was a dead end. Whitelisted server-side from billingSnapshot. */}
+                    {bank?.beneficiaryName && <BankRow label="BENEFICIARY" value={bank.beneficiaryName} onCopy={() => onCopy(bank.beneficiaryName!)} />}
+                    {bank?.bankName && <BankRow label="BANK" value={bank.bankName} />}
+                    {bank?.accountNumber && <BankRow label="ACCOUNT" value={bank.accountNumber} onCopy={() => onCopy(bank.accountNumber!)} />}
+                    {bank?.swiftCode && <BankRow label="SWIFT / BIC" value={bank.swiftCode} onCopy={() => onCopy(bank.swiftCode!)} />}
+                    {bank?.address && <BankRow label="BANK ADDRESS" value={bank.address} />}
+                    {bank?.notes && <BankRow label="NOTE" value={bank.notes} />}
+                    <p style={{ fontSize: '0.74rem', color: 'var(--ink-2)', marginTop: 10 }}>
+                        {bank?.accountNumber
+                            ? <>Include the reference so we can match your transfer — this flips to <strong style={{ color: 'var(--sage)' }}>Paid</strong> the same day.</>
+                            : <>Full bank details are on the PDF below. Include the reference and we match transfers the same day — this flips to <strong style={{ color: 'var(--sage)' }}>Paid</strong>.</>}
+                    </p>
                 </div>
             )}
             {st === 'Paid' && (
@@ -135,8 +195,8 @@ function StatementDetail({ inv, onCopy }: { inv: Invoice; onCopy: (t: string) =>
                 </div>
             )}
 
-            {showPdf && (
-                <a href={inv.filePath!} target="_blank" rel="noopener noreferrer" className="desk-btn desk-btn--quiet desk-btn--sm" style={{ textDecoration: 'none' }}>
+            {href && (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="desk-btn desk-btn--quiet desk-btn--sm" style={{ textDecoration: 'none' }}>
                     <Download size={14} /> Download PDF
                 </a>
             )}

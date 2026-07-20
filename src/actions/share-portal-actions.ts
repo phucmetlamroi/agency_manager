@@ -552,8 +552,12 @@ function notifyInboxKey(email: string): string {
         const plus = local.indexOf('+')
         if (plus > 0) local = local.slice(0, plus)
     }
-    // Dots are ignored by Gmail only.
-    if (domain === 'gmail.com' || domain === 'googlemail.com') local = local.replace(/\./g, '')
+    // Dots are ignored by Gmail only — and googlemail.com is the SAME mailbox as gmail.com,
+    // so it has to fold into one key or the alias this exists to close survives at half
+    // strength (a.b@googlemail.com and ab@gmail.com are one inbox, two buckets).
+    if (domain === 'gmail.com' || domain === 'googlemail.com') {
+        return `${local.replace(/\./g, '')}@gmail.com`
+    }
     return `${local}@${domain}`
 }
 
@@ -937,8 +941,10 @@ export async function approveDeliverablesViaToken(
     // gets their own tasks, their own count, and a link that goes where it says.
     const byRecipient = new Map<string, typeof applied>()
     for (const t of applied) {
-        for (const uid of [t.assigneeId, t.assignedById]) {
-            if (!uid) continue
+        // Set, not array: on a small team the assignee IS the manager, and pushing per role
+        // counted that task twice — "Khách đã duyệt 2 video" listing one title twice, from one
+        // approval. A person hears about each task once.
+        for (const uid of new Set([t.assigneeId, t.assignedById].filter(Boolean) as string[])) {
             const arr = byRecipient.get(uid) ?? []
             arr.push(t)
             byRecipient.set(uid, arr)

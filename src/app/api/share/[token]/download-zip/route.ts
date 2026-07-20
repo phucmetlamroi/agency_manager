@@ -218,7 +218,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         const file = sanitizeSegment(row.fileName || a.currentVersion.fileName || a.title)
         entries.push({ r2Key: row.r2Key, zipPath: dir ? `${dir}/${file}` : file })
     }
-    if (entries.length === 0) return new NextResponse('Nothing to download', { status: 409 })
+    // Only a BARE 409 when nothing was ever eligible. If files WERE requested and every one of
+    // them vanished between the snapshot and this lookup, the client gets the archive anyway —
+    // holding just the receipt, which names each file and says who to ask. "Nothing to download"
+    // on a selection the client watched themselves make is the disappearance complaint restated.
+    if (entries.length === 0 && vanished.length === 0) {
+        return new NextResponse('Nothing to download', { status: 409 })
+    }
     dedupe(entries)
 
     const archiveName = sanitizeSegment(

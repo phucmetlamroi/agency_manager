@@ -100,7 +100,7 @@ export async function resolveShareToken(
     // Both fail OPEN: a limiter outage must never present every client with a dead link.
     const ip = await getRequestIp()
     if (ip !== 'unknown') {
-        const ipRl = await limitDb(`share-token-ip:${ip}`, 600, 60, { failClosed: false })
+        const ipRl = await limitDb(`share-token-ip:${ip}`, 240, 60, { failClosed: false })
         if (!ipRl.success) return null
     }
 
@@ -128,10 +128,17 @@ export async function resolveShareToken(
     if (!link.profile || link.profile.status !== 'ACTIVE') return null
 
     // Tier 2, charged only now that the token is proven real — so a random string can never
-    // create a bucket row. Generous enough for a busy client: one page load costs ~3
-    // resolutions and each extra tab a few more, so 600/min is many tabs refreshing hard,
-    // while still bounding a valid-token flood long before the DB feels it.
-    const rl = await limitDb(`share-token:${tokenHash}`, 600, 60, { failClosed: false })
+    // create a bucket row.
+    //
+    // Deliberately a RUNAWAY BACKSTOP, not the sharp control, and review is why. The token is
+    // the credential and there is no per-user session, so a token bucket is SHARED FATE: one
+    // person who still has a forwarded link, looping at a few requests a second, would exhaust
+    // it and every legitimate viewer at that client would then see the same blank 404 a revoked
+    // link shows — no 429, no message, for as long as the loop runs. So the per-IP tier above is
+    // set where a single abusive source trips ITSELF first (240/min is ~20-60 ordinary page
+    // loads from one address), and this ceiling sits far above any honest usage, catching only a
+    // genuinely distributed flood.
+    const rl = await limitDb(`share-token:${tokenHash}`, 2000, 60, { failClosed: false })
     if (!rl.success) return null
 
     // ── Scope: the client's FULL history across the whole profile ──────────

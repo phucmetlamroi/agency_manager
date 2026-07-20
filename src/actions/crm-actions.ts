@@ -241,10 +241,26 @@ export async function restoreClient(id: number, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
         const ids = await collectClientSubtreeIds(wp, id)
-        await wp.client.updateMany({
-            where: { id: { in: ids } },
-            data: { status: 'ACTIVE', deletedAt: null, hardDeleteAfter: null },
+        // [Authz 2026-07 round 2] Restoring brings a row back to ACTIVE, which is a create as far
+        // as the name-path scope is concerned — and it was the one revival path with no duplicate
+        // guard. Trash "Acme", create a new "Acme" at the same level, then restore the old one:
+        // two ACTIVE clients share a name path, and resolveShareToken collapses them into ONE
+        // scope, so either client's link reads the other's tasks, invoices and files. Locked for
+        // the same reason detach and merge are: check-then-write is not atomic on its own.
+        const restored: { success: boolean; error?: string } = await wp.$transaction(async (tx: any) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${String(profileId ?? workspaceId)}, 0))`
+            const root = await tx.client.findUnique({ where: { id }, select: { name: true, parentId: true } })
+            if (!root) return { success: false, error: 'Không tìm thấy khách hàng.' }
+            if (await findDuplicateName(tx, root.name, root.parentId, id)) {
+                return { success: false, error: `Không thể khôi phục: đã có khách hàng "${root.name.trim()}" ở cùng cấp. Đổi tên khách hàng đang hoạt động trước, rồi khôi phục lại.` }
+            }
+            await tx.client.updateMany({
+                where: { id: { in: ids } },
+                data: { status: 'ACTIVE', deletedAt: null, hardDeleteAfter: null },
+            })
+            return { success: true }
         })
+        if (!restored.success) return restored
         void audit({
             workspaceId,
             actorUserId: session?.user?.id ?? null,
@@ -369,10 +385,24 @@ export async function mergeClientIntoParent(childId: number, parentId: number, w
         if (child.parentId !== null) return { success: false, error: 'Khách hàng được kéo đã là khách hàng trực thuộc, không thể gộp.' }
         if (parent.parentId !== null) return { success: false, error: 'Khách hàng đích đến đã là khách hàng trực thuộc, không thể dùng làm khách hàng chính.' }
 
-        await workspacePrisma.client.update({
-            where: { id: childId },
-            data: { parentId }
+        // [Authz 2026-07 round 2] Merging MOVES a client under a new parent, so it needs the
+        // same duplicate guard and the same lock as detaching. Hardening only unmergeClient was
+        // treating one direction of the same edge: dragging "Acme" under "Bob" when "Bob > Acme"
+        // already exists produces two ACTIVE siblings with one name, and resolveShareToken reads
+        // a shared name path as a SINGLE client scope — either link then reads both libraries.
+        const merged: { success: boolean; error?: string } = await workspacePrisma.$transaction(async (tx: any) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${String(profileId ?? workspaceId)}, 0))`
+            const fresh = await tx.client.findUnique({ where: { id: childId }, select: { name: true, parentId: true, status: true } })
+            if (!fresh || fresh.status !== 'ACTIVE' || fresh.parentId !== null) {
+                return { success: false, error: 'Khách hàng đã thay đổi, vui lòng tải lại trang.' }
+            }
+            if (await findDuplicateName(tx, fresh.name, parentId, childId)) {
+                return { success: false, error: `Không thể gộp: khách hàng chính đã có "${fresh.name.trim()}" trực thuộc. Đổi tên một trong hai trước khi gộp.` }
+            }
+            await tx.client.update({ where: { id: childId }, data: { parentId } })
+            return { success: true }
         })
+        if (!merged.success) return merged
 
         revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }

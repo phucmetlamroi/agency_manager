@@ -26,9 +26,8 @@ export interface Deliverable {
     collectFilesLink: string | null
     notes_vi: string | null
     notes_en: string | null
-    frameUsername: string | null
-    framePassword: string | null
-    frameNote: string | null
+    // frameUsername / framePassword / frameNote deliberately absent — a stored review-tool
+    // password is no longer sent to the client page (share-portal-actions.ts select).
     duration: string | null
     clientReview: string | null
     clientFeedback: string | null

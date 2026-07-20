@@ -14,7 +14,7 @@ function del(p: Partial<Deliverable> & { id: string; title: string; clientStatus
     return {
         type: 'Short-form reel', status: 'Đang làm', needsYou: false, deadline: iso(5), createdAt: iso(-20), updatedAt: iso(-1),
         productLink: null, references: null, resources: null, collectFilesLink: null, notes_vi: null, notes_en: null,
-        frameUsername: null, framePassword: null, frameNote: null, duration: '0:45', clientReview: null, clientFeedback: null,
+        duration: '0:45', clientReview: null, clientFeedback: null,
         clientReviewedAt: null, clientId: 1, client: { id: 1, name: 'Meridian Group' }, clientPath: 'Meridian Group',
         project: null, rating: null, assignee: null, manager: 'Ava Lin', jobPriceUSD: 1200, workspaceId: 'w7', workspaceName: 'July 2026',
         reviewUrl: null, ...p,

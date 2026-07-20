@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
     X, Play, FolderOpen, ExternalLink, Clock, Check, RotateCcw, Info, CheckCircle2,
-    Download, KeyRound, Star, History, ChevronDown,
+    Download, Star, History, ChevronDown,
 } from 'lucide-react'
 import { StatusBadge, statusSentence } from './ui'
 import { fmtDate, relDeadline, fmtMoney } from './format'
@@ -34,7 +34,6 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
     const [busy, setBusy] = useState(false)
     const [err, setErr] = useState<string | null>(null)
     const [activity, setActivity] = useState<ActivityItem[]>([])
-    const [showCreds, setShowCreds] = useState(false)
     const [showActivity, setShowActivity] = useState(false)
 
     const brandName = d.client?.name || '—'
@@ -116,21 +115,8 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
                         </a>
                     )}
 
-                    {/* Frame review login */}
-                    {(d.frameUsername || d.framePassword) && (
-                        <div>
-                            <button onClick={() => setShowCreds(s => !s)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-3)', fontSize: 12.5, fontWeight: 600, padding: 0 }}>
-                                <KeyRound size={13} /> {showCreds ? 'Hide review login' : 'Need a login to review?'}
-                            </button>
-                            {showCreds && (
-                                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--line)', fontSize: 12.5, color: 'var(--fg-2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {d.frameUsername && <div><span style={{ color: 'var(--fg-3)' }}>User:</span> <span className="num" style={{ color: 'var(--fg-1)' }}>{d.frameUsername}</span></div>}
-                                    {d.framePassword && <div><span style={{ color: 'var(--fg-3)' }}>Pass:</span> <span className="num" style={{ color: 'var(--fg-1)' }}>{d.framePassword}</span></div>}
-                                    {d.frameNote && <div style={{ color: 'var(--fg-3)', fontSize: 11.5, marginTop: 2 }}>{d.frameNote}</div>}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {/* Removed with the same block in DeliverableSheet: a stored review-tool
+                        username/password is no longer sent to, or shown on, a client page. */}
 
                     {/* Status — the real admin-mirrored state + a plain-English line */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '2px 2px 0' }}>

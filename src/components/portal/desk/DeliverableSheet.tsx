@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
     Play, FolderOpen, ExternalLink, Clock, Check, RotateCcw, Info, CheckCircle2,
-    Download, KeyRound, Star, History, ChevronDown, Send,
+    Download, Star, History, ChevronDown, Send,
 } from 'lucide-react'
 import { Sheet, SheetHeader, Button, Avatar } from './ui'
 import { StatusPill } from './ui'
@@ -38,7 +38,6 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
     const [busy, setBusy] = useState(false)
     const [err, setErr] = useState<string | null>(null)
     const [activity, setActivity] = useState<ActivityItem[]>([])
-    const [showCreds, setShowCreds] = useState(false)
     const [showActivity, setShowActivity] = useState(false)
 
     const brandName = d.client?.name || '—'
@@ -142,21 +141,9 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                     </a>
                 )}
 
-                {/* Frame review login */}
-                {(d.frameUsername || d.framePassword) && (
-                    <div>
-                        <button onClick={() => setShowCreds(s => !s)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: '0.82rem', fontWeight: 600, padding: 0 }}>
-                            <KeyRound size={13} /> {showCreds ? 'Hide review login' : 'Need a login to review?'}
-                        </button>
-                        {showCreds && (
-                            <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 6, background: 'var(--paper-sunken)', border: '1px solid var(--hairline)', fontSize: '0.82rem', color: 'var(--ink-2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {d.frameUsername && <div><span className="desk-muted">User:</span> <span className="desk-mono">{d.frameUsername}</span></div>}
-                                {d.framePassword && <div><span className="desk-muted">Pass:</span> <span className="desk-mono">{d.framePassword}</span></div>}
-                                {d.frameNote && <div className="desk-muted" style={{ fontSize: '0.76rem', marginTop: 2 }}>{d.frameNote}</div>}
-                            </div>
-                        )}
-                    </div>
-                )}
+                {/* The "Need a login to review?" block is gone: it printed a stored
+                    frameUsername/framePassword to the client, and nothing in the data says
+                    whose account those belong to. The screening room above needs no login. */}
 
                 {/* Status sentence */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>

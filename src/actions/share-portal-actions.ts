@@ -219,9 +219,14 @@ export async function getShareSnapshot(token: string) {
                 references: true,
                 resources: true,
                 collectFilesLink: true,
-                frameUsername: true,
-                framePassword: true,
-                frameNote: true,
+                // [Authz 2026-07] frameUsername / framePassword / frameNote are NOT selected.
+                // They were being shipped to the client page and rendered behind a "Need a
+                // login to review?" toggle. Nothing in the data says whose Frame.io account
+                // they are — some tasks may carry the agency's shared login — and a stored
+                // password reaching a party who may not own it is not a risk worth carrying
+                // for a convenience link. frameNote goes with them: it is free text written
+                // by staff for staff, in Vietnamese. Owner confirmed: strip, re-enable later
+                // if a client-owned credential field is ever wanted as its own field.
                 duration: true,
                 clientReview: true,
                 clientFeedback: true,
@@ -366,7 +371,9 @@ export async function getShareSnapshot(token: string) {
                 reviewUrl = `${guestBase}/r/${known}`
             } else {
                 try {
-                    reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
+                    // null = an admin revoked this asset's client board; the kill switch holds.
+                    const minted = await getOrCreateClientReviewSlug(asset)
+                    reviewUrl = minted ? `${guestBase}/r/${minted}` : null
                 } catch {
                     // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
                     reviewUrl = null

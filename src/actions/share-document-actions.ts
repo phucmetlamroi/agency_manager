@@ -377,12 +377,14 @@ async function buildClientDocuments(
                 reviewUrl = `${guestBase}/r/${known}`
             } else {
                 try {
-                    reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug({
+                    // null = an admin revoked this asset's client board; no Watch link.
+                    const minted = await getOrCreateClientReviewSlug({
                         id: asset.id,
                         workspaceId: asset.workspaceId,
                         taskId: asset.taskId ?? null,
                         createdById: asset.createdById,
-                    })}`
+                    })
+                    reviewUrl = minted ? `${guestBase}/r/${minted}` : null
                 } catch {
                     reviewUrl = null
                 }

@@ -386,12 +386,13 @@ export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<str
     return out
 }
 
+/** Returns null when an admin has revoked this asset's client board — see the guard below. */
 export async function getOrCreateClientReviewSlug(asset: {
     id: string
     workspaceId: string
     taskId: string | null
     createdById: string
-}): Promise<string> {
+}): Promise<string | null> {
     // 1. Try to find a live share link containing this asset that ALREADY has allowDownload enabled
     // and no password, to avoid minting duplicates when one is already available.
     const candidates = await prisma.shareLink.findMany({
@@ -440,6 +441,36 @@ export async function getOrCreateClientReviewSlug(asset: {
     //    whose only existing link is restricted. Staff's link keeps its settings; the
     //    client gets their own board. Nothing the client can reach here is wider than what
     //    the portal already grants them — they can download these same bytes from Files.
+    // [Revoke wins — owner decision 2026-07] Before minting, honour the kill switch. Revoke is
+    // the only control an admin has to pull a video back out of a client's hands, and minting
+    // is unconditional, so a client's very next page load handed them a brand-new board and the
+    // revoke evaporated — silently, un-audited, attributed to the uploader. That also reopens
+    // R5: revokeClientExposureOnNewVersion revokes the board when a fresh cut lands, precisely
+    // so the client cannot see an uncleared version.
+    // Scoped tightly: only a revoked board of the CLIENT shape (single item = this asset,
+    // downloadable, ungated, no password) suppresses minting. A staff member revoking their own
+    // restricted link does not cost the client their board. Un-revoking (revokedAt = null,
+    // already supported) brings it straight back.
+    const revokedClientBoard = await prisma.shareLink.findFirst({
+        where: {
+            revokedAt: { not: null },
+            items: { some: { assetId: asset.id } },
+            allowDownload: true,
+            downloadOnlyWhenApproved: false,
+            passwordHash: null,
+        },
+        orderBy: { revokedAt: 'desc' },
+        select: { items: { select: { assetId: true, folderId: true } } },
+    })
+    if (
+        revokedClientBoard &&
+        revokedClientBoard.items.length === 1 &&
+        revokedClientBoard.items[0].assetId === asset.id &&
+        !revokedClientBoard.items[0].folderId
+    ) {
+        return null
+    }
+
     const created = await prisma.shareLink.create({
         data: {
             slug: nanoid(SLUG_LEN),

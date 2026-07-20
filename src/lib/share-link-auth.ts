@@ -75,7 +75,13 @@ export async function resolveShareToken(
     opts?: {
         recordAccess?: boolean
         /**
-         * [round 7] Run every query on THIS client instead of the module-level `prisma`.
+         * [round 7] Run this function's OWN data queries — the link lookup, the profile-client
+         * list and the workspace list — on THIS client instead of the module-level `prisma`.
+         *
+         * NOT everything: limitDb has its own global client, and the recordAccess telemetry
+         * write is deliberately global (it must outlive the caller). So `db` alone is not enough
+         * to make this call safe inside a transaction — pass `skipRateLimit` with it, and do not
+         * pass `recordAccess`. The one caller that does this is documented at its call site.
          *
          * Exists for exactly one caller: re-deriving scope INSIDE an interactive transaction
          * that already holds the profile advisory lock. Using the global client there would

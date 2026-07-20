@@ -147,19 +147,32 @@ async function applyMuxReady(
             // client, revoke the active shares + clear the client signal so this un-re-approved cut is
             // invisible until the admin re-Duyệt. Self-guarding (no-op unless clientReview='AWAITING'),
             // never throws — an internal-round or first-cut ready is untouched.
-            await revokeClientExposureOnNewVersion(version.asset.taskId, version.assetId, version.workspaceId)
+            const revoked = await revokeClientExposureOnNewVersion(
+                version.asset.taskId,
+                version.assetId,
+                version.workspaceId,
+            )
             try {
                 const flip = await syncTaskFromReviewEvent(
                     version.asset.taskId,
                     version.workspaceId,
                     REVIEW_STATUS_MAP.submitted,
                 )
-                if (flip.applied) {
+                // [Client escalation 2026-07] The revoke above ALREADY wrote A2 on the revision
+                // path, so this flip is a no-op (`applied:false`) — which used to swallow the
+                // alert entirely. That is the worst hand-off in the product: the client's link
+                // is now dead and their status has regressed, and the only thing that undoes
+                // either is an admin pressing "Duyệt & gửi khách" — who was never told. Work sat
+                // untouched until a human happened to look. A real client cited exactly this
+                // ("we're getting behind on changes") when asking to move back to Frame.io.
+                // Treat a revoke as a flip for notification purposes: the gate stays (an
+                // un-approved cut still never reaches the client), but it now rings a bell.
+                if (flip.applied || revoked.resetFrom) {
                     void notifyManagerOfReviewFlip({
                         taskId: version.asset.taskId,
                         workspaceId: version.workspaceId,
                         assetId: version.assetId,
-                        fromStatus: flip.from ?? '',
+                        fromStatus: flip.from ?? revoked.resetFrom ?? '',
                         toStatus: flip.to ?? REVIEW_STATUS_MAP.submitted,
                         actorId: null, // system
                         versionId,

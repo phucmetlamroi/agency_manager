@@ -28,6 +28,7 @@ import {
     guestCookieAttrs,
     guestCookieName,
     resolveShareClient,
+    resolveShareOwnerClientIds,
 } from '@/lib/review/share-auth'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
@@ -83,8 +84,15 @@ export async function ensureScreeningIdentity(
     if (await getGuestSession(share, jar)) return { ok: true }
 
     // The video must belong to THIS token's client (or one of its sub-brands).
-    const owner = await resolveShareClient(share)
-    if (!owner || !scope.clientIds.includes(owner.id)) return { ok: false }
+    // [Codex review 2026-07] Authorize on the OWNING client ids, NOT on the display
+    // name. resolveShareClient walks UP to the top-level client so comments read
+    // "Jack" instead of the sub-brand "MotoHalo" — using that id as the access check
+    // rejected the rightful owner (a sub-brand token never contains its parent's id,
+    // and a task-less multi-asset share resolves to null), sending a client who had
+    // already verified their email straight back to the Name/Email modal. That false
+    // rejection is friction the owner explicitly asked us to remove.
+    const ownerIds = await resolveShareOwnerClientIds(share)
+    if (!ownerIds.some((id) => scope.clientIds.includes(id))) return { ok: false }
 
     const link = await prisma.clientShareLink.findUnique({
         where: { id: scope.shareLinkId },
@@ -93,8 +101,10 @@ export async function ensureScreeningIdentity(
     // No confirmed email yet → fall through; the player still shows its modal.
     if (!link?.notifyEmail || !link.notifyEmailVerifiedAt) return { ok: false }
 
+    // Display name only — never an access decision.
+    const owner = await resolveShareClient(share)
     const created = await createGuestSession(share, {
-        name: scope.clientName || owner.name,
+        name: scope.clientName || owner?.name || 'Client',
         email: link.notifyEmail.toLowerCase(),
         userAgent: null,
     })

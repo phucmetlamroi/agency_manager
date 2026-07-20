@@ -134,7 +134,17 @@ export interface DocumentFolder {
 export interface DocumentsSnapshot {
     folders: DocumentFolder[]
     assets: DocumentAsset[]
-    summary: { folderCount: number; assetCount: number; totalBytes: string }
+    summary: {
+        folderCount: number; assetCount: number; totalBytes: string
+        /** [Honest empty state 2026-07] Delivered videos whose file is still being
+         *  processed, so it is real but not yet downloadable. Counting it is the
+         *  difference between "nothing here" and "3 still processing". */
+        processingCount?: number
+        /** Videos in scope that have NOT reached the client yet. The library is a
+         *  delivery archive, so these are correctly absent — but silence about them
+         *  is what reads as work having gone missing. */
+        inProgressCount?: number
+    }
     generatedAt: string
 }
 

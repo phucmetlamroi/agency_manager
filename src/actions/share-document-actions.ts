@@ -157,6 +157,12 @@ async function buildClientDocuments(
         .filter((task) => isClientDeliveredPhase(task.status, task.clientReview))
         .map((task) => task.id)
     const scopedTaskById = new Map(scopedTasks.map((task) => [task.id, task]))
+    // Videos in scope that have not reached the client at all. Computed once, up here,
+    // so EVERY return below reports the same number — an empty state that contradicts
+    // the populated one is how a client concludes the system is lying.
+    const inProgressCount = scopedTasks.filter(
+        (t) => !visibleTaskIds.includes(t.id) && t.status !== 'Đã hủy',
+    ).length
 
     if (visibleTaskIds.length === 0) {
         return {
@@ -164,7 +170,9 @@ async function buildClientDocuments(
             documents: {
                 folders: [],
                 assets: [],
-                summary: { folderCount: 0, assetCount: 0, totalBytes: '0' },
+                // No delivered video at all → no asset was even queried, so nothing can be
+                // mid-processing. inProgressCount carries the real reason.
+                summary: { folderCount: 0, assetCount: 0, totalBytes: '0', processingCount: 0, inProgressCount },
                 generatedAt: new Date().toISOString(),
             },
             downloadable: new Map(),
@@ -222,8 +230,17 @@ async function buildClientDocuments(
         })
         : []
     const versionById = new Map(currentVersions.map((version) => [version.id, version]))
+    // [Honest empty state] The count of delivered videos whose file is not servable yet
+    // must be taken HERE — this filter is where they are dropped. Counting inside the
+    // render loop below is dead code: nothing survives to it without a READY version.
+    let processingCount = 0
     const assets = assetsRaw.filter((asset) => {
-        if (!asset.currentVersionId || !versionById.has(asset.currentVersionId)) return false
+        if (!asset.currentVersionId || !versionById.has(asset.currentVersionId)) {
+            // In scope and delivered, but the file is still transcoding or has no object
+            // yet. Real work, not yet servable — the client is told, not left guessing.
+            if (asset.taskId && scopedTaskById.has(asset.taskId)) processingCount++
+            return false
+        }
         if (!asset.taskId || !scopedTaskById.has(asset.taskId)) return false
         return !asset.clientId || allowedClientIds.has(asset.clientId)
     })
@@ -234,7 +251,7 @@ async function buildClientDocuments(
             documents: {
                 folders: [],
                 assets: [],
-                summary: { folderCount: 0, assetCount: 0, totalBytes: '0' },
+                summary: { folderCount: 0, assetCount: 0, totalBytes: '0', processingCount, inProgressCount },
                 generatedAt: new Date().toISOString(),
             },
             downloadable: new Map(),
@@ -418,6 +435,8 @@ async function buildClientDocuments(
                 folderCount: sortedFolders.length,
                 assetCount: sortedAssets.length,
                 totalBytes: bytesLabelTotal(sortedAssets),
+                processingCount,
+                inProgressCount,
             },
             generatedAt: new Date().toISOString(),
         },

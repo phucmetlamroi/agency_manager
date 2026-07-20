@@ -171,12 +171,35 @@ export async function getShareSnapshot(token: string) {
             where: {
                 clientId: { in: scope.clientIds },
                 workspaceId: { in: scope.workspaceIds },
-                isArchived: false,
+                // [Vanishing work 2026-07] Cancelling a task sets isArchived (task-actions),
+                // so `isArchived: false` erased it from the client's history RETROACTIVELY —
+                // a production they discussed last week simply was not in the list, with no
+                // tombstone and no count. Any mis-click, any cancel-and-recreate, any bulk
+                // tidy-up did that. Keep archived work OUT by default, but keep the ones the
+                // client demonstrably knew about: clientReview is only ever written once a
+                // deliverable has been through their hands, so it is the tightest possible
+                // "they saw this" marker and it survives the cancel. Those come back as a
+                // read-only 'Closed' row (portal-derive maps 'Đã hủy'), never as work in
+                // progress and never actionable — findScopedTask still refuses every write
+                // on an archived task.
+                // Only SETTLED decisions come back. Readmitting 'AWAITING' was actively
+                // harmful: deriveClientStatus reads clientReview BEFORE status, so a
+                // cancelled task would render 'Awaiting your review', deriveNeedsYou would
+                // return true, and it would sit in the Action tray with a live Approve
+                // button — which every write path then refuses, because findScopedTask
+                // still requires isArchived:false. The client would be left with a badge
+                // saying one video is waiting on them, attached to a button that answers
+                // "this link is invalid", forever. Worse than the vanishing it replaced.
+                OR: [
+                    { isArchived: false },
+                    { AND: [{ isArchived: true }, { clientReview: { in: ['APPROVED', 'CHANGES'] } }] },
+                ],
             },
             select: {
                 id: true,
                 title: true,
                 status: true,
+                isArchived: true,
                 deadline: true,
                 createdAt: true,
                 updatedAt: true,
@@ -333,7 +356,11 @@ export async function getShareSnapshot(token: string) {
         // R5 gate: only surface a review board when the task is in a CLIENT-facing phase.
         const asset = readyAssetByTask.get(task.id)
         let reviewUrl: string | null = null
-        if (asset && isClientFacingPhase(task.status, task.clientReview)) {
+        // A cancelled task must never reach the minting branch. isClientFacingPhase is true
+        // whenever clientReview != null regardless of status, so without this guard a mere
+        // portal READ could CREATE a fresh open, download-enabled /r/ board for work the
+        // admin had cancelled and whose old board they had deliberately revoked.
+        if (!task.isArchived && asset && isClientFacingPhase(task.status, task.clientReview)) {
             const known = slugByAsset.get(asset.id)
             if (known) {
                 reviewUrl = `${guestBase}/r/${known}`
@@ -374,8 +401,13 @@ export async function getShareSnapshot(token: string) {
         createdAt: iso(task.createdAt)!,
         updatedAt: iso(task.updatedAt)!,
         clientReviewedAt: iso(task.clientReviewedAt),
-        clientStatus: deriveClientStatus(task.status, effClientReview),
-        needsYou: deriveNeedsYou({ status: task.status, productLink: effProductLink, clientReview: effClientReview }),
+        // A cancelled row is a tombstone: it exists so the client's history is honest,
+        // never as live work. Force it past deriveClientStatus, which would otherwise
+        // read the surviving clientReview and label it 'Completed' or 'In revision'.
+        clientStatus: task.isArchived ? 'Closed' : deriveClientStatus(task.status, effClientReview),
+        needsYou: task.isArchived
+            ? false
+            : deriveNeedsYou({ status: task.status, productLink: effProductLink, clientReview: effClientReview }),
         clientPath: formatClientHierarchy(task.client),
         workspaceName: task.workspaceId ? wsNameById.get(task.workspaceId) ?? null : null,
         reviewUrl,

@@ -355,6 +355,13 @@ async function buildClientDocuments(
         } else {
             let parentId = workspaceFolderId
             for (const row of chain.slice(safeStart)) {
+                // safeStart only vouches for the FIRST in-scope ancestor; everything below it
+                // was emitted unchecked. A folder explicitly owned by a DIFFERENT client —
+                // staff can move one anywhere — then contributed its name to this client's
+                // tree. The name is all that escaped (its assets are filtered separately), but
+                // a rival brand's name appearing in a client's folder path is still a leak.
+                // Collapse those rows out of the path rather than rendering them.
+                if (row.clientId && !allowedClientIds.has(row.clientId)) continue
                 parentId = ensureRealFolder(folders, row, parentId, allowedClientIds)
             }
             visibleFolderId = parentId
@@ -464,9 +471,12 @@ export async function downloadDocumentsViaToken(
     error?: string
     files?: { versionId: string; fileName: string; url: string; expiresAt: string }[]
 }> {
-    const built = await buildClientDocuments(token)
-    if (!built) return { success: false, error: 'This link is invalid.' }
-
+    // [Authz 2026-07] ORDER MATTERS, and it was wrong. Everything below used to run AFTER
+    // buildClientDocuments — the full ~8-query library build — so the limiter throttled only
+    // the presigning, never the work. Worse, the three early returns above it (invalid link,
+    // empty selection, oversized selection) skipped the limiter ENTIRELY: an attacker sending
+    // `versionIds: []` in a loop paid nothing and billed us a full library build per request,
+    // forever. Cheap, free checks first; then the lock; then the expensive part.
     const cleaned = Array.from(
         new Set((versionIds || []).filter((id) => typeof id === 'string' && id.length > 0)),
     )
@@ -475,13 +485,21 @@ export async function downloadDocumentsViaToken(
         return { success: false, error: `You can download up to ${MAX_DOWNLOAD_BATCH} files at a time.` }
     }
 
+    // Resolve the token on its own first (one indexed lookup, itself throttled) so the limiter
+    // can be keyed and charged BEFORE any library work happens.
+    const scope = await resolveShareToken(token)
+    if (!scope) return { success: false, error: 'This link is invalid.' }
+
     // [Parity review 2026-07] Was rateLimit(), a per-process in-memory Map: on serverless
     // every cold instance starts at zero, so in aggregate it capped nothing — and its key
     // mixed in an IP read from client-supplied X-Forwarded-For. The zip route next door
     // already rejected that design for exactly these bytes; same door, same lock now:
     // DB-backed, keyed on the share link, unspoofable.
-    const rl = await limitDb(`portal-doc-download:${built.scope.shareLinkId}`, 60, 60 * 60, { failClosed: true })
+    const rl = await limitDb(`portal-doc-download:${scope.shareLinkId}`, 60, 60 * 60, { failClosed: true })
     if (!rl.success) return { success: false, error: 'Too many downloads. Please try again in a little while.' }
+
+    const built = await buildClientDocuments(token)
+    if (!built) return { success: false, error: 'This link is invalid.' }
 
     const allowed = cleaned
         .map((id) => built.downloadable.get(id))

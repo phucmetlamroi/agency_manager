@@ -17,7 +17,7 @@
 import { createHash } from 'crypto'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/db'
-import { rateLimit } from '@/lib/rate-limit'
+import { limitDb } from '@/lib/review/rate-limit-db'
 
 export interface ShareLinkScope {
     /** ClientShareLink.id — for audit provenance + telemetry bumps */
@@ -41,15 +41,25 @@ export function hashShareToken(raw: string): string {
     return createHash('sha256').update(raw).digest('hex')
 }
 
-/** Best-effort caller IP for rate limiting + audit. */
+/**
+ * Best-effort caller IP, for AUDIT provenance.
+ *
+ * [G1, extended 2026-07] Not a rate-limit key any more — see resolveShareToken. The
+ * left-most `x-forwarded-for` token is chosen by the caller, so anything keyed on it is
+ * defeated by sending a different value each request. Mirror the trusted-header order that
+ * rate-limit-db.ts:getClientIp already uses: platform headers first, then the RIGHT-most
+ * forwarded entry (the hop added by the closest trusted proxy), never the left-most.
+ */
 export async function getRequestIp(): Promise<string> {
     try {
         const h = await headers()
-        return (
-            h.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-            h.get('x-real-ip') ||
-            'unknown'
-        )
+        const realIp = h.get('x-real-ip')?.trim()
+        if (realIp) return realIp
+        const vercelFwd = h.get('x-vercel-forwarded-for')?.split(',').pop()?.trim()
+        if (vercelFwd) return vercelFwd
+        const parts = (h.get('x-forwarded-for') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+        if (parts.length) return parts[parts.length - 1]
+        return 'unknown'
     } catch {
         return 'unknown'
     }
@@ -65,15 +75,33 @@ export async function resolveShareToken(
     opts?: { recordAccess?: boolean },
 ): Promise<ShareLinkScope | null> {
     if (!rawToken || !TOKEN_RX.test(rawToken)) return null
+    const tokenHash = hashShareToken(rawToken)
 
-    // Rate limit token resolution per IP (in-memory: per-instance on Vercel,
-    // still kills single-instance burst loops; 256-bit keyspace is the real wall).
-    const ip = await getRequestIp()
-    const rl = await rateLimit(`share-token:${ip}`, 30, 60_000)
+    // [Authz 2026-07] Throttle keyed on the TOKEN, not the caller's IP.
+    //
+    // This is the only throttle on ~15 portal server actions — getShareSnapshot,
+    // getDocumentsViaToken, approve/approveMany, requestChanges, the comment feed and the
+    // rest all rely on it — and it was broken three ways at once:
+    //   • the key was the LEFT-most x-forwarded-for token, which the caller picks, so
+    //     rotating one header opened a fresh bucket on every request and the limit never
+    //     fired (each request then runs the full ~8-query library build);
+    //   • the limiter was the in-memory Map, one bucket per lambda instance, so on Vercel
+    //     it barely applies even to an honest caller;
+    //   • when NO forwarding header exists (direct connection — the standalone/desktop
+    //     target this repo also builds for) every visitor of every agency collapsed into a
+    //     single `share-token:unknown` bucket of 30/min, and visitor 31 was shown "this
+    //     link is no longer valid".
+    //
+    // The token hash fixes all three: it is server-derived (unspoofable), stable per link
+    // (so one agency office behind one NAT egress is not one shared bucket), and DB-backed
+    // via limitDb, so the ceiling is real across instances. Enumeration is not what this
+    // defends — a 256-bit keyspace is that wall; this bounds hammering with a VALID token.
+    // Fail-OPEN: a limiter outage must not present every client with a dead link.
+    const rl = await limitDb(`share-token:${tokenHash}`, 120, 60, { failClosed: false })
     if (!rl.success) return null
 
     const link = await prisma.clientShareLink.findUnique({
-        where: { tokenHash: hashShareToken(rawToken) },
+        where: { tokenHash },
         select: {
             id: true,
             revokedAt: true,
@@ -131,7 +159,20 @@ export async function resolveShareToken(
         while (cur != null && !seen.has(cur)) {
             seen.add(cur)
             const c = byId.get(cur)
-            if (!c) break
+            if (!c) {
+                // [Authz 2026-07] An ancestor outside the ACTIVE set (soft-deleted, merged, or
+                // left behind by collectClientSubtreeIds, whose cascade stops at depth 8) used
+                // to end the path silently — which RE-ROOTED the descendant under its own name.
+                // "bob > … > acme" then read as ["acme"] and matched a root client literally
+                // named "Acme", pulling an unrelated customer's tasks, invoices and files into
+                // this token's scope. Record the break as an unforgeable segment instead. Real
+                // segments are `.trim().toLowerCase()`, so none can begin with a space — this
+                // marker is unspellable as a client name, and a truncated path can therefore
+                // only match ANOTHER descendant of the SAME missing ancestor, which is exactly
+                // the sibling relationship it really has.
+                names.push(` #${cur}`)
+                break
+            }
             names.push((c.name ?? '').normalize('NFC').trim().toLowerCase())
             cur = c.parentId
         }

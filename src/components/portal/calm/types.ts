@@ -14,7 +14,10 @@ export interface Deliverable {
     id: string
     title: string
     type: string
-    status: string
+    // No raw `status`. The internal Vietnamese workflow label is not sent to the client
+    // (share-portal-actions.ts strips it); `clientStatus` below is the derived, client-facing
+    // one and is what every surface renders. Leaving the field declared here would have made
+    // the type claim something the wire no longer carries.
     clientStatus: string
     needsYou: boolean
     deadline: string | null

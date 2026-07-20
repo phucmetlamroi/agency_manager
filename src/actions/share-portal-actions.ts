@@ -235,7 +235,20 @@ export async function getShareSnapshot(token: string) {
                     select: { id: true, name: true, parent: { select: { name: true } } },
                 },
                 project: { select: { id: true, name: true } },
-                rating: true,
+                // [Authz 2026-07] Narrowed from `rating: true`. The DTO type declares four
+                // fields, but the type does not strip at runtime — `...task` spread the WHOLE
+                // Rating row, which carries staffId. That is the editor's stable identity,
+                // handed to the client on every rated task, re-opening exactly the leak
+                // `assignee: null` two lines below exists to close (the client works with the
+                // manager and must not know who edited). clientId and shareLinkId rode along too.
+                rating: {
+                    select: {
+                        creativeQuality: true,
+                        responsiveness: true,
+                        communication: true,
+                        qualitativeFeedback: true,
+                    },
+                },
                 assignee: { select: { username: true, nickname: true } },
                 // [Trial P0] Manager ("Người quản lý") — the ONLY staff identity the client may see.
                 assignedBy: { select: { username: true, nickname: true } },
@@ -393,8 +406,14 @@ export async function getShareSnapshot(token: string) {
         // links (frame.io / Drive) are ALWAYS preserved — they back the sheet's "Download files" button.
         const clientProductLink = isOwnReviewLink(task.productLink) ? (reviewUrl ?? null) : task.productLink
         const effProductLink = clientProductLink
+        // [Authz 2026-07] The raw internal status never leaves the server. It is a Vietnamese
+        // staff-workflow label — including the four internalOnly ones ("Đã nộp video (nội bộ)"
+        // and friends) — and it was being spread straight into the client's page payload by
+        // `...task`. No portal component reads it: everything renders `clientStatus`, which is
+        // derived below. It stayed on the wire only because the spread was never pruned.
+        const { status: _internalStatus, ...taskSafe } = task
         return {
-        ...task,
+        ...taskSafe,
         productLink: clientProductLink,
         // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
         // ship the Manager instead ("client làm việc với manager, không biết editor").
@@ -503,6 +522,23 @@ function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
 </div>`
 }
 
+/**
+ * Collapse an address to the mailbox it actually reaches, for rate-limit keys ONLY.
+ * Never store or send this — it is deliberately lossy. `+tag` suffixes are stripped for every
+ * provider (universally a same-inbox alias); dots are stripped only for Gmail, which is the one
+ * major provider that ignores them.
+ */
+function notifyInboxKey(email: string): string {
+    const at = email.lastIndexOf('@')
+    if (at < 1) return email
+    let local = email.slice(0, at)
+    const domain = email.slice(at + 1)
+    const plus = local.indexOf('+')
+    if (plus > 0) local = local.slice(0, plus)
+    if (domain === 'gmail.com' || domain === 'googlemail.com') local = local.replace(/\./g, '')
+    return `${local}@${domain}`
+}
+
 /** Current notify-email state for the portal Settings panel. Null = invalid token. */
 export async function getPortalNotifyEmail(
     token: string,
@@ -535,7 +571,11 @@ export async function requestPortalNotifyEmail(
     // (survives serverless cold-starts, unlike the in-memory rateLimit below). Without a per-inbox
     // cap keyed on the destination address, the portal could be abused to email-bomb an arbitrary
     // victim inbox (the per-link+ip cap doesn't bound how many distinct addresses one caller hits).
-    const inboxRl = await limitDb(`portal-notify-inbox:${email}`, 3, 60 * 60)
+    // [Authz 2026-07] Key on the DELIVERY inbox, not the typed string. The cap existed to stop
+    // this endpoint being used to email-bomb an arbitrary victim, but keying on the raw address
+    // meant victim+1@gmail.com, victim+2@… and v.i.c.t.i.m@… were three separate buckets
+    // delivering to one mailbox — 3/hour became unbounded for the cost of typing a plus sign.
+    const inboxRl = await limitDb(`portal-notify-inbox:${notifyInboxKey(email)}`, 3, 60 * 60)
     if (!inboxRl.success) {
         return { success: false, error: 'Too many attempts for this email. Please try again later.' }
     }
@@ -810,10 +850,24 @@ export async function approveDeliverablesViaToken(
 
     // One transaction: a half-applied batch would leave the client unsure what they
     // approved, and payroll reading a partial month.
-    await prisma.$transaction(
-        eligible.map((t) =>
-            prisma.task.update({
-                where: { id: t.id },
+    //
+    // [Authz 2026-07] The precondition is re-stated INSIDE the write. This used to be
+    // `update({ where: { id } })` — the eligibility test above ran against a snapshot read
+    // moments earlier, so an admin cancelling or completing a task in that window was
+    // silently overwritten: 'Đã hủy' flipped back to 'Hoàn tất', which is a payroll-bearing
+    // status. updateMany with the same conditions makes the check and the write one atomic
+    // step; a row that stopped qualifying reports count 0 and is counted as skipped instead
+    // of clobbered. Interactive transaction so a mid-batch failure still rolls back whole.
+    const approvedIds = await prisma.$transaction(async (tx) => {
+        const done: string[] = []
+        for (const t of eligible) {
+            const res = await tx.task.updateMany({
+                where: {
+                    id: t.id,
+                    isArchived: false,
+                    status: { not: 'Hoàn tất' },
+                    clientReview: t.clientReview,
+                },
                 data: {
                     status: 'Hoàn tất',
                     deadline: null,
@@ -821,43 +875,60 @@ export async function approveDeliverablesViaToken(
                     clientReviewedAt: new Date(),
                     version: { increment: 1 },
                 },
-            }),
-        ),
-    )
+            })
+            if (res.count > 0) done.push(t.id)
+        }
+        return done
+    })
 
-    // ONE notification for the batch — 20 separate bells for one client action is noise
-    // that gets muted, which is how a change request goes unnoticed in the first place.
-    const titles = eligible.map((t) => t.title).filter(Boolean)
-    const preview = titles.slice(0, 3).join(', ') + (titles.length > 3 ? `, +${titles.length - 3} nữa` : '')
-    const recipients = new Set<string>()
-    for (const t of eligible) {
-        if (t.assigneeId) recipients.add(t.assigneeId)
-        if (t.assignedById) recipients.add(t.assignedById)
+    const approvedSet = new Set(approvedIds)
+    const applied = eligible.filter((t) => approvedSet.has(t.id))
+    if (applied.length === 0) {
+        return { success: false, approved: 0, skipped: ids.length, error: 'Those have already been updated. Please refresh.' }
     }
-    const body = `Khách hàng "${scope.clientName}" đã duyệt ${eligible.length} video qua link chia sẻ: ${preview}. Các task được đánh dấu Hoàn tất.`
-    // Every editor/manager touched by the batch gets exactly ONE summary. notifyStaff
-    // fans out to a task's assignee+manager, so drive it once per unique recipient
-    // rather than once per task — 20 bells for one client click is noise people mute,
-    // and a muted bell is how the next change request goes unseen.
-    for (const uid of recipients) {
+
+    // ONE notification per person — 20 separate bells for one client action is noise that
+    // gets muted, which is how a change request goes unnoticed in the first place.
+    //
+    // [Authz 2026-07] Grouped BY RECIPIENT. Every notification used to be built from
+    // eligible[0]: the same deep link for everyone (so an editor clicking their bell landed
+    // on a colleague's task) and a body listing every title in the batch (so each editor was
+    // shown the names of other clients' work they have nothing to do with). Each person now
+    // gets their own tasks, their own count, and a link that goes where it says.
+    const byRecipient = new Map<string, typeof applied>()
+    for (const t of applied) {
+        for (const uid of [t.assigneeId, t.assignedById]) {
+            if (!uid) continue
+            const arr = byRecipient.get(uid) ?? []
+            arr.push(t)
+            byRecipient.set(uid, arr)
+        }
+    }
+    for (const [uid, mine] of byRecipient) {
+        const titles = mine.map((t) => t.title).filter(Boolean)
+        const preview = titles.slice(0, 3).join(', ') + (titles.length > 3 ? `, +${titles.length - 3} nữa` : '')
         await notifyStaff(
-            { assigneeId: uid, assignedById: null, title: eligible[0].title },
-            eligible[0].id,
-            'Khách đã duyệt nhiều sản phẩm 🎉',
-            body,
+            { assigneeId: uid, assignedById: null, title: mine[0].title },
+            mine[0].id,
+            mine.length > 1 ? 'Khách đã duyệt nhiều sản phẩm 🎉' : 'Khách đã duyệt sản phẩm 🎉',
+            `Khách hàng "${scope.clientName}" đã duyệt ${mine.length} video qua link chia sẻ: ${preview}. Các task được đánh dấu Hoàn tất.`,
         )
     }
 
-    for (const t of eligible) {
-        void audit({
+    // Awaited, not fire-and-forget. These are the only record that a payroll-bearing status
+    // change came from a share link rather than a staff member; `void audit(...)` after a
+    // committed transaction means the batch can land with no trail at all if the process is
+    // torn down first, which on a serverless function is the normal case, not an edge one.
+    await Promise.all(applied.map((t) =>
+        audit({
             workspaceId: t.workspaceId, actorUserId: null, action: 'task.client_approved',
             targetType: 'Task', targetId: t.id,
             before: { status: t.status },
             after: { status: 'Hoàn tất', clientReview: 'APPROVED', viaShareLinkId: scope.shareLinkId, bulk: true },
-        })
-    }
+        }).catch(() => { /* one failed audit row must not fail the client's approval */ }),
+    ))
 
-    const workspaces = new Set(eligible.map((t) => t.workspaceId).filter(Boolean) as string[])
+    const workspaces = new Set(applied.map((t) => t.workspaceId).filter(Boolean) as string[])
     for (const ws of workspaces) {
         try {
             revalidatePath(`/${ws}/admin`)
@@ -865,7 +936,9 @@ export async function approveDeliverablesViaToken(
         } catch { /* best-effort */ }
     }
 
-    return { success: true, approved: eligible.length, skipped }
+    // Report what actually landed, not what we hoped would: ids.length - applied.length
+    // counts both the never-eligible and anything an admin changed underneath us.
+    return { success: true, approved: applied.length, skipped: ids.length - applied.length }
 }
 
 /** Client requests changes via the public link → task 'Revision' + feedback. */
@@ -1122,6 +1195,8 @@ export async function createTaskViaToken(
 const DESIRED_TYPES = new Set(['Short form', 'Long form', 'Trial'])
 /** Max ACTIVE sub-brands a client may create under one parent via the portal. */
 const SUBCLIENT_CAP = 20
+/** Deepest ancestor chain a client may create through the portal. See createSubClientViaToken. */
+const MAX_SUBCLIENT_DEPTH = 4
 
 /**
  * Realtime + bespoke-VN-email fan-out to every profile OWNER/ADMIN about a fresh
@@ -1306,7 +1381,9 @@ export async function createSubClientViaToken(token: string, input: { name: stri
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    const rl = await rateLimit(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60 * 1000)
+    // DB-backed, like every other portal write: the in-memory limiter resets on each cold start,
+    // so on serverless it capped almost nothing.
+    const rl = await limitDb(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60)
     if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
 
     if (!input || typeof input.parentId !== 'number') return { success: false, error: 'Missing information.' }
@@ -1326,6 +1403,28 @@ export async function createSubClientViaToken(token: string, input: { name: stri
         where: { parentId: input.parentId, status: 'ACTIVE' },
     })
     if (existing >= SUBCLIENT_CAP) return { success: false, error: 'You have reached the maximum number of sub-brands.' }
+
+    // [Authz 2026-07] SUBCLIENT_CAP bounds the WIDTH of one parent, not the DEPTH of the tree —
+    // and depth is the expensive dimension. resolveShareToken rebuilds a name path for every
+    // ACTIVE client in the profile on EVERY portal request, walking parentId upward each time,
+    // so cost is O(clients × depth). A client could chain sub-brand inside sub-brand without
+    // limit and permanently slow every page load for that agency, from the public side, with no
+    // staff action. Four levels is deeper than any real brand hierarchy here.
+    let depth = 0
+    let cursor: number | null = input.parentId
+    const walked = new Set<number>()
+    while (cursor != null && depth < MAX_SUBCLIENT_DEPTH && !walked.has(cursor)) {
+        walked.add(cursor)
+        const row: { parentId: number | null } | null = await prisma.client.findUnique({
+            where: { id: cursor },
+            select: { parentId: true },
+        })
+        depth++
+        cursor = row?.parentId ?? null
+    }
+    if (cursor != null || depth >= MAX_SUBCLIENT_DEPTH) {
+        return { success: false, error: 'This brand is already nested as deeply as we allow. Ask the studio to add it for you.' }
+    }
 
     let client: { id: number; name: string }
     try {

@@ -392,6 +392,22 @@ export async function unmergeClient(clientId: number, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
+        // [Authz 2026-07] Detaching MOVES a client to root level, so it has to clear the same
+        // duplicate guard createClient and updateClient already run — this was the one
+        // parent-changing path without one. The share-token scope identifies a client by its
+        // hierarchical NAME PATH, so two ACTIVE roots named "Michael" in one profile collapse
+        // into a SINGLE scope and either one's link reads the other's tasks, invoices and
+        // files. "Bob > Michael" alongside a root "Michael" is legal (the unique index keys on
+        // profile + parent + name), which makes detaching the way that pair gets created.
+        const target = await workspacePrisma.client.findUnique({
+            where: { id: clientId },
+            select: { name: true, parentId: true },
+        })
+        if (!target) return { success: false, error: 'Không tìm thấy khách hàng.' }
+        if (target.parentId !== null && await findDuplicateName(workspacePrisma, target.name, null, clientId)) {
+            return { success: false, error: `Không thể tách: đã có khách hàng "${target.name.trim()}" ở cấp gốc. Đổi tên một trong hai trước khi tách.` }
+        }
+
         await workspacePrisma.client.update({
             where: { id: clientId },
             data: { parentId: null }

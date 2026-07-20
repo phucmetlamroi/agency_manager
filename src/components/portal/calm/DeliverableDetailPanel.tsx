@@ -51,7 +51,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
         const res = await actions.approve(d.id)
         setBusy(false)
         if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Hoàn tất', clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
+            onUpdated(d.id, { clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
             actions.activity(d.id).then(setActivity).catch(() => { })
         } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
     }
@@ -62,7 +62,7 @@ export default function DeliverableDetailPanel({ d, actions, onClose, onUpdated 
         const res = await actions.requestChanges(d.id, notes.trim())
         setBusy(false)
         if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Revision', clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
+            onUpdated(d.id, { clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
             setMode(null); setNotes('')
             actions.activity(d.id).then(setActivity).catch(() => { })
         } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')

@@ -64,7 +64,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
         const res = await actions.approve(d.id)
         setBusy(false)
         if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Hoàn tất', clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
+            onUpdated(d.id, { clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
             actions.activity(d.id).then(setActivity).catch(() => {})
         } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
     }
@@ -75,7 +75,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
         const res = await actions.requestChanges(d.id, notes.trim())
         setBusy(false)
         if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Revision', clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
+            onUpdated(d.id, { clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
             setMode(null); setNotes('')
             actions.activity(d.id).then(setActivity).catch(() => {})
         } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')
@@ -93,8 +93,12 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                     </div>
                 )}
 
-                {/* Review board link */}
-                {!(d.reviewUrl || d.productLink) ? (
+                {/* Review board link. `closed` short-circuits it: a cancelled job that still
+                    carries an external productLink was rendering "Open the screening room —
+                    watch, comment and approve", i.e. an invitation to review work nobody is
+                    doing, on a task every write path refuses. Its files, if any were ever
+                    delivered, remain in Files & masters. */}
+                {closed || !(d.reviewUrl || d.productLink) ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 16, borderRadius: 8, background: 'var(--paper-sunken)', border: '1px dashed var(--hairline-strong)' }}>
                         <span style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper-raised)', border: '1px solid var(--hairline)', color: 'var(--ink-3)' }}><Clock size={20} /></span>
                         {/* [Client escalation 2026-07] A task that HAS client feedback on record is

@@ -353,9 +353,30 @@ export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<str
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
-        select: { slug: true, items: { select: { assetId: true } } },
+        select: { slug: true, items: { select: { assetId: true, folderId: true } } },
     })
+    // [Authz 2026-07] CONTAINMENT — the query above matches on POLICY SHAPE and on membership
+    // of ONE in-scope asset. It says nothing about the share's OTHER items, and a /r/ board
+    // shows every item it holds to whoever opens it. A staff member who multi-selects two
+    // clients' videos in the Team browser and turns download on with the approval gate off
+    // produces exactly this shape — so the portal would hand client A a link that renders
+    // client B's video, presigns B's master through /api/r/<slug>/download-url, and accepts a
+    // review decision on B's task. Nothing downstream can catch it: a multi-item share has
+    // taskId null, and the /r/ door authorizes on the slug alone, by design.
+    //
+    // Reuse therefore requires the share to be ENTIRELY inside the caller's allowed set.
+    // Folder items are rejected outright: a folder's contents are unbounded and can gain
+    // another client's asset after this check. Rejecting is cheap — the caller mints a
+    // single-asset board instead.
+    //
+    // Verified read-only against production before shipping (scripts/probe-share-scope.mjs):
+    // live shares of this shape spanning >1 client, or holding a folder item = 0 rows. The
+    // leak is not open today; 46 of 77 links match the reusable shape, so it opens on the
+    // first cross-client multi-select.
+    const allowed = new Set(assetIds)
     for (const r of rows) {
+        if (r.items.length === 0) continue
+        if (r.items.some((it) => it.folderId || !it.assetId || !allowed.has(it.assetId))) continue
         for (const it of r.items) {
             // orderBy createdAt asc + first-write-wins == the oldest link, matching the
             // single-asset lookup's `orderBy: { createdAt: 'asc' }`.
@@ -373,7 +394,7 @@ export async function getOrCreateClientReviewSlug(asset: {
 }): Promise<string> {
     // 1. Try to find a live share link containing this asset that ALREADY has allowDownload enabled
     // and no password, to avoid minting duplicates when one is already available.
-    const alreadyEnabled = await prisma.shareLink.findFirst({
+    const candidates = await prisma.shareLink.findMany({
         where: {
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
@@ -383,8 +404,20 @@ export async function getOrCreateClientReviewSlug(asset: {
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
-        select: { slug: true },
+        select: { slug: true, items: { select: { assetId: true, folderId: true } } },
     })
+    // [Authz 2026-07] Reuse ONLY a board that holds this asset and nothing else. The query
+    // matches on policy shape plus membership; it cannot see what ELSE the share contains, and
+    // a /r/ board renders every item it holds to whoever opens the link. A staff multi-select
+    // across two clients produces exactly this shape, so an unrestricted reuse would hand one
+    // client a board showing another client's video — and /api/r/<slug>/download-url would
+    // presign that client's master, since it gates on membership in the share, not ownership.
+    // Single-item containment is the one condition provable here without the caller's full
+    // scope; findClientReviewSlugs does the same check against its whole allowed set. A miss
+    // is not a failure — we mint a private single-asset board immediately below.
+    const alreadyEnabled = candidates.find(
+        (c) => c.items.length === 1 && c.items[0].assetId === asset.id && !c.items[0].folderId,
+    )
     if (alreadyEnabled) {
         return alreadyEnabled.slug
     }

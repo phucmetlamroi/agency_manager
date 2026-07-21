@@ -233,6 +233,36 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
         [allAssets, folderId, prefs.sort, prefs.dir],
     )
 
+    /* [Owner review 2026-07-22] "Folder mù" — a folder card used to be one lucide glyph, so the
+       client could not tell a folder of finished videos from an empty one without opening it. Show
+       what is INSIDE, the way Frame.io does (owner, 01:15-01:51): up to two real tiles, and when
+       there are more than two children the rest collapses into a single "+N" tile.
+
+       This costs NOTHING extra on the wire. getDocumentsViaToken already returns the WHOLE library
+       — every folder with its parentId, every asset with its folderId and a Mux-signed posterUrl —
+       and Library holds it all in allFolders/allAssets. So the tiles are derived from data already
+       in memory; there is no new query, no new route, and no schema change. (The staff /team
+       browser is NOT like this: it pages one folder at a time and genuinely needs a backend feed —
+       that half is deliberately not in this change.)
+
+       One index for the whole level instead of two filters per card, so a folder-heavy level stays
+       O(n) rather than O(folders × assets). */
+    const previewIndex = useMemo(() => {
+        const subfolders = new Map<string, DocumentFolder[]>()
+        const files = new Map<string, DocumentAsset[]>()
+        for (const f of allFolders) {
+            if (!f.parentId) continue
+            const list = subfolders.get(f.parentId)
+            if (list) list.push(f); else subfolders.set(f.parentId, [f])
+        }
+        for (const a of allAssets) {
+            if (!a.folderId) continue
+            const list = files.get(a.folderId)
+            if (list) list.push(a); else files.set(a.folderId, [a])
+        }
+        return { subfolders, files }
+    }, [allFolders, allAssets])
+
     const shown = searching ? results : assets
     const windowed = shown.slice(0, limit)
     useEffect(() => { setLimit(WINDOW) }, [folderId, term, wsScope, clientScope])
@@ -534,10 +564,59 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                                 {folders.map(f => {
                                     // C8 — a client-root folder reads differently from a plain folder.
                                     const Glyph = f.kind === 'client' ? Building2 : Folder
+                                    const kidFiles = previewIndex.files.get(f.id) ?? []
+                                    const kidFolders = previewIndex.subfolders.get(f.id) ?? []
+                                    /* Videos first — a delivered cut is what the client came for; sub-folders
+                                       fill the remaining slot(s). Two real tiles max, per the owner's
+                                       "trên 3 video thì nó sẽ hiển thị cố định là dạng 2 video". */
+                                    const picks: { key: string; poster: string | null; folder: boolean }[] = [
+                                        ...kidFiles.slice(0, 2).map(a => ({ key: 'a' + a.id, poster: a.currentVersion?.posterUrl ?? null, folder: false })),
+                                        ...(kidFiles.length < 2
+                                            ? kidFolders.slice(0, 2 - kidFiles.length).map(s => ({ key: 'f' + s.id, poster: null, folder: true }))
+                                            : []),
+                                    ]
+                                    const rest = kidFiles.length + kidFolders.length - picks.length
                                     return (
                                         <div key={f.id} style={{ position: 'relative' }} onContextMenu={e => openMenu(e, folderMenu(f))}>
-                                            <button onClick={() => setFolderId(f.id)} style={{ width: '100%', border: '1px solid ' + (selFolders.has(f.id) ? 'var(--accent)' : 'var(--hairline)'), background: selFolders.has(f.id) ? 'var(--accent-tint)' : 'var(--paper-raised)', padding: '16px 18px 16px 44px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer', textAlign: 'left', borderRadius: 4 }}>
-                                                <Glyph size={20} style={{ color: 'var(--ink-2)', flexShrink: 0 }} />
+                                            {/* [Owner review 2026-07-22, 02:17-02:55] Single click TICKS, double click OPENS.
+                                                It used to open on a single click anywhere on the body, so selecting meant
+                                                hitting the 18px tick exactly — "rất là khó về cái mặt trải nghiệm người dùng".
+                                                Enter still opens (preventDefault stops the button's synthetic click, so Enter
+                                                does not also toggle); right-click → Open is the third route. Note this makes
+                                                folders and FILES behave oppositely in the same grid — file cards deliberately
+                                                open on a plain click (see onCardClick) — which is what the owner asked for
+                                                specifically for folders. */}
+                                            <button
+                                                onClick={() => toggleFolder(f.id)}
+                                                onDoubleClick={() => setFolderId(f.id)}
+                                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setFolderId(f.id) } }}
+                                                title={`${f.name} — click to select, double-click to open`}
+                                                style={{ width: '100%', border: '1px solid ' + (selFolders.has(f.id) ? 'var(--accent)' : 'var(--hairline)'), background: selFolders.has(f.id) ? 'var(--accent-tint)' : 'var(--paper-raised)', padding: '16px 18px 16px 44px', display: 'flex', gap: 12, alignItems: 'center', cursor: 'pointer', textAlign: 'left', borderRadius: 4 }}>
+                                                {picks.length === 0 ? (
+                                                    <Glyph size={20} style={{ color: 'var(--ink-2)', flexShrink: 0 }} />
+                                                ) : (
+                                                    <span aria-hidden style={{ display: 'flex', gap: 2, flexShrink: 0, width: 52, height: 36 }}>
+                                                        {picks.map(p => (
+                                                            <span
+                                                                key={p.key}
+                                                                style={{
+                                                                    flex: 1, minWidth: 0, borderRadius: 2, background: p.poster ? `#09090b center/cover url("${p.poster}")` : 'var(--accent-tint)',
+                                                                    border: '1px solid var(--hairline)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                }}
+                                                            >
+                                                                {/* No poster: images never get one (Mux only mints thumbnails for
+                                                                    video), and a video is poster-less until Mux finishes. Show the
+                                                                    kind rather than a broken tile. */}
+                                                                {!p.poster && <Glyph size={11} style={{ color: 'var(--ink-3)' }} />}
+                                                            </span>
+                                                        ))}
+                                                        {rest > 0 && (
+                                                            <span className="desk-mono" style={{ flex: 1, minWidth: 0, borderRadius: 2, background: 'var(--accent-tint)', border: '1px solid var(--hairline)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.5rem', color: 'var(--ink-2)' }}>
+                                                                +{rest}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )}
                                                 <span style={{ minWidth: 0, flex: 1 }}>
                                                     <p className="desk-truncate" style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem' }}>{f.name}</p>
                                                     <p className="desk-mono" style={{ fontSize: '0.6rem', color: 'var(--ink-3)', margin: '2px 0 0' }}>{f.itemCount} item{f.itemCount === 1 ? '' : 's'} · {fmtBytes(f.totalBytes)}</p>

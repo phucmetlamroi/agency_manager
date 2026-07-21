@@ -182,6 +182,24 @@ function ReviewPlayerShellInner({
       const a = document.createElement("a");
       a.href = url;
       a.rel = "noopener";
+      // [Client bug 2026-07-21] target="_blank" is LOAD-BEARING, not cosmetic.
+      //
+      // `download` is silently IGNORED for a cross-origin href, and this href is a presigned
+      // R2 URL. So the anchor is not a download at all — it is a plain navigation of the
+      // CURRENT browsing context. On the staff pages that context is the tab, the response
+      // carries Content-Disposition: attachment, and the file saves; nobody noticed.
+      //
+      // In the CLIENT portal that context is the screening-room IFRAME
+      // (components/portal/desk/ScreeningRoom.tsx), and the parent /share page ships
+      // `frame-src 'self' *.frame.io` (next.config.ts). R2 is not in that list, so the frame
+      // navigation is refused BEFORE any response — Content-Disposition never gets a say —
+      // and Chrome replaces the whole player with "This content is blocked. Contact the site
+      // owner to fix the issue." The client loses the video AND gets no file: exactly the
+      // "we're not able to download" they reported, reproduced on video at 00:34.
+      //
+      // _blank makes it a TOP-LEVEL navigation, which the parent's frame-src does not govern.
+      // The attachment header then saves the file and the blank tab closes itself.
+      a.target = "_blank";
       a.download = version.originalName || "";
       document.body.appendChild(a);
       a.click();

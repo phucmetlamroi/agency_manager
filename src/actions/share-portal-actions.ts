@@ -781,8 +781,21 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
         return { success: false, error: 'This deliverable is not currently awaiting your review.' }
     }
 
-    await prisma.task.update({
-        where: { id: taskId },
+    // [Client escalation 2026-07-21] PIN the state the gates above were decided on, and the
+    // tenancy. This was a bare `update({ where: { id: taskId } })`, i.e. every check above was
+    // advisory: between the read and the write an admin can cancel the job or a new cut can land
+    // (revokeClientExposureOnNewVersion pulls the task back to A2 and nulls clientReview), and the
+    // write still stamped 'Hoàn tất' — which is the editor's payroll signal. The bulk sibling
+    // approveDeliverablesViaToken already pins exactly this; the single-deliverable path, the one
+    // a client actually clicks, did not. A lost race is not an error for the client: re-read and
+    // report the truth rather than claiming an approval that did not happen.
+    const applied = await prisma.task.updateMany({
+        where: {
+            id: taskId,
+            workspaceId: task.workspaceId,
+            status: task.status,
+            clientReview: task.clientReview,
+        },
         data: {
             status: 'Hoàn tất',
             deadline: null,
@@ -791,6 +804,9 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
             version: { increment: 1 },
         },
     })
+    if (applied.count === 0) {
+        return { success: false, error: 'This deliverable just changed. Please refresh and try again.' }
+    }
 
     await notifyStaff(
         task, taskId,

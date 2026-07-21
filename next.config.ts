@@ -76,8 +76,21 @@ const nextConfig: NextConfig = {
               // The host is safe to wildcard because r2.ts pins the endpoint to
               // https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com with no custom-domain/r2.dev
               // escape hatch; revisit both img-src and connect-src if that ever changes.
-              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io;"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io; upgrade-insecure-requests;"
+              // NOTE (frame-src + R2 — client download): *.r2.cloudflarestorage.com is LOAD-BEARING here,
+              // not a copy-paste of the img-src token. The client portal embeds the guest review player
+              // in a same-origin iframe (portal/desk/ScreeningRoom.tsx). Its Download button navigates the
+              // CURRENT browsing context to a presigned R2 URL whose response carries
+              // `Content-Disposition: attachment` — a frame navigation to an attachment downloads the file
+              // and leaves the frame untouched, which is exactly the intended in-place behaviour.
+              // BUT the CONTAINING document's frame-src governs every navigation of a nested browsing
+              // context, and it is checked BEFORE any response — so Content-Disposition never gets a say.
+              // Without R2 listed, Chrome refuses the navigation and replaces the whole player with
+              // "This content is blocked. Contact the site owner to fix the issue." — the client loses the
+              // video AND gets no file (owner's bug video 2026-07-21 @00:34; the reported "we're also not
+              // able to download"). It never reproduced on staff pages: there the player is top-level, and
+              // frame-src does not apply to top-level navigations.
+              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com;"
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com; upgrade-insecure-requests;"
           },
           {
             key: 'X-Content-Type-Options',
@@ -99,8 +112,17 @@ const nextConfig: NextConfig = {
       // OFF /r/ here (kept as DENY for every other route below) and /r/ instead gets
       // SAMEORIGIN + `frame-ancestors 'self'`: ONLY our own same-origin portal may
       // frame the review page; external sites still cannot (clickjacking stays
-      // blocked). /r/ keeps the global CSP (Mux/playback) from the '/(.*)' rule; this
-      // adds only the ancestor restriction. reviewUrl is same-origin (guestAppBaseUrl
+      // blocked).
+      // ⚠️ CORRECTION — this rule REPLACES the global Content-Security-Policy for /r/, it does
+      // NOT extend it (Next overwrites same-key headers from a later matching rule; only
+      // `set-cookie` accumulates). The /r/ document therefore ships `frame-ancestors 'self'` and
+      // nothing else — no default-src, no media-src. Two consequences worth knowing before
+      // touching this: (1) guest playback works BECAUSE there is no policy here, so "restoring"
+      // the global CSP onto /r/ would newly apply default-src 'self' and kill hls.js's blob:
+      // worker; (2) the frame-src governing the screening-room iframe's navigations belongs to
+      // the PARENT /share document, which matches '/(.*)' — that is where the R2 download fix
+      // lives, and patching this rule instead would do nothing.
+      // reviewUrl is same-origin (guestAppBaseUrl
       // === portal origin in prod), so the rv_guest_/rv_unlock_ SameSite=Lax cookies
       // keep flowing inside the frame.
       {

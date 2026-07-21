@@ -21,7 +21,7 @@ export default function YourDesk({
     periodLabel: string
     needsYouCount: number
     openDeliverable: (id: string) => void
-    openReview: (url: string, title: string) => void
+    openReview: (url: string, title: string, deliverableId: string) => void
     goStatements: () => void
     openInvoice: (id: string) => void
 }) {
@@ -110,7 +110,7 @@ export default function YourDesk({
                                         style={{ flex: 'none', width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }}
                                     />
                                 )}
-                                <button onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title) : openDeliverable(d.id))} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
+                                <button onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title, d.id) : openDeliverable(d.id))} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
                                     <Play size={18} fill="#f7f2e9" color="#f7f2e9" />
                                     {d.duration && <span className="desk-mono" style={{ position: 'absolute', right: 6, bottom: 5, fontSize: '0.56rem', color: '#eae5d9', background: 'rgba(9,9,11,.65)', padding: '1px 5px' }}>{d.duration}</span>}
                                 </button>
@@ -124,7 +124,7 @@ export default function YourDesk({
                                     </p>
                                     <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>A new video is ready for your review.</p>
                                 </span>
-                                <Button variant="primary" size="sm" className="desk-tray-cta" onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title) : openDeliverable(d.id))} style={{ flex: 'none' }}>Watch &amp; decide</Button>
+                                <Button variant="primary" size="sm" className="desk-tray-cta" onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title, d.id) : openDeliverable(d.id))} style={{ flex: 'none' }}>Watch &amp; decide</Button>
                             </div>
                         )
                     })}

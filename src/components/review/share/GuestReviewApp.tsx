@@ -378,6 +378,18 @@ function GuestStage({
             await api.submitDecision({ versionId: version.versionId, decision, note: note || undefined })
             setDecisionModal(null)
             showToast(decision === 'approve' ? 'Approved — the team has been notified.' : 'Changes requested — the team has been notified.')
+            // Tell the PORTAL, when we are running inside its screening-room iframe
+            // (components/portal/desk/ScreeningRoom.tsx), that the client just decided. Without
+            // this the Desk keeps its pre-decision snapshot: the client approves here, closes the
+            // room, and the card still says "ready for your review" with a live Approve button that
+            // then answers "This deliverable has already been approved." Same-origin, so we pin
+            // targetOrigin to our own origin rather than '*'; a standalone /r/ tab has no parent
+            // and this is a no-op.
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ source: 'velox-review', type: 'decision', decision }, window.location.origin)
+                }
+            } catch { /* never let the bridge break a committed decision */ }
             refreshContent()
             if (note) feed.refresh()
         } catch (e) {
@@ -399,6 +411,13 @@ function GuestStage({
         if (!version) return
         try {
             const { url } = await api.fetchDownloadUrl(version.versionId)
+            // This navigates the CURRENT context to a presigned R2 URL; the response carries
+            // `Content-Disposition: attachment`, so the browser downloads and leaves the page
+            // (or, in the portal, the screening-room iframe) exactly where it was.
+            // ⚠️ That only holds while `frame-src` in next.config.ts lists R2. This player is
+            // framed by the client portal, the containing document's frame-src governs every
+            // navigation of a nested context, and it is checked BEFORE any response — drop R2
+            // from that list and Chrome replaces the whole player with "This content is blocked."
             window.location.href = url
         } catch (e) {
             alert(e instanceof Error ? e.message : 'Download failed.')

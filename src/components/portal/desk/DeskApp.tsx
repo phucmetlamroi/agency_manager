@@ -5,7 +5,7 @@
    adapter + DTOs the calm portal used (src/components/portal/calm/types.ts).
    No money / review / auth plumbing changes here — only the room changes. */
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
     Inbox, LayoutGrid, FolderOpen, CreditCard, Send, Bell, Search, ChevronDown, Menu,
 } from 'lucide-react'
@@ -84,7 +84,11 @@ function DeskInner({
     const [openInv, setOpenInv] = useState<string | null>(null)
     const [newReqOpen, setNewReqOpen] = useState(false)
     const [searchOpen, setSearchOpen] = useState(false)
-    const [screening, setScreening] = useState<{ url: string; title: string } | null>(null)
+    const [screening, setScreening] = useState<{ url: string; title: string; id: string } | null>(null)
+    // Mirrored into a ref so the (mount-once) postMessage listener below reads the CURRENT room
+    // instead of closing over the null it saw on mount.
+    const screeningRef = useRef<typeof screening>(null)
+    screeningRef.current = screening
     const [navOpen, setNavOpen] = useState(false)
     const narrow = useIsNarrow()
 
@@ -116,10 +120,35 @@ function DeskInner({
     // moment the player loads instead of hitting a second name+email prompt. It must
     // finish BEFORE the iframe mounts, or the frame loads without the cookie. Failure
     // is non-fatal — the player then shows its own identity modal, as it always did.
-    const openReview = async (url: string, title: string) => {
+    const openReview = async (url: string, title: string, deliverableId: string) => {
         try { await actions.prepareScreening?.(url) } catch { /* non-fatal */ }
-        setScreening({ url, title })
+        setScreening({ url, title, id: deliverableId })
     }
+
+    // [Client escalation 2026-07-21] Adopt a decision the client made INSIDE the screening room.
+    // The framed player writes the approval server-side and shows its own toast, but the Desk held
+    // the pre-decision snapshot: closing the room left the card still reading "This video is ready
+    // for your review" with a live Approve button — and pressing it answered "This deliverable has
+    // already been approved." The client had approved, and the portal called them wrong.
+    // The frame is same-origin, so it postMessages the outcome up; we patch the one card. Both the
+    // origin AND the marker are checked — a message from any other frame or origin is ignored.
+    useEffect(() => {
+        const onMessage = (e: MessageEvent) => {
+            if (e.origin !== window.location.origin) return
+            const d = e.data as { source?: string; type?: string; decision?: string } | null
+            if (!d || d.source !== 'velox-review' || d.type !== 'decision') return
+            const id = screeningRef.current?.id
+            if (!id) return
+            if (d.decision === 'approve') {
+                updateDeliverable(id, { clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
+            } else if (d.decision === 'request_changes') {
+                updateDeliverable(id, { clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES' })
+            }
+        }
+        window.addEventListener('message', onMessage)
+        return () => window.removeEventListener('message', onMessage)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // ⌘K / Ctrl-K opens the search palette.
     useEffect(() => {

@@ -30,8 +30,9 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
     actions: DeliverableActions
     onClose: () => void
     onUpdated: (id: string, patch: Partial<Deliverable>) => void
-    /** Open the in-portal screening room for a same-origin /r review link. */
-    onOpenReview?: (url: string, title: string) => void
+    /** Open the in-portal screening room for a same-origin /r review link.
+     *  `deliverableId` lets DeskApp apply the decision the client makes INSIDE the frame. */
+    onOpenReview?: (url: string, title: string, deliverableId: string) => void
 }) {
     const [mode, setMode] = useState<null | 'changes'>(null)
     const [notes, setNotes] = useState('')
@@ -59,26 +60,41 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [d.id])
 
+    /* These two await SERVER ACTIONS, which reject on a network drop, a redeploy mid-flight, or any
+       server-side throw — and a rejection is not the `{success:false}` the else-branch handles. With
+       the await bare, that rejection escaped, `setBusy(false)` never ran, and the client was left
+       with a permanently disabled Approve button and no message at all. try/finally, and surface
+       the failure instead of swallowing it. */
     const approve = async () => {
         setBusy(true); setErr(null)
-        const res = await actions.approve(d.id)
-        setBusy(false)
-        if ('success' in res && res.success) {
-            onUpdated(d.id, { clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
-            actions.activity(d.id).then(setActivity).catch(() => {})
-        } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
+        try {
+            const res = await actions.approve(d.id)
+            if ('success' in res && res.success) {
+                onUpdated(d.id, { clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
+                actions.activity(d.id).then(setActivity).catch(() => {})
+            } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
+        } catch {
+            setErr('Could not reach the server. Please check your connection and try again.')
+        } finally {
+            setBusy(false)
+        }
     }
 
     const requestChanges = async () => {
         if (!notes.trim()) return
         setBusy(true); setErr(null)
-        const res = await actions.requestChanges(d.id, notes.trim())
-        setBusy(false)
-        if ('success' in res && res.success) {
-            onUpdated(d.id, { clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
-            setMode(null); setNotes('')
-            actions.activity(d.id).then(setActivity).catch(() => {})
-        } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')
+        try {
+            const res = await actions.requestChanges(d.id, notes.trim())
+            if ('success' in res && res.success) {
+                onUpdated(d.id, { clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
+                setMode(null); setNotes('')
+                actions.activity(d.id).then(setActivity).catch(() => {})
+            } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')
+        } catch {
+            setErr('Could not reach the server. Please check your connection and try again.')
+        } finally {
+            setBusy(false)
+        }
     }
 
     return (
@@ -142,7 +158,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                             // productLink (frame.io etc.) always opens in a new tab.
                             if (d.reviewUrl && onOpenReview && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
                                 e.preventDefault()
-                                onOpenReview(d.reviewUrl, d.title)
+                                onOpenReview(d.reviewUrl, d.title, d.id)
                             }
                         }}
                         style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 8, background: 'var(--paper-raised)', border: '1px solid var(--hairline)', textDecoration: 'none', transition: 'border-color .15s, background .15s' }}

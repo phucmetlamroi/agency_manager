@@ -24,6 +24,22 @@ const BCRYPT_ROUNDS = 10
 const PASSWORD_MIN = 4
 const PASSWORD_MAX = 72 // bcrypt input cap
 
+/**
+ * THE CLIENT-BOARD SHAPE. A `/r/` board that the AGENCY hands to a paying client is defined by
+ * these two option values, and four places in this file must agree on them or the board becomes
+ * invisible to the portal:
+ *   - getOrCreatePrimaryShareForAsset — reuse filter AND create (F10 bridge + "Copy link khách")
+ *   - findClientReviewSlugs           — the portal's batch lookup
+ *   - getOrCreateClientReviewSlug     — the portal's per-asset lookup + mint
+ * They were three hand-copied literals and one omission; the omission (create with
+ * createShareLink's view-only defaults) is what made the client's Download button vanish and, worse,
+ * made the portal fall through to the revoked-board kill switch and lose the review link for good.
+ * Keep them derived from this one constant.
+ * `passwordHash: null` is part of the shape too, but it is not an input to createShareLink
+ * (which derives it from `password`), so it stays an explicit clause at each query.
+ */
+const CLIENT_BOARD = { allowDownload: true, downloadOnlyWhenApproved: false } as const
+
 export type ShareState = 'active' | 'revoked' | 'expired'
 
 export interface ShareItemRef {
@@ -284,6 +300,22 @@ export async function getOrCreatePrimaryShareForAsset(
                 revokedAt: null,
                 AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, scope],
                 items: { some: { assetId: asset.id } },
+                // [Client escalation 2026-07-21] Match the CLIENT-BOARD SHAPE, the same three
+                // columns findClientReviewSlugs and getOrCreateClientReviewSlug filter on. Until
+                // now this reused ANY live share holding the asset, so a staff view-only link
+                // (allowDownload:false — the createShareLink DEFAULT) was handed to the client as
+                // "their" board. Two things then broke, and both were reported as bugs:
+                //   1. GuestReviewApp renders the Download button ONLY when share.allowDownload,
+                //      so the client had no way to download at all;
+                //   2. the portal's own lookups filter on this shape, missed the board, and fell
+                //      through to the revoked-board kill switch — which returns null forever. From
+                //      the second cut onward the card said "ready for your review" with nothing to
+                //      open. See the CLIENT_BOARD comment on the create below.
+                // Reusing only a client-shaped board means a deliberate view-only staff link is
+                // left alone (we mint a separate client board next to it) — the same call the
+                // comment at "2. REMOVED" below already made.
+                ...CLIENT_BOARD,
+                passwordHash: null,
             },
             orderBy: { createdAt: 'asc' },
             include: { items: true },
@@ -297,7 +329,7 @@ export async function getOrCreatePrimaryShareForAsset(
                     select: { id: true },
                 })
                 if (!mine) {
-                    const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }] })
+                    const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }], ...CLIENT_BOARD })
                     return { share, created: true }
                 }
             }
@@ -307,6 +339,16 @@ export async function getOrCreatePrimaryShareForAsset(
         const { share } = await createShareLink({
             workspaceId: asset.workspaceId,
             items: [{ type: 'asset', id: asset.id }],
+            // CLIENT_BOARD, not createShareLink's defaults. This function has exactly two callers
+            // and BOTH hand their link to the client: the F10 admin bridge
+            // (task-sync.ts approveInternalAndSendToClient, which also stamps it onto
+            // task.productLink and emails it) and the staff "Copy link khách" route
+            // (POST /api/review/assets/[id]/share). createShareLink defaults to
+            // `allowDownload: false, downloadOnlyWhenApproved: true`, which is the right default
+            // for a link a staff member configures by hand in ShareLinkModal — and the wrong one
+            // for the board the agency sends a paying client. Owner requirement, verbatim:
+            // "dù khách có bấm vào link là duyệt được luôn".
+            ...CLIENT_BOARD,
         })
         return { share, created: true }
     })
@@ -346,10 +388,8 @@ export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<str
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: { in: assetIds } } },
-            // Same shape as branch 1 of getOrCreateClientReviewSlug — a board already
-            // configured the way a client's own review link is.
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            // A board already configured the way a client's own review link is — see CLIENT_BOARD.
+            ...CLIENT_BOARD,
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
@@ -400,8 +440,7 @@ export async function getOrCreateClientReviewSlug(asset: {
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: asset.id } },
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            ...CLIENT_BOARD,
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
@@ -455,8 +494,7 @@ export async function getOrCreateClientReviewSlug(asset: {
         where: {
             revokedAt: { not: null },
             items: { some: { assetId: asset.id } },
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            ...CLIENT_BOARD,
             passwordHash: null,
         },
         orderBy: { revokedAt: 'desc' },
@@ -480,8 +518,7 @@ export async function getOrCreateClientReviewSlug(asset: {
             showAllVersions: false,
             // Client downloads the original (identical to the uploaded file) from their review
             // board. Not gated behind approval so the download works as soon as it's shared.
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            ...CLIENT_BOARD,
             createdById: asset.createdById,
             items: { create: [{ assetId: asset.id, sortIndex: 0 }] },
         },

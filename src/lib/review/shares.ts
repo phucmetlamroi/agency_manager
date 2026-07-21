@@ -25,20 +25,40 @@ const PASSWORD_MIN = 4
 const PASSWORD_MAX = 72 // bcrypt input cap
 
 /**
- * THE CLIENT-BOARD SHAPE. A `/r/` board that the AGENCY hands to a paying client is defined by
- * these two option values, and four places in this file must agree on them or the board becomes
- * invisible to the portal:
- *   - getOrCreatePrimaryShareForAsset — reuse filter AND create (F10 bridge + "Copy link khách")
- *   - findClientReviewSlugs           — the portal's batch lookup
- *   - getOrCreateClientReviewSlug     — the portal's per-asset lookup + mint
- * They were three hand-copied literals and one omission; the omission (create with
- * createShareLink's view-only defaults) is what made the client's Download button vanish and, worse,
- * made the portal fall through to the revoked-board kill switch and lose the review link for good.
- * Keep them derived from this one constant.
+ * THE POLICY a `/r/` board gets when the AGENCY mints one for a paying client. Used ONLY at
+ * CREATE time — see CLIENT_BOARD_MATCH below for how an existing one is recognised.
+ * Creators: getOrCreatePrimaryShareForAsset (the F10 bridge + "Copy link khách") and
+ * getOrCreateClientReviewSlug (the portal's own mint).
+ *
+ * These were hand-copied literals plus one omission; the omission (create with createShareLink's
+ * view-only defaults) is what made the client's Download button vanish and, worse, made the portal
+ * fall through to the revoked-board kill switch and lose the review link for good.
+ *
+ * `downloadOnlyWhenApproved: true` — owner review 2026-07-22: "phải duyệt video thì mới được tải".
+ * It was false; the client could pull the master before signing anything off. GuestReviewApp gates
+ * the Download button on exactly this flag (`!downloadOnlyWhenApproved || reviewState==='approved'`).
+ * NOTE this only governs boards minted from now on. Boards already live in production keep
+ * `false` until staff change them or a fresh board is minted; flipping the existing rows is a data
+ * migration against the production DB and is NOT done here.
+ *
  * `passwordHash: null` is part of the shape too, but it is not an input to createShareLink
  * (which derives it from `password`), so it stays an explicit clause at each query.
  */
-const CLIENT_BOARD = { allowDownload: true, downloadOnlyWhenApproved: false } as const
+const CLIENT_BOARD = { allowDownload: true, downloadOnlyWhenApproved: true } as const
+
+/**
+ * How we RECOGNISE an existing client board, which is deliberately LOOSER than how we create one.
+ *
+ * These two must not be the same object. `downloadOnlyWhenApproved` is a POLICY that the owner can
+ * change his mind about — he just did (review 2026-07-22: "phải duyệt video thì mới được tải"), so
+ * CLIENT_BOARD flipped it from false to true. Every board already minted in production carries the
+ * OLD value. If the lookups matched on the policy, the flip would make all of them invisible
+ * overnight, the portal would fall through to the revoked-board kill switch, and every client would
+ * lose their review link — the exact production-wide outage documented in the CLIENT_BOARD comment
+ * above, caused this time by a one-word policy change. Identity is `allowDownload` + no password;
+ * the approval gate is policy layered on top.
+ */
+const CLIENT_BOARD_MATCH = { allowDownload: true } as const
 
 export type ShareState = 'active' | 'revoked' | 'expired'
 
@@ -314,7 +334,7 @@ export async function getOrCreatePrimaryShareForAsset(
                 // Reusing only a client-shaped board means a deliberate view-only staff link is
                 // left alone (we mint a separate client board next to it) — the same call the
                 // comment at "2. REMOVED" below already made.
-                ...CLIENT_BOARD,
+                ...CLIENT_BOARD_MATCH,
                 passwordHash: null,
             },
             orderBy: { createdAt: 'asc' },
@@ -389,7 +409,7 @@ export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<str
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: { in: assetIds } } },
             // A board already configured the way a client's own review link is — see CLIENT_BOARD.
-            ...CLIENT_BOARD,
+            ...CLIENT_BOARD_MATCH,
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
@@ -440,7 +460,7 @@ export async function getOrCreateClientReviewSlug(asset: {
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: asset.id } },
-            ...CLIENT_BOARD,
+            ...CLIENT_BOARD_MATCH,
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
@@ -494,7 +514,7 @@ export async function getOrCreateClientReviewSlug(asset: {
         where: {
             revokedAt: { not: null },
             items: { some: { assetId: asset.id } },
-            ...CLIENT_BOARD,
+            ...CLIENT_BOARD_MATCH,
             passwordHash: null,
         },
         orderBy: { revokedAt: 'desc' },

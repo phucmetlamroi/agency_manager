@@ -40,9 +40,11 @@ export default function ScreeningRoom({ url, title, onClose }: { url: string; ti
                     <Kicker accent style={{ fontSize: '0.56rem' }}>Screening room</Kicker>
                     <p className="desk-serif desk-truncate" style={{ margin: 0, fontSize: '0.98rem', color: 'var(--ink)', lineHeight: 1.1 }}>{title}</p>
                 </span>
-                <a href={url} target="_blank" rel="noopener noreferrer" className="desk-btn desk-btn--quiet desk-btn--sm" style={{ textDecoration: 'none' }} title="Open in a new tab">
-                    <ExternalLink size={13} /> New tab
-                </a>
+                {/* The "New tab" escape hatch is GONE (owner review 2026-07-22: "về phần new tab
+                    này thì bạn có thể bỏ… mình không cần hiển thị nữa"). It only ever existed as a
+                    workaround for the download that CSP was blocking inside this iframe — now that
+                    frame-src allows R2, downloading works in place and the button is clutter that
+                    invited the client out of the portal. */}
                 <button onClick={onClose} className="desk-iconbtn" aria-label="Close screening room" title="Close (Esc)"><X size={19} /></button>
             </header>
             <div style={{ flex: 1, minHeight: 0, background: '#000' }}>

@@ -89,11 +89,16 @@ export function GuestReviewApp({
 
     // ── identity interception ──
     const [identityOpen, setIdentityOpen] = useState(false)
+    // What the guest was TRYING to do when we intercepted them. The modal used to be headed
+    // "Add your name to comment" no matter what — so a client who pressed Approve was shown an
+    // unexplained form about comments and reasonably read it as an unrelated interruption.
+    const [identityPurpose, setIdentityPurpose] = useState<'comment' | 'decision'>('comment')
     const identityWaitersRef = useRef<{ resolve: () => void; reject: (e: Error) => void }[]>([])
     const guestNameRef = useRef(guestName)
     guestNameRef.current = guestName
-    const ensureIdentity = useCallback((): Promise<void> => {
+    const ensureIdentity = useCallback((purpose: 'comment' | 'decision' = 'comment'): Promise<void> => {
         if (guestNameRef.current) return Promise.resolve()
+        setIdentityPurpose(purpose)
         setIdentityOpen(true)
         return new Promise((resolve, reject) => {
             identityWaitersRef.current.push({ resolve, reject })
@@ -177,6 +182,7 @@ export function GuestReviewApp({
             />
             {identityOpen && (
                 <IdentityModal
+                    purpose={identityPurpose}
                     onSubmit={async (name, email) => {
                         const res = await api.identify({ name, email })
                         setGuestName(res.guest.name)
@@ -219,8 +225,9 @@ function GuestStage({
     itemCount: number
     assetIndex: number
     onAssetIndex: (i: number) => void
-    /** opens the Name+Email modal and resolves once the guest submits (rejects if closed) */
-    ensureIdentity: () => Promise<void>
+    /** opens the Name+Email modal and resolves once the guest submits (rejects if closed).
+     *  `purpose` only changes the modal's wording. */
+    ensureIdentity: (purpose?: 'comment' | 'decision') => Promise<void>
     onAdoptNewHead: () => void
     refreshContent: () => void
     onVersionChange?: (v: GuestVersionView) => void
@@ -357,26 +364,62 @@ function GuestStage({
     // ── decision ──
     const [decisionModal, setDecisionModal] = useState<null | 'approve' | 'request_changes'>(null)
     const [decisionBusy, setDecisionBusy] = useState(false)
+    // The change-request draft lives HERE, above the modal, and is cleared only on a successful
+    // send. Keeping it inside RequestChangesModal made every close a silent delete of the client's
+    // typed feedback — including the close they are forced into to reach the Reload banner, which
+    // the modal's own full-screen scrim covers. Owning it here is what makes "close the modal, do
+    // the thing, reopen" safe; nothing else in this file may reset it.
+    const [changeNote, setChangeNote] = useState('')
     const [toast, setToast] = useState<string | null>(null)
+    // Each call used to arm an independent 4s timer, so a second message inherited the FIRST
+    // message's remaining time and could vanish almost instantly. Cancel the pending one.
+    const toastTimerRef = useRef<number | null>(null)
     const showToast = (msg: string) => {
+        if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
         setToast(msg)
-        window.setTimeout(() => setToast(null), 4000)
+        toastTimerRef.current = window.setTimeout(() => {
+            setToast(null)
+            toastTimerRef.current = null
+        }, 6000)
     }
+    useEffect(() => () => { if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current) }, [])
     const submitDecision = async (decision: 'approve' | 'request_changes', note?: string) => {
         if (!version) return
+        // The player PINS the version the guest opened and offers a Reload banner rather than
+        // hot-swapping mid-review. But a client board is minted with showAllVersions=false, and in
+        // that mode the server only accepts a decision on the CURRENT head — so if the editor
+        // uploaded a new cut while the client was watching, posting the pinned id came back as a
+        // bare 404 'Not found.' in a raw browser alert, with nothing saying "press Reload". Refuse
+        // it here instead, and say the one useful thing.
+        if (newHead && !share.showAllVersions) {
+            // CLOSE the modal. The Reload banner this toast points at is in normal flow, so while
+            // the modal is open its `fixed inset-0 bg-black/70` scrim both hides it and eats the
+            // click — leaving the modal mounted made the instruction literally unfollowable, and
+            // the client's only way out (clicking the scrim) used to delete their note. The draft
+            // now lives in `changeNote` above, so closing costs nothing: they Reload, reopen
+            // Request changes, and their text is still there.
+            setDecisionModal(null)
+            showToast('A newer cut was uploaded — press Reload to watch it, then send again. Your text is saved.')
+            return
+        }
         // A decision REQUIRES guest identity (server 401s otherwise). Gate on the identity modal
         // the same way comments/reactions do — a brand-new guest who opens the link and clicks
         // Approve gets the name+email modal, then the decision proceeds. NO email PIN: the owner
         // waived impersonation protection on approvals; editor pay stays admin-only via H3.
         try {
-            await ensureIdentity()
+            await ensureIdentity('decision')
         } catch {
-            return // guest closed the identity modal → abort silently, leave decision modal open
+            // Guest closed the identity modal. This used to `return` in total silence, leaving the
+            // decision modal open with a live Approve button — so the client pressed it again,
+            // got the same modal, closed it again, and concluded Approve was broken. Say why.
+            showToast('Add your name and email to record your decision.')
+            return
         }
         setDecisionBusy(true)
         try {
             await api.submitDecision({ versionId: version.versionId, decision, note: note || undefined })
             setDecisionModal(null)
+            setChangeNote('') // the draft is now durable content on the server — the only place it is cleared
             showToast(decision === 'approve' ? 'Approved — the team has been notified.' : 'Changes requested — the team has been notified.')
             // Tell the PORTAL, when we are running inside its screening-room iframe
             // (components/portal/desk/ScreeningRoom.tsx), that the client just decided. Without
@@ -397,8 +440,25 @@ function GuestStage({
             // a plain message; anything else is a stale-state 409 that self-heals on refresh.
             if (e instanceof GuestApiError && e.code === 'DECISIONS_DISABLED') {
                 showToast('This review isn’t open for approval.')
+            } else if (e instanceof GuestApiError && e.code === 'NOT_FOUND') {
+                // Belt to the newHead brace above. Wording stays NEUTRAL on purpose: the decision
+                // route returns 404 for a replaced head, but also for a version deleted or moved to
+                // trash, so naming "a newer cut" would be a confident lie in those cases. Closing
+                // is safe now that the draft is held above the modal.
+                setDecisionModal(null)
+                // NO "your text is saved" here, unlike the newHead branch above. The two are not
+                // symmetric: newHead is a new version of the SAME asset, so GuestStage (keyed on
+                // assetId) stays mounted and the draft really does survive. NOT_FOUND is thrown
+                // when the version OR THE ASSET was trashed — and refreshContent then drops that
+                // asset from the payload, which flips the key, remounts GuestStage and destroys
+                // both `changeNote` and this very toast. Promising a save we cannot honour in the
+                // one case that produces this error is worse than saying nothing.
+                showToast('This video is no longer available at this link.')
+                refreshContent()
             } else {
-                alert(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+                // NOT alert(): a native dialog inside the portal's screening-room iframe looks like
+                // a browser malfunction, not a message from us.
+                showToast(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
                 refreshContent() // stale-state 409 → self-heal
             }
         } finally {
@@ -420,7 +480,9 @@ function GuestStage({
             // from that list and Chrome replaces the whole player with "This content is blocked."
             window.location.href = url
         } catch (e) {
-            alert(e instanceof Error ? e.message : 'Download failed.')
+            // Toast, not a native dialog — same reason as the decision path: inside the portal's
+            // screening-room iframe an alert() reads as the browser breaking, not as our message.
+            showToast(e instanceof Error ? e.message : 'Download failed.')
         }
     }
 
@@ -713,9 +775,19 @@ function GuestStage({
                 Sent via HustlyTasker
             </footer>
 
-            {/* toast */}
+            {/* toast — z-[120] is ABOVE both decision modals (z-95) and the identity modal (z-96).
+                It used to sit at z-90, i.e. underneath them, which was invisible until the toast
+                started carrying ERRORS: every message shown while a modal is still open (the
+                identity-cancelled notice, a failed decision) was painted behind a full-screen
+                black/70 scrim and the client saw nothing at all. Success toasts looked fine only
+                because the modal is closed first. Do not lower this below the modals again.
+                role=status/aria-live replaces the announcement alert() used to give for free. */}
             {toast && (
-                <div className="fixed bottom-4 left-1/2 z-[90] -translate-x-1/2 rounded-lg bg-zinc-800 px-4 py-2 text-sm text-white shadow-xl">
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="fixed bottom-4 left-1/2 z-[120] -translate-x-1/2 max-w-[90vw] rounded-lg bg-zinc-800 px-4 py-2 text-center text-sm text-white shadow-xl"
+                >
                     {toast}
                 </div>
             )}
@@ -747,6 +819,8 @@ function GuestStage({
                 <RequestChangesModal
                     busy={decisionBusy}
                     hasComments={feed.comments.length > 0}
+                    note={changeNote}
+                    onNoteChange={setChangeNote}
                     onCancel={() => setDecisionModal(null)}
                     onSend={(note) => void submitDecision('request_changes', note)}
                 />
@@ -776,13 +850,19 @@ function RequestChangesModal({
     hasComments,
     onCancel,
     onSend,
+    note,
+    onNoteChange,
 }: {
     busy: boolean
     hasComments: boolean
     onCancel: () => void
     onSend: (note: string) => void
+    /** The draft is owned by GuestStage, NOT by this modal. It used to be local useState, which
+     *  meant every route out of the modal — Cancel, the scrim, or any code path that closed it —
+     *  destroyed up to 2000 characters the client had typed, with no warning and no undo. */
+    note: string
+    onNoteChange: (v: string) => void
 }) {
-    const [note, setNote] = useState('')
     return (
         <Modal onClose={() => !busy && onCancel()}>
             <h2 className="text-base font-semibold text-white">Request changes</h2>
@@ -791,8 +871,18 @@ function RequestChangesModal({
                 {!hasComments && ' Tip: timecoded comments below help the editor the most.'}
             </p>
             <textarea
+                ref={(el) => {
+                    // Park the caret at the END of a preserved draft. autoFocus alone leaves
+                    // selectionStart at 0, so a client resuming after the modal was closed and
+                    // reopened would type their new sentence in FRONT of what they already wrote.
+                    // Harmless when the draft is empty, which is why it never showed up before the
+                    // draft started surviving a close.
+                    if (el && el.value.length > 0 && el.selectionStart === 0 && el.selectionEnd === 0) {
+                        el.setSelectionRange(el.value.length, el.value.length)
+                    }
+                }}
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => onNoteChange(e.target.value)}
                 rows={3}
                 maxLength={2000}
                 autoFocus
@@ -818,9 +908,14 @@ function RequestChangesModal({
 function IdentityModal({
     onSubmit,
     onClose,
+    purpose = 'comment',
 }: {
     onSubmit: (name: string, email: string) => Promise<void>
     onClose: () => void
+    /** Only changes the wording. A client who pressed Approve must not be shown a form about
+     *  comments — they read it as an unrelated interruption and close it, which silently cancels
+     *  the approval they came to give. */
+    purpose?: 'comment' | 'decision'
 }) {
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
@@ -844,7 +939,9 @@ function IdentityModal({
         <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/70 p-4">
             <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-900 p-5 shadow-2xl">
                 <div className="flex items-start justify-between">
-                    <h2 className="text-base font-semibold text-white">Add your name to comment</h2>
+                    <h2 className="text-base font-semibold text-white">
+                        {purpose === 'decision' ? 'Sign off with your name' : 'Add your name to comment'}
+                    </h2>
                     <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-lg text-white/50 hover:bg-white/10" aria-label="Close">
                         <X className="h-4 w-4" />
                     </button>
@@ -869,7 +966,9 @@ function IdentityModal({
                     />
                 </div>
                 <p className="mt-2.5 text-xs text-white/40">
-                    We only use this to identify your comments and notify you of replies. No account needed.
+                    {purpose === 'decision'
+                        ? 'Your decision is recorded against this name, and we email you when the team responds. No account needed.'
+                        : 'We only use this to identify your comments and notify you of replies. No account needed.'}
                 </p>
                 {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
                 <button

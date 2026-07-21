@@ -302,6 +302,16 @@ export async function submitGuestDecision(
                         where: {
                             id: asset.taskId,
                             workspaceId: asset.workspaceId,
+                            // Re-assert what the gate checked. The gate read status/isArchived ONCE, at
+                            // the top of the request; without these two the settle happily writes
+                            // 'APPROVED' onto a task an admin cancelled in the meantime — which re-admits
+                            // the tombstone into the client's portal history (share-portal-actions filters
+                            // archived rows back IN when clientReview is APPROVED/CHANGES) — or onto a cut
+                            // revokeClientExposureOnNewVersion had just withdrawn, so staff read "khách đã
+                            // duyệt" for a version the system pulled. One-request window, no attacker
+                            // needed. task-sync.ts does the same re-guard.
+                            isArchived: false,
+                            status: decisionTask.status,
                             // NULL belongs here. The gate above now admits a task the admin put into a
                             // client status by hand, whose clientReview was never set by the F10 bridge.
                             // Without the null branch the approval would land on the version but never on

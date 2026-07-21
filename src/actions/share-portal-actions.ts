@@ -792,9 +792,13 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
     const applied = await prisma.task.updateMany({
         where: {
             id: taskId,
-            workspaceId: task.workspaceId,
+            // Every field the eligibility test above relied on, restated — including the TENANCY
+            // scope and isArchived. Same restatement, same reason, as the bulk sibling.
+            isArchived: false,
             status: task.status,
             clientReview: task.clientReview,
+            clientId: { in: scope.clientIds },
+            workspaceId: { in: scope.workspaceIds },
         },
         data: {
             status: 'Hoàn tất',
@@ -1022,8 +1026,19 @@ export async function requestChangesViaToken(token: string, taskId: string, feed
         return { success: false, error: 'This deliverable is not currently awaiting your review.' }
     }
 
-    await prisma.task.update({
-        where: { id: taskId },
+    // Same restatement as approveDeliverableViaToken — this action was copied from the same
+    // unconditional original and kept the same hole: an admin cancelling the job, or the task
+    // moving to another client, in the window between findScopedTask and this write still got
+    // 'Revision' + the client's feedback stamped on it.
+    const applied = await prisma.task.updateMany({
+        where: {
+            id: taskId,
+            isArchived: false,
+            status: task.status,
+            clientReview: task.clientReview,
+            clientId: { in: scope.clientIds },
+            workspaceId: { in: scope.workspaceIds },
+        },
         data: {
             status: 'Revision',
             deadline: null,
@@ -1033,6 +1048,9 @@ export async function requestChangesViaToken(token: string, taskId: string, feed
             version: { increment: 1 },
         },
     })
+    if (applied.count === 0) {
+        return { success: false, error: 'This deliverable just changed. Please refresh and try again.' }
+    }
 
     await notifyStaff(
         task, taskId,

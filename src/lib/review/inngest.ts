@@ -706,6 +706,16 @@ export const reviewShareDecision = inngest.createFunction(
                     where: {
                         id: data.taskId!,
                         workspaceId: data.workspaceId,
+                        // isArchived is LOAD-BEARING and was missing. This step runs seconds after
+                        // the request, so it is the LAST writer: the synchronous settle in
+                        // share-decision.ts correctly refuses to stamp a task an admin cancelled
+                        // mid-decision, and then this un-guarded backup stamped it anyway. Cancel
+                        // sets status='Đã hủy' AND isArchived=true in one update (task-actions.ts),
+                        // and getShareSnapshot re-admits archived rows whose clientReview is
+                        // APPROVED/CHANGES — so the cancelled job reappeared in the client's portal
+                        // and staff read "khách đã duyệt" on work that was called off. A guard the
+                        // backup does not share is not a guard.
+                        isArchived: false,
                         // `in: [null, …]` is not a legal Prisma filter on a nullable column.
                         OR: [{ clientReview: null }, { clientReview: { in: ['AWAITING', 'CHANGES'] } }],
                     },

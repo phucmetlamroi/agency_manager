@@ -382,7 +382,13 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
         )
     }
 
-    const nothingAtAll = !snap || (allFolders.length === 0 && allAssets.length === 0)
+    // Deliberately measured on the UNFILTERED snapshot. processingCount/inProgressCount are
+    // computed server-side across the whole token scope, so pairing them with a period- or
+    // brand-filtered emptiness attributes one month's work to another: pick June, which has
+    // nothing, and July's three in-progress videos are announced as June's. When the library
+    // has content and only this view is empty, the "Nothing in this period" branch below is
+    // the honest answer.
+    const nothingAtAll = !snap || ((snap.folders?.length ?? 0) === 0 && (snap.assets?.length ?? 0) === 0)
     const emptyHere = folders.length === 0 && shown.length === 0
     const filtered = wsScope !== 'all' || clientScope !== 'all'
 
@@ -498,7 +504,21 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
             )}
 
             {nothingAtAll ? (
-                <Empty icon={Folder} title="Nothing here yet" sub="Files appear the moment a cut is delivered — originals, not previews." />
+                /* [Honest empty state] "Nothing here yet" was a lie whenever the library was
+                   empty for a REASON — work still in production, or files still processing.
+                   A client reading it concluded their delivered work had gone missing. Say
+                   what is actually true. */
+                <Empty
+                    icon={Folder}
+                    title="Nothing to download yet"
+                    sub={
+                        (snap?.summary.processingCount ?? 0) > 0
+                            ? `${snap!.summary.processingCount} file${snap!.summary.processingCount === 1 ? ' is' : 's are'} still being processed — they appear here on their own.`
+                            : (snap?.summary.inProgressCount ?? 0) > 0
+                                ? `${snap!.summary.inProgressCount} video${snap!.summary.inProgressCount === 1 ? '' : 's'} still in production. Files land here as each one is delivered.`
+                                : 'Files appear the moment a video is delivered — originals, not previews.'
+                    }
+                />
             ) : emptyHere ? (
                 searching
                     ? <Empty icon={Search} title={`No file matches “${q.trim()}”`} sub="Try a shorter word, or clear the period filter." />

@@ -14,7 +14,10 @@ export interface Deliverable {
     id: string
     title: string
     type: string
-    status: string
+    // No raw `status`. The internal Vietnamese workflow label is not sent to the client
+    // (share-portal-actions.ts strips it); `clientStatus` below is the derived, client-facing
+    // one and is what every surface renders. Leaving the field declared here would have made
+    // the type claim something the wire no longer carries.
     clientStatus: string
     needsYou: boolean
     deadline: string | null
@@ -26,9 +29,8 @@ export interface Deliverable {
     collectFilesLink: string | null
     notes_vi: string | null
     notes_en: string | null
-    frameUsername: string | null
-    framePassword: string | null
-    frameNote: string | null
+    // frameUsername / framePassword / frameNote deliberately absent — a stored review-tool
+    // password is no longer sent to the client page (share-portal-actions.ts select).
     duration: string | null
     clientReview: string | null
     clientFeedback: string | null
@@ -134,7 +136,17 @@ export interface DocumentFolder {
 export interface DocumentsSnapshot {
     folders: DocumentFolder[]
     assets: DocumentAsset[]
-    summary: { folderCount: number; assetCount: number; totalBytes: string }
+    summary: {
+        folderCount: number; assetCount: number; totalBytes: string
+        /** [Honest empty state 2026-07] Delivered videos whose file is still being
+         *  processed, so it is real but not yet downloadable. Counting it is the
+         *  difference between "nothing here" and "3 still processing". */
+        processingCount?: number
+        /** Videos in scope that have NOT reached the client yet. The library is a
+         *  delivery archive, so these are correctly absent — but silence about them
+         *  is what reads as work having gone missing. */
+        inProgressCount?: number
+    }
     generatedAt: string
 }
 

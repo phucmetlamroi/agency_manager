@@ -196,6 +196,15 @@ function ReviewPlayerShellInner({
       const a = document.createElement("a");
       a.href = url;
       a.rel = "noopener";
+      // NOTE: `download` is silently ignored for a CROSS-ORIGIN href, and this href is a
+      // presigned R2 URL — so the attribute is inert and the click is really a navigation of
+      // the current browsing context. It still saves the file because the presigned response
+      // carries `Content-Disposition: attachment`.
+      // This shell is the STAFF player (/[workspaceId]/team/asset/[assetId]) and is never framed,
+      // so that navigation is always top-level and no CSP frame directive applies. The CLIENT has
+      // a different component — GuestReviewApp at /r/[slug], which the portal DOES frame; its
+      // download broke on frame-src until R2 was listed in next.config.ts. Fix that one there, not
+      // here: a previous attempt patched this file and shipped with the client's bug untouched.
       a.download = version.originalName || "";
       document.body.appendChild(a);
       a.click();

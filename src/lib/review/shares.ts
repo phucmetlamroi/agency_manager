@@ -24,6 +24,22 @@ const BCRYPT_ROUNDS = 10
 const PASSWORD_MIN = 4
 const PASSWORD_MAX = 72 // bcrypt input cap
 
+/**
+ * THE CLIENT-BOARD SHAPE. A `/r/` board that the AGENCY hands to a paying client is defined by
+ * these two option values, and four places in this file must agree on them or the board becomes
+ * invisible to the portal:
+ *   - getOrCreatePrimaryShareForAsset — reuse filter AND create (F10 bridge + "Copy link khách")
+ *   - findClientReviewSlugs           — the portal's batch lookup
+ *   - getOrCreateClientReviewSlug     — the portal's per-asset lookup + mint
+ * They were three hand-copied literals and one omission; the omission (create with
+ * createShareLink's view-only defaults) is what made the client's Download button vanish and, worse,
+ * made the portal fall through to the revoked-board kill switch and lose the review link for good.
+ * Keep them derived from this one constant.
+ * `passwordHash: null` is part of the shape too, but it is not an input to createShareLink
+ * (which derives it from `password`), so it stays an explicit clause at each query.
+ */
+const CLIENT_BOARD = { allowDownload: true, downloadOnlyWhenApproved: false } as const
+
 export type ShareState = 'active' | 'revoked' | 'expired'
 
 export interface ShareItemRef {
@@ -284,6 +300,22 @@ export async function getOrCreatePrimaryShareForAsset(
                 revokedAt: null,
                 AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, scope],
                 items: { some: { assetId: asset.id } },
+                // [Client escalation 2026-07-21] Match the CLIENT-BOARD SHAPE, the same three
+                // columns findClientReviewSlugs and getOrCreateClientReviewSlug filter on. Until
+                // now this reused ANY live share holding the asset, so a staff view-only link
+                // (allowDownload:false — the createShareLink DEFAULT) was handed to the client as
+                // "their" board. Two things then broke, and both were reported as bugs:
+                //   1. GuestReviewApp renders the Download button ONLY when share.allowDownload,
+                //      so the client had no way to download at all;
+                //   2. the portal's own lookups filter on this shape, missed the board, and fell
+                //      through to the revoked-board kill switch — which returns null forever. From
+                //      the second cut onward the card said "ready for your review" with nothing to
+                //      open. See the CLIENT_BOARD comment on the create below.
+                // Reusing only a client-shaped board means a deliberate view-only staff link is
+                // left alone (we mint a separate client board next to it) — the same call the
+                // comment at "2. REMOVED" below already made.
+                ...CLIENT_BOARD,
+                passwordHash: null,
             },
             orderBy: { createdAt: 'asc' },
             include: { items: true },
@@ -297,7 +329,7 @@ export async function getOrCreatePrimaryShareForAsset(
                     select: { id: true },
                 })
                 if (!mine) {
-                    const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }] })
+                    const { share } = await createShareLink({ workspaceId: asset.workspaceId, items: [{ type: 'asset', id: asset.id }], ...CLIENT_BOARD })
                     return { share, created: true }
                 }
             }
@@ -307,6 +339,16 @@ export async function getOrCreatePrimaryShareForAsset(
         const { share } = await createShareLink({
             workspaceId: asset.workspaceId,
             items: [{ type: 'asset', id: asset.id }],
+            // CLIENT_BOARD, not createShareLink's defaults. This function has exactly two callers
+            // and BOTH hand their link to the client: the F10 admin bridge
+            // (task-sync.ts approveInternalAndSendToClient, which also stamps it onto
+            // task.productLink and emails it) and the staff "Copy link khách" route
+            // (POST /api/review/assets/[id]/share). createShareLink defaults to
+            // `allowDownload: false, downloadOnlyWhenApproved: true`, which is the right default
+            // for a link a staff member configures by hand in ShareLinkModal — and the wrong one
+            // for the board the agency sends a paying client. Owner requirement, verbatim:
+            // "dù khách có bấm vào link là duyệt được luôn".
+            ...CLIENT_BOARD,
         })
         return { share, created: true }
     })
@@ -346,16 +388,35 @@ export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<str
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: { in: assetIds } } },
-            // Same shape as branch 1 of getOrCreateClientReviewSlug — a board already
-            // configured the way a client's own review link is.
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            // A board already configured the way a client's own review link is — see CLIENT_BOARD.
+            ...CLIENT_BOARD,
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
-        select: { slug: true, items: { select: { assetId: true } } },
+        select: { slug: true, items: { select: { assetId: true, folderId: true } } },
     })
+    // [Authz 2026-07] CONTAINMENT — the query above matches on POLICY SHAPE and on membership
+    // of ONE in-scope asset. It says nothing about the share's OTHER items, and a /r/ board
+    // shows every item it holds to whoever opens it. A staff member who multi-selects two
+    // clients' videos in the Team browser and turns download on with the approval gate off
+    // produces exactly this shape — so the portal would hand client A a link that renders
+    // client B's video, presigns B's master through /api/r/<slug>/download-url, and accepts a
+    // review decision on B's task. Nothing downstream can catch it: a multi-item share has
+    // taskId null, and the /r/ door authorizes on the slug alone, by design.
+    //
+    // Reuse therefore requires the share to be ENTIRELY inside the caller's allowed set.
+    // Folder items are rejected outright: a folder's contents are unbounded and can gain
+    // another client's asset after this check. Rejecting is cheap — the caller mints a
+    // single-asset board instead.
+    //
+    // Verified read-only against production before shipping (scripts/probe-share-scope.mjs):
+    // live shares of this shape spanning >1 client, or holding a folder item = 0 rows. The
+    // leak is not open today; 46 of 77 links match the reusable shape, so it opens on the
+    // first cross-client multi-select.
+    const allowed = new Set(assetIds)
     for (const r of rows) {
+        if (r.items.length === 0) continue
+        if (r.items.some((it) => it.folderId || !it.assetId || !allowed.has(it.assetId))) continue
         for (const it of r.items) {
             // orderBy createdAt asc + first-write-wins == the oldest link, matching the
             // single-asset lookup's `orderBy: { createdAt: 'asc' }`.
@@ -365,26 +426,38 @@ export async function findClientReviewSlugs(assetIds: string[]): Promise<Map<str
     return out
 }
 
+/** Returns null when an admin has revoked this asset's client board — see the guard below. */
 export async function getOrCreateClientReviewSlug(asset: {
     id: string
     workspaceId: string
     taskId: string | null
     createdById: string
-}): Promise<string> {
+}): Promise<string | null> {
     // 1. Try to find a live share link containing this asset that ALREADY has allowDownload enabled
     // and no password, to avoid minting duplicates when one is already available.
-    const alreadyEnabled = await prisma.shareLink.findFirst({
+    const candidates = await prisma.shareLink.findMany({
         where: {
             revokedAt: null,
             AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
             items: { some: { assetId: asset.id } },
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            ...CLIENT_BOARD,
             passwordHash: null,
         },
         orderBy: { createdAt: 'asc' },
-        select: { slug: true },
+        select: { slug: true, items: { select: { assetId: true, folderId: true } } },
     })
+    // [Authz 2026-07] Reuse ONLY a board that holds this asset and nothing else. The query
+    // matches on policy shape plus membership; it cannot see what ELSE the share contains, and
+    // a /r/ board renders every item it holds to whoever opens the link. A staff multi-select
+    // across two clients produces exactly this shape, so an unrestricted reuse would hand one
+    // client a board showing another client's video — and /api/r/<slug>/download-url would
+    // presign that client's master, since it gates on membership in the share, not ownership.
+    // Single-item containment is the one condition provable here without the caller's full
+    // scope; findClientReviewSlugs does the same check against its whole allowed set. A miss
+    // is not a failure — we mint a private single-asset board immediately below.
+    const alreadyEnabled = candidates.find(
+        (c) => c.items.length === 1 && c.items[0].assetId === asset.id && !c.items[0].folderId,
+    )
     if (alreadyEnabled) {
         return alreadyEnabled.slug
     }
@@ -407,6 +480,35 @@ export async function getOrCreateClientReviewSlug(asset: {
     //    whose only existing link is restricted. Staff's link keeps its settings; the
     //    client gets their own board. Nothing the client can reach here is wider than what
     //    the portal already grants them — they can download these same bytes from Files.
+    // [Revoke wins — owner decision 2026-07] Before minting, honour the kill switch. Revoke is
+    // the only control an admin has to pull a video back out of a client's hands, and minting
+    // is unconditional, so a client's very next page load handed them a brand-new board and the
+    // revoke evaporated — silently, un-audited, attributed to the uploader. That also reopens
+    // R5: revokeClientExposureOnNewVersion revokes the board when a fresh cut lands, precisely
+    // so the client cannot see an uncleared version.
+    // Scoped tightly: only a revoked board of the CLIENT shape (single item = this asset,
+    // downloadable, ungated, no password) suppresses minting. A staff member revoking their own
+    // restricted link does not cost the client their board. Un-revoking (revokedAt = null,
+    // already supported) brings it straight back.
+    const revokedClientBoard = await prisma.shareLink.findFirst({
+        where: {
+            revokedAt: { not: null },
+            items: { some: { assetId: asset.id } },
+            ...CLIENT_BOARD,
+            passwordHash: null,
+        },
+        orderBy: { revokedAt: 'desc' },
+        select: { items: { select: { assetId: true, folderId: true } } },
+    })
+    if (
+        revokedClientBoard &&
+        revokedClientBoard.items.length === 1 &&
+        revokedClientBoard.items[0].assetId === asset.id &&
+        !revokedClientBoard.items[0].folderId
+    ) {
+        return null
+    }
+
     const created = await prisma.shareLink.create({
         data: {
             slug: nanoid(SLUG_LEN),
@@ -416,8 +518,7 @@ export async function getOrCreateClientReviewSlug(asset: {
             showAllVersions: false,
             // Client downloads the original (identical to the uploaded file) from their review
             // board. Not gated behind approval so the download works as soon as it's shared.
-            allowDownload: true,
-            downloadOnlyWhenApproved: false,
+            ...CLIENT_BOARD,
             createdById: asset.createdById,
             items: { create: [{ assetId: asset.id, sortIndex: 0 }] },
         },

@@ -21,7 +21,7 @@ export default function YourDesk({
     periodLabel: string
     needsYouCount: number
     openDeliverable: (id: string) => void
-    openReview: (url: string, title: string) => void
+    openReview: (url: string, title: string, deliverableId: string) => void
     goStatements: () => void
     openInvoice: (id: string) => void
 }) {
@@ -39,12 +39,21 @@ export default function YourDesk({
     const approvePicked = async () => {
         if (!actions.approveMany || picked.size === 0 || approving) return
         setApproving(true)
-        const res = await actions.approveMany(Array.from(picked))
-        setApproving(false)
-        if (res.success) {
-            toast('ok', `Approved ${res.approved} video${res.approved === 1 ? '' : 's'}.${res.skipped ? ` ${res.skipped} skipped.` : ''}`)
-            setPicked(new Set())
-        } else toast('err', res.error || 'Could not approve those.')
+        // try/finally, because this server action CAN reject rather than resolve — a database
+        // transaction timeout on a large batch throws. Without it the rejection unwound the
+        // handler before setApproving(false) ran, leaving a permanently disabled "Approving…"
+        // button on a batch that approved nothing, and no message either way.
+        try {
+            const res = await actions.approveMany(Array.from(picked))
+            if (res.success) {
+                toast('ok', `Approved ${res.approved} video${res.approved === 1 ? '' : 's'}.${res.skipped ? ` ${res.skipped} skipped.` : ''}`)
+                setPicked(new Set())
+            } else toast('err', res.error || 'Could not approve those.')
+        } catch {
+            toast('err', 'That took too long and nothing was approved — none of your videos changed. Try again, or approve a few at a time.')
+        } finally {
+            setApproving(false)
+        }
     }
     const overdue = invoices.filter(i => mapInvoiceStatus(i.status) === 'Overdue')
     const delivered = deliverables.filter(d => d.clientStatus === 'Completed').length
@@ -57,7 +66,7 @@ export default function YourDesk({
     const headline = trayEmpty
         ? 'You’re all caught up.'
         : needsYouCount > 0
-            ? `${needsYouCount} ${needsYouCount === 1 ? 'cut is' : 'cuts are'} waiting on you.`
+            ? `${needsYouCount} ${needsYouCount === 1 ? 'video is' : 'videos are'} waiting on you.`
             : 'A couple of things need a look.'
 
     return (
@@ -101,7 +110,7 @@ export default function YourDesk({
                                         style={{ flex: 'none', width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }}
                                     />
                                 )}
-                                <button onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title) : openDeliverable(d.id))} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
+                                <button onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title, d.id) : openDeliverable(d.id))} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
                                     <Play size={18} fill="#f7f2e9" color="#f7f2e9" />
                                     {d.duration && <span className="desk-mono" style={{ position: 'absolute', right: 6, bottom: 5, fontSize: '0.56rem', color: '#eae5d9', background: 'rgba(9,9,11,.65)', padding: '1px 5px' }}>{d.duration}</span>}
                                 </button>
@@ -113,9 +122,9 @@ export default function YourDesk({
                                     <p className="desk-mono" style={{ fontSize: '0.64rem', letterSpacing: '0.08em', color: 'var(--ink-3)', margin: '5px 0 0', textTransform: 'uppercase' }}>
                                         {(d.client?.name || 'Production')}{d.deadline ? ` · ${rel.text || 'Target ' + fmtDate(d.deadline, false)}` : ''}
                                     </p>
-                                    <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>A new cut is ready for your review.</p>
+                                    <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>A new video is ready for your review.</p>
                                 </span>
-                                <Button variant="primary" size="sm" className="desk-tray-cta" onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title) : openDeliverable(d.id))} style={{ flex: 'none' }}>Watch &amp; decide</Button>
+                                <Button variant="primary" size="sm" className="desk-tray-cta" onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title, d.id) : openDeliverable(d.id))} style={{ flex: 'none' }}>Watch &amp; decide</Button>
                             </div>
                         )
                     })}
@@ -141,7 +150,7 @@ export default function YourDesk({
                 {trayEmpty && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 30, color: 'var(--ink-3)' }}>
                         <ShieldCheck size={15} style={{ color: 'var(--sage)' }} />
-                        <span style={{ fontSize: '0.84rem' }}>Every cut is decided — the tray clears itself as you act.</span>
+                        <span style={{ fontSize: '0.84rem' }}>Every video is decided — the tray clears itself as you act.</span>
                     </div>
                 )}
             </main>
@@ -266,7 +275,7 @@ function WelcomeCard() {
                 <button onClick={() => setOpen(false)} className="desk-iconbtn" style={{ marginLeft: 'auto', width: 24, height: 24 }} aria-label="Dismiss"><X size={12} /></button>
             </div>
             <div style={{ display: 'grid', gap: 9, fontSize: '0.8rem', color: 'var(--ink-2)' }}>
-                <Bullet on>Cuts open right here — watch and decide in the screening desk.</Bullet>
+                <Bullet on>Videos open right here — watch and decide in the screening room.</Bullet>
                 <Bullet>Notes pin to exact frames — the editor sees what you see.</Bullet>
                 <Bullet>Statements carry a matching payment reference.</Bullet>
             </div>

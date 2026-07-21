@@ -22,7 +22,8 @@ import { REVIEW_STATUS_MAP } from './status-map'
 import { inngest, REVIEW_EVENTS } from './inngest'
 import { type ShareWithItems } from './share-auth'
 import { notifyReview, resolveTaskRecipients, reviewPlayerUrl } from './notify'
-import { isValidStatus } from '@/lib/task-statuses'
+import { isValidStatus, isTerminalStatus, SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
+import { isClientFacingPhase } from '@/lib/portal-derive'
 // [video-fix ③④⑤] Run the task-side effects SYNCHRONOUSLY (below) instead of relying only on the
 // async Inngest fn, so the editor/manager notify + the A5→A6 status advance can't be silently dropped.
 import { syncTaskOnChangesRequested } from './task-sync'
@@ -131,18 +132,44 @@ export async function submitGuestDecision(
     const { version, asset } = await assertVersionInShare(share, input.versionId)
 
     // [AUDIT H1] A decision (approve / request changes) is a client SIGN-OFF; accept it ONLY on a
-    // share an admin actually SENT to the client — i.e. the asset's task is in the client-review flow
-    // (Task.clientReview set by approveInternalAndSendToClient / F10). A bare asset or Team share, or a
-    // task never sent, can be viewed & commented on but never decided. This realizes "allowDecisions =
-    // admin-sent shares only" from existing state, no schema flag.
+    // share an admin actually opened to the client. A bare asset or Team share has no task at all,
+    // so it can be viewed & commented on but never decided.
     if (!asset.taskId) {
         throw apiError(403, 'DECISIONS_DISABLED', 'This link is not open for approval.')
     }
     const decisionTask = await prisma.task.findFirst({
         where: { id: asset.taskId, workspaceId: asset.workspaceId },
-        select: { clientReview: true },
+        select: { clientReview: true, status: true, isArchived: true },
     })
-    if (!decisionTask || decisionTask.clientReview == null) {
+    if (!decisionTask) {
+        throw apiError(403, 'DECISIONS_DISABLED', 'This link is not open for approval.')
+    }
+    // [Owner bug video 2026-07-21 @01:02] This gate used to demand `clientReview != null`, i.e. the
+    // F10 admin "Duyệt & gửi khách" bridge must have run. The CLIENT PORTAL never agreed with that:
+    // share-portal-actions.ts surfaces a live /r/ board — and synthesizes `effClientReview =
+    // task.clientReview ?? 'AWAITING'` for the badge — on the BROADER `isClientFacingPhase` test
+    // (clientReview set, OR the status string contains "khách"). So a task an admin moved into a
+    // client status by hand, without going through F10, showed the client "Awaiting your review",
+    // opened the screening room, offered an enabled Approve button — and then the server refused it
+    // with "This review is not open for approval yet." The UI and the gate were reading two different
+    // fields. The owner reproduced exactly that on video.
+    //
+    // Align the gate with the predicate that already decides whether the client may SEE the cut at
+    // all. That grants no new exposure: `isClientFacingPhase` is the same R5 gate that mints the
+    // board, so anything decidable here was already watchable. Every internal "(nội bộ)" step still
+    // fails it, so an unapproved internal cut is still undecidable — and unviewable.
+    // CANCELLED only. Deliberately NOT every terminal status: 'Hoàn tất' must keep accepting a
+    // decision, because it already did before this change (a completed task has clientReview set,
+    // so the old gate passed) and because refusing would SILENTLY DROP a late client "request
+    // changes" — the note, the comment and the staff notification all hang off this call. Payroll
+    // is not at risk from allowing it: the terminal guard that matters lives downstream in
+    // syncTaskFromReviewEvent (E1/J1), which refuses to move a completed task's STATUS. What must
+    // be refused here is the tombstone — a cancelled/archived job is not live work to sign off.
+    const cancelled = isTerminalStatus(decisionTask.status) && decisionTask.status !== SALARY_COMPLETED_STATUS
+    if (decisionTask.isArchived || cancelled) {
+        throw apiError(403, 'DECISIONS_DISABLED', 'This project is closed. Please contact your producer.')
+    }
+    if (!isClientFacingPhase(decisionTask.status, decisionTask.clientReview)) {
         throw apiError(403, 'DECISIONS_DISABLED', 'This review is not open for approval yet.')
     }
 
@@ -272,7 +299,28 @@ export async function submitGuestDecision(
             } else {
                 await prisma.task
                     .updateMany({
-                        where: { id: asset.taskId, workspaceId: asset.workspaceId, clientReview: { in: ['AWAITING', 'CHANGES'] } },
+                        where: {
+                            id: asset.taskId,
+                            workspaceId: asset.workspaceId,
+                            // Re-assert what the gate checked. The gate read status/isArchived ONCE, at
+                            // the top of the request; without these two the settle happily writes
+                            // 'APPROVED' onto a task an admin cancelled in the meantime — which re-admits
+                            // the tombstone into the client's portal history (share-portal-actions filters
+                            // archived rows back IN when clientReview is APPROVED/CHANGES) — or onto a cut
+                            // revokeClientExposureOnNewVersion had just withdrawn, so staff read "khách đã
+                            // duyệt" for a version the system pulled. One-request window, no attacker
+                            // needed. task-sync.ts does the same re-guard.
+                            isArchived: false,
+                            status: decisionTask.status,
+                            // NULL belongs here. The gate above now admits a task the admin put into a
+                            // client status by hand, whose clientReview was never set by the F10 bridge.
+                            // Without the null branch the approval would land on the version but never on
+                            // the task, and the portal — which synthesizes AWAITING whenever a board is
+                            // live and clientReview is null — would nag "Awaiting your review" forever,
+                            // with the client's own approval already recorded. `in: [null, …]` is NOT a
+                            // legal Prisma filter for a nullable column, hence the explicit OR.
+                            OR: [{ clientReview: null }, { clientReview: { in: ['AWAITING', 'CHANGES'] } }],
+                        },
                         data: { clientReview: 'APPROVED', clientReviewedAt: new Date() },
                     })
                     .catch(() => {})

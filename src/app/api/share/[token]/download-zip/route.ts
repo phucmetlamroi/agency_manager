@@ -45,6 +45,14 @@ const MAX_ZIP_FILES = 1000
 /** Bound on how many ids we will even PARSE out of the query string, before any
  *  intersection work. MAX_ZIP_FILES only bounds the result, not the input. */
 const MAX_IDS = 500
+/** Byte ceiling for ONE archive. STORE mode streams masters uncompressed, so the file COUNT
+ *  says nothing about the work: 40 4K masters is ~200 GB through a 300-second function.
+ *  Sized against the clock, not against generosity — the stream is paced to the browser, so
+ *  even a sustained 100 MB/s moves only ~30 GB inside maxDuration, and a function killed
+ *  mid-stream hands the client a truncated zip with no receipt (the exact failure the receipt
+ *  exists to make visible). 20 GB leaves real headroom on an ordinary connection; bigger
+ *  libraries come down a folder at a time, and the receipt says so. */
+const MAX_ZIP_BYTES = 20 * 1024 * 1024 * 1024
 
 const NOT_FOUND = () => new NextResponse('Not found', { status: 404 })
 
@@ -164,8 +172,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         : snap.assets.filter((a) => inScope.has(a.folderId))
     if (picked.length === 0) return new NextResponse('Nothing to download', { status: 409 })
 
-    const wanted = picked.slice(0, MAX_ZIP_FILES)
+    // [Authz 2026-07] Two ceilings, not one. MAX_ZIP_FILES bounded the COUNT; nothing bounded
+    // the BYTES, and archiver runs in STORE mode — so 40 untouched 4K masters is a ~200 GB read
+    // streamed out of R2 inside one 300-second function, repeatable 12× per 10 minutes per
+    // link, forever, with egress billed every time. Cut at whichever ceiling comes first, and
+    // name that ceiling in the receipt so a short archive is never read as a lost file.
+    const capped: typeof picked = []
+    let plannedBytes = 0
+    for (const a of picked) {
+        if (capped.length >= MAX_ZIP_FILES) break
+        const size = Number(a.currentVersion?.sizeBytes ?? 0)
+        // The first entry always goes in: a single master larger than the whole budget must
+        // still be downloadable, or the client is locked out of their own file.
+        if (capped.length > 0 && Number.isFinite(size) && plannedBytes + size > MAX_ZIP_BYTES) break
+        if (Number.isFinite(size)) plannedBytes += size
+        capped.push(a)
+    }
+    const wanted = capped
     const skipped = picked.length - wanted.length
+    const hitByteCap = skipped > 0 && wanted.length < MAX_ZIP_FILES
 
     // r2Keys come from the DB by id — but only for versions already present in the
     // authorized snapshot, so no id supplied by the caller ever reaches this query.
@@ -177,14 +202,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     const keyById = new Map(rows.map((r) => [r.id, r]))
 
     const entries: { r2Key: string; zipPath: string }[] = []
+    // Files the client asked for that disappeared between the snapshot and this query — staff
+    // soft-deleted the version, or a re-transcode flipped it out of READY. They landed in
+    // NEITHER of the receipt's lists before, so the archive just came back short with no
+    // explanation: the exact "stuff is going missing" experience, produced by its own fix.
+    const vanished: string[] = []
     for (const a of wanted) {
         const row = keyById.get(a.currentVersion.id)
-        if (!row?.r2Key) continue
         const dir = relPathOf(a.folderId)
+        if (!row?.r2Key) {
+            const missing = sanitizeSegment(a.currentVersion.fileName || a.title)
+            vanished.push(dir ? `${dir}/${missing}` : missing)
+            continue
+        }
         const file = sanitizeSegment(row.fileName || a.currentVersion.fileName || a.title)
         entries.push({ r2Key: row.r2Key, zipPath: dir ? `${dir}/${file}` : file })
     }
-    if (entries.length === 0) return new NextResponse('Nothing to download', { status: 409 })
+    // Only a BARE 409 when nothing was ever eligible. If files WERE requested and every one of
+    // them vanished between the snapshot and this lookup, the client gets the archive anyway —
+    // holding just the receipt, which names each file and says who to ask. "Nothing to download"
+    // on a selection the client watched themselves make is the disappearance complaint restated.
+    if (entries.length === 0 && vanished.length === 0) {
+        return new NextResponse('Nothing to download', { status: 409 })
+    }
     dedupe(entries)
 
     const archiveName = sanitizeSegment(
@@ -214,6 +254,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     const archive = archiver('zip', { store: true }) // STORE = no recompress → lossless + fast
     archive.on('warning', (err) => reviewLog('warn', 'client_zip.warning', { error: String(err) }))
 
+    // [Authz 2026-07] There was NO 'error' listener, and that turned a recoverable failure into
+    // a hang. The try/catch below covers only getObjectStream(), which resolves as soon as R2
+    // returns headers — if the body then dies mid-transfer (connection reset on a multi-GB
+    // master, or the object removed while being read) archiver aborts that entry and emits
+    // 'error'. The pump sits on `await entryDone`, a promise resolved ONLY by the matching
+    // 'entry' event, which will now never fire and has no timeout: pump() neither resolves nor
+    // rejects, finalize() is never reached, and _contents.txt is never written. The client's
+    // browser, already holding a 200 with no Content-Length, shows a COMPLETED download of a
+    // truncated zip. Racing every wait against this makes the failure loud instead of silent.
+    const fatalSignal = new Promise<never>((_, reject) => {
+        archive.on('error', (err) => reject(err instanceof Error ? err : new Error(String(err))))
+    })
+    // Keep an always-attached handler so a late error (after pump has finished) can never
+    // surface as an unhandled rejection. Promise.race still observes the rejection below.
+    fatalSignal.catch(() => { /* observed by the races below */ })
+
     // One entry at a time: open each R2 stream only after the previous finished, so we never
     // hold many open connections and archiver's backpressure paces us to the client's speed
     // (bounded memory even for a multi-GB production).
@@ -232,9 +288,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
                 failed.push(entry.zipPath)
                 continue
             }
+            // Surface a source-stream failure as an archive error rather than letting the
+            // append stall silently.
+            body.on('error', (err) => archive.emit('error', err))
             const entryDone = new Promise<void>((resolve) => archive.once('entry', () => resolve()))
             archive.append(body, { name: entry.zipPath })
-            await entryDone
+            await Promise.race([entryDone, fatalSignal])
             included.push(entry.zipPath)
         }
 
@@ -267,12 +326,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
                 ...failed.map((p) => `  ${p}`),
             )
         }
+        // Requested, but gone by the time we looked up the storage key. Previously counted
+        // nowhere at all — the archive was simply short.
+        if (vanished.length) {
+            lines.push(
+                '',
+                `NO LONGER AVAILABLE (${vanished.length})`,
+                '  These were in your library when this download started but were changed or',
+                '  removed while it ran. Ask the studio and they will re-send them.',
+                ...vanished.map((p) => `  ${p}`),
+            )
+        }
         if (skipped > 0) {
-            lines.push('', `NOT REQUESTED (${skipped})`, `  This download was capped at ${MAX_ZIP_FILES} files. Download the remaining files separately, or a folder at a time.`)
+            lines.push(
+                '',
+                `NOT INCLUDED THIS TIME (${skipped})`,
+                hitByteCap
+                    ? `  One archive is capped at ${Math.round(MAX_ZIP_BYTES / 1024 / 1024 / 1024)} GB. Download the rest separately, or a folder at a time.`
+                    : `  This download was capped at ${MAX_ZIP_FILES} files. Download the remaining files separately, or a folder at a time.`,
+            )
         }
         const receiptDone = new Promise<void>((resolve) => archive.once('entry', () => resolve()))
         archive.append(Buffer.from(lines.join('\r\n'), 'utf8'), { name: '_contents.txt' })
-        await receiptDone
+        await Promise.race([receiptDone, fatalSignal])
 
         await archive.finalize()
     }

@@ -698,13 +698,26 @@ export const reviewShareDecision = inngest.createFunction(
             // portal stops nagging "Awaiting your review" / "In revision" after the client already
             // decided. Mirror the request_changes path (which writes clientReview). Scoped to tasks that
             // were actually sent to the client (clientReview AWAITING, or a stale CHANGES from an earlier
-            // flip-flop) — never a task that was never client-exposed. Idempotent under Inngest retry.
+            // flip-flop) — or NULL, which is a task an admin moved into a client status by hand rather
+            // than through the F10 bridge; share-decision.ts admits those now, so this backup must
+            // settle them too or the portal nags forever. Idempotent under Inngest retry.
             await step.run('settle-client-review', async () => {
                 const res = await prisma.task.updateMany({
                     where: {
                         id: data.taskId!,
                         workspaceId: data.workspaceId,
-                        clientReview: { in: ['AWAITING', 'CHANGES'] },
+                        // isArchived is LOAD-BEARING and was missing. This step runs seconds after
+                        // the request, so it is the LAST writer: the synchronous settle in
+                        // share-decision.ts correctly refuses to stamp a task an admin cancelled
+                        // mid-decision, and then this un-guarded backup stamped it anyway. Cancel
+                        // sets status='Đã hủy' AND isArchived=true in one update (task-actions.ts),
+                        // and getShareSnapshot re-admits archived rows whose clientReview is
+                        // APPROVED/CHANGES — so the cancelled job reappeared in the client's portal
+                        // and staff read "khách đã duyệt" on work that was called off. A guard the
+                        // backup does not share is not a guard.
+                        isArchived: false,
+                        // `in: [null, …]` is not a legal Prisma filter on a nullable column.
+                        OR: [{ clientReview: null }, { clientReview: { in: ['AWAITING', 'CHANGES'] } }],
                     },
                     data: { clientReview: 'APPROVED', clientReviewedAt: new Date() },
                 })

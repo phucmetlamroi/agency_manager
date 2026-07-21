@@ -78,6 +78,37 @@ async function findDuplicateName(
     return siblings.some((s) => s.id !== excludeId && norm(s.name) === normalized)
 }
 
+/**
+ * [Authz 2026-07 round 4] EVERY write that can put a client at a (profile, parent, name)
+ * position runs inside this lock. Review found the first pass had locked only three of six —
+ * and a lock only half the writers take is not a lock: unmerge could hold it, check "no root
+ * Acme", and an UNLOCKED rename of "Beta"->"Acme" would land in the same window, producing the
+ * two same-named ACTIVE roots that resolveShareToken collapses into ONE share scope, so either
+ * client's link reads the other's tasks, invoices and files.
+ *
+ * deleteClient takes it too, for a different reason: merge validates its target parent and then
+ * writes, and an unlocked soft-delete in between would leave an ACTIVE child under a trashed
+ * parent — invisible in the active tree and not part of any deleted subtree.
+ *
+ * The key is the PROFILE, because that is the scope the uniqueness invariant is defined over.
+ */
+async function withClientNameLock<T>(
+    wp: any,
+    profileId: string | undefined,
+    workspaceId: string,
+    fn: (tx: any) => Promise<T>,
+): Promise<T> {
+    // Prisma's interactive default is 5s and db.ts sets none. deleteClient and restoreClient run
+    // a level-by-level tree walk INSIDE this lock — one round-trip per level — so a deep client
+    // hierarchy could blow the default and roll back, showing the admin nothing but the generic
+    // "could not" message on perfectly valid data. 20s is the same budget the bulk-approve
+    // transaction uses; maxWait covers contention with another CRM write holding the lock.
+    return wp.$transaction(async (tx: any) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${String(profileId ?? workspaceId)}, 0))`
+        return fn(tx)
+    }, { timeout: 20_000, maxWait: 10_000 })
+}
+
 
 export async function createClient(data: { name: string, parentId?: number }, workspaceId: string) {
     try {
@@ -87,15 +118,23 @@ export async function createClient(data: { name: string, parentId?: number }, wo
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         const parentId = data.parentId || null
-        if (await findDuplicateName(workspacePrisma, data.name, parentId)) {
-            return { success: false, error: `Khách hàng "${data.name.trim()}" đã tồn tại trong profile — clients giờ dùng chung cho mọi workspace, không cần tạo lại.` }
-        }
-        await workspacePrisma.client.create({
-            data: {
-                name: data.name,
-                parentId
+        const created: { success: boolean; error?: string } = await withClientNameLock(workspacePrisma, profileId, workspaceId, async (tx) => {
+            // A SOFT_DELETED parent must not accept new children. findDuplicateName only compares
+            // ACTIVE siblings, so creating under a trashed parent slipped the guard entirely —
+            // and then restoring that parent brought BOTH same-named children back to ACTIVE.
+            if (parentId !== null) {
+                const parent = await tx.client.findUnique({ where: { id: parentId }, select: { status: true } })
+                if (!parent || parent.status !== 'ACTIVE') {
+                    return { success: false, error: 'Khách hàng chính không còn hoạt động — hãy tải lại trang.' }
+                }
             }
+            if (await findDuplicateName(tx, data.name, parentId)) {
+                return { success: false, error: `Khách hàng "${data.name.trim()}" đã tồn tại trong profile — clients giờ dùng chung cho mọi workspace, không cần tạo lại.` }
+            }
+            await tx.client.create({ data: { name: data.name, parentId } })
+            return { success: true }
         })
+        if (!created.success) return created
         revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
@@ -109,15 +148,18 @@ export async function updateClient(id: number, data: { name: string }, workspace
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-        // Dup-guard on rename: same normalized name under the same parent.
-        const current = await workspacePrisma.client.findUnique({ where: { id }, select: { parentId: true } })
-        if (current && await findDuplicateName(workspacePrisma, data.name, current.parentId, id)) {
-            return { success: false, error: `Khách hàng "${data.name.trim()}" đã tồn tại trong profile.` }
-        }
-        await workspacePrisma.client.update({
-            where: { id },
-            data: { name: data.name }
+        // Dup-guard on rename: same normalized name under the same parent. A rename REACHES a
+        // name position exactly as a create does, so it takes the same lock — otherwise it is
+        // the unlocked writer that defeats every locked one.
+        const renamed: { success: boolean; error?: string } = await withClientNameLock(workspacePrisma, profileId, workspaceId, async (tx) => {
+            const current = await tx.client.findUnique({ where: { id }, select: { parentId: true } })
+            if (current && await findDuplicateName(tx, data.name, current.parentId, id)) {
+                return { success: false, error: `Khách hàng "${data.name.trim()}" đã tồn tại trong profile.` }
+            }
+            await tx.client.update({ where: { id }, data: { name: data.name } })
+            return { success: true }
         })
+        if (!renamed.success) return renamed
         revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
     } catch (error) {
@@ -173,19 +215,32 @@ export async function createFeedback(_data: any, _workspaceId: string) {
 // --- SOFT-DELETE / TRASH / RESTORE ---
 
 /**
- * [Soft-delete] Collect a client's full descendant subtree (root + all
- * subsidiaries, bounded depth) so soft-delete / restore cascade the whole tree
- * the way the old hard-delete cascade did — but reversibly. Status is NOT
- * filtered here, so it works for soft-delete (children ACTIVE) AND restore
- * (children SOFT_DELETED). Uses the workspace-scoped client.
+ * [Soft-delete] Collect a client's full descendant subtree (root + all subsidiaries) so
+ * soft-delete / restore cascade the whole tree the way the old hard-delete cascade did — but
+ * reversibly. Uses the workspace-scoped client.
+ *
+ * `status` is OPTIONAL and each caller passes what it means:
+ *   deleteClient  -> 'ACTIVE'        (a trashed descendant is already trashed)
+ *   restoreClient -> 'SOFT_DELETED'  (an ACTIVE descendant is NOT ours to reactivate — and
+ *                                     including it made the collision check exclude the very
+ *                                     rows it existed to catch)
+ *   permanentlyDeleteClient -> omitted, every status, because it removes the lot.
+ *
+ * Depth is NOT capped. The old `guard < 8` stopped descending while the caller updated
+ * everything already collected, which partially trashed and partially restored deep trees.
+ * Termination comes from the visited set, so a corrupt parent cycle also ends.
  */
-async function collectClientSubtreeIds(wp: any, rootId: number): Promise<number[]> {
+async function collectClientSubtreeIds(wp: any, rootId: number, status?: 'ACTIVE' | 'SOFT_DELETED'): Promise<number[]> {
     const all = new Set<number>([rootId])
     let frontier: number[] = [rootId]
-    let guard = 0
-    while (frontier.length > 0 && guard < 8) {
+    // [round 4 review] The old `guard < 8` stopped DESCENDING at depth 8 while the caller went
+    // on to update every id it HAD collected — so a 9-deep tree was partially soft-deleted
+    // (leaving ACTIVE children under a trashed parent) and partially restored. Depth is bounded
+    // by the visited set now: every node is enqueued at most once, so the loop terminates on a
+    // cycle too, and a real hierarchy is never silently truncated.
+    while (frontier.length > 0) {
         const children: { id: number }[] = await wp.client.findMany({
-            where: { parentId: { in: frontier } },
+            where: { parentId: { in: frontier }, ...(status ? { status } : {}) },
             select: { id: true },
         })
         const next: number[] = []
@@ -193,7 +248,6 @@ async function collectClientSubtreeIds(wp: any, rootId: number): Promise<number[
             if (!all.has(c.id)) { all.add(c.id); next.push(c.id) }
         }
         frontier = next
-        guard++
     }
     return Array.from(all)
 }
@@ -209,10 +263,16 @@ export async function deleteClient(id: number, workspaceId: string) {
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
-        const ids = await collectClientSubtreeIds(wp, id)
-        await wp.client.updateMany({
-            where: { id: { in: ids } },
-            data: { status: 'SOFT_DELETED', deletedAt: new Date() },
+        // Locked as well: mergeClientIntoParent validates its target parent and then writes, so
+        // an unlocked soft-delete landing in that window leaves an ACTIVE child hanging under a
+        // trashed parent — gone from the active tree, and not inside any deleted subtree either.
+        const ids = await withClientNameLock(wp, profileId, workspaceId, async (tx) => {
+            const subtree = await collectClientSubtreeIds(tx, id, 'ACTIVE')
+            await tx.client.updateMany({
+                where: { id: { in: subtree } },
+                data: { status: 'SOFT_DELETED', deletedAt: new Date() },
+            })
+            return subtree
         })
         void audit({
             workspaceId,
@@ -240,11 +300,64 @@ export async function restoreClient(id: number, workspaceId: string) {
         const session = await getSession()
         const profileId = (session?.user as any)?.sessionProfileId
         const wp = getWorkspacePrisma(workspaceId, profileId)
-        const ids = await collectClientSubtreeIds(wp, id)
-        await wp.client.updateMany({
-            where: { id: { in: ids } },
-            data: { status: 'ACTIVE', deletedAt: null, hardDeleteAfter: null },
+        // [Authz 2026-07 round 4] Restoring turns rows back to ACTIVE, which is a create as far
+        // as the name-path scope is concerned. Round 3 checked only the SUBTREE ROOT, and review
+        // showed why that is not enough: a client can be created under a SOFT_DELETED parent (a
+        // stale form, or simply a second tab), because findDuplicateName compares ACTIVE siblings
+        // only and the parent was not active. Restoring then flips BOTH same-named children to
+        // ACTIVE at once, and resolveShareToken reads one name path as ONE client scope — each
+        // link then reads the other's tasks, invoices and files. Every node is checked, and the
+        // subtree is recollected INSIDE the lock so it cannot shift underneath the check.
+        const restored: { success: boolean; error?: string; ids?: number[] } = await withClientNameLock(wp, profileId, workspaceId, async (tx) => {
+            // SOFT_DELETED only. The previous version walked the tree without a status filter, so
+            // an ACTIVE client already sitting at a name position INSIDE the tree was pulled into
+            // the subtree set — and then excluded from the collision check as "one of ours". The
+            // two rows it was supposed to catch were the two it silently allowed.
+            const subtree = await collectClientSubtreeIds(tx, id, 'SOFT_DELETED')
+            const rows: { id: number; name: string; parentId: number | null }[] = await tx.client.findMany({
+                where: { id: { in: subtree }, status: 'SOFT_DELETED' },
+                select: { id: true, name: true, parentId: true },
+            })
+            if (rows.length === 0) return { success: false, error: 'Không tìm thấy khách hàng trong Thùng rác.' }
+
+            const parentIds = Array.from(new Set(rows.map((r) => r.parentId)))
+            const nonNullParents = parentIds.filter((v): v is number => v !== null)
+            // `in: [null, 10, 11]` is not a legal Prisma filter for a nullable Int — it is
+            // rejected at validation, which turned EVERY ordinary root restore into the generic
+            // "Không thể khôi phục" catch. Root level has to be its own OR branch.
+            const parentWhere = parentIds.includes(null)
+                ? { OR: [{ parentId: null }, ...(nonNullParents.length ? [{ parentId: { in: nonNullParents } }] : [])] }
+                : { parentId: { in: nonNullParents } }
+            const occupants: { id: number; name: string; parentId: number | null }[] = nonNullParents.length || parentIds.includes(null)
+                ? await tx.client.findMany({
+                    where: { status: 'ACTIVE', ...parentWhere },
+                    select: { id: true, name: true, parentId: true },
+                })
+                : []
+
+            const norm = (s: string) => (s ?? '').normalize('NFC').trim().toLowerCase()
+            const key = (parentId: number | null, name: string) => `${parentId ?? -1}\u0000${norm(name)}`
+            const taken = new Set(occupants.map((o) => key(o.parentId, o.name)))
+            for (const r of rows) {
+                const k = key(r.parentId, r.name)
+                // Against what is already live...
+                if (taken.has(k)) {
+                    return { success: false, error: `Không thể khôi phục: đã có khách hàng "${r.name.trim()}" đang hoạt động ở cùng cấp. Đổi tên nó trước, rồi khôi phục lại.` }
+                }
+                // ...AND against the rest of this restore. Two soft-deleted siblings can share a
+                // name (updateClient renames a trashed row without an ACTIVE-status check), and
+                // reactivating both in one updateMany would create the collision by itself.
+                taken.add(k)
+            }
+
+            await tx.client.updateMany({
+                where: { id: { in: subtree } },
+                data: { status: 'ACTIVE', deletedAt: null, hardDeleteAfter: null },
+            })
+            return { success: true, ids: subtree }
         })
+        if (!restored.success) return restored
+        const ids = restored.ids ?? []
         void audit({
             workspaceId,
             actorUserId: session?.user?.id ?? null,
@@ -369,10 +482,31 @@ export async function mergeClientIntoParent(childId: number, parentId: number, w
         if (child.parentId !== null) return { success: false, error: 'Khách hàng được kéo đã là khách hàng trực thuộc, không thể gộp.' }
         if (parent.parentId !== null) return { success: false, error: 'Khách hàng đích đến đã là khách hàng trực thuộc, không thể dùng làm khách hàng chính.' }
 
-        await workspacePrisma.client.update({
-            where: { id: childId },
-            data: { parentId }
+        // [Authz 2026-07 round 2] Merging MOVES a client under a new parent, so it needs the
+        // same duplicate guard and the same lock as detaching. Hardening only unmergeClient was
+        // treating one direction of the same edge: dragging "Acme" under "Bob" when "Bob > Acme"
+        // already exists produces two ACTIVE siblings with one name, and resolveShareToken reads
+        // a shared name path as a SINGLE client scope — either link then reads both libraries.
+        const merged: { success: boolean; error?: string } = await withClientNameLock(workspacePrisma, profileId, workspaceId, async (tx) => {
+            const fresh = await tx.client.findUnique({ where: { id: childId }, select: { name: true, parentId: true, status: true } })
+            if (!fresh || fresh.status !== 'ACTIVE' || fresh.parentId !== null) {
+                return { success: false, error: 'Khách hàng đã thay đổi, vui lòng tải lại trang.' }
+            }
+            // Re-read the PARENT inside the lock as well. Round 3 revalidated only the child, so
+            // a soft-delete landing between the pre-flight read and this write left an ACTIVE
+            // client parented to a trashed one — missing from the active hierarchy, and outside
+            // any deleted subtree, so nothing would ever clean it up or show it.
+            const freshParent = await tx.client.findUnique({ where: { id: parentId }, select: { parentId: true, status: true } })
+            if (!freshParent || freshParent.status !== 'ACTIVE' || freshParent.parentId !== null) {
+                return { success: false, error: 'Khách hàng chính đã thay đổi, vui lòng tải lại trang.' }
+            }
+            if (await findDuplicateName(tx, fresh.name, parentId, childId)) {
+                return { success: false, error: `Không thể gộp: khách hàng chính đã có "${fresh.name.trim()}" trực thuộc. Đổi tên một trong hai trước khi gộp.` }
+            }
+            await tx.client.update({ where: { id: childId }, data: { parentId } })
+            return { success: true }
         })
+        if (!merged.success) return merged
 
         revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }
@@ -392,10 +526,33 @@ export async function unmergeClient(clientId: number, workspaceId: string) {
         const profileId = (session?.user as any)?.sessionProfileId
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
-        await workspacePrisma.client.update({
-            where: { id: clientId },
-            data: { parentId: null }
+        // [Authz 2026-07] Detaching MOVES a client to root level, so it has to clear the same
+        // duplicate guard createClient and updateClient already run — this was the one
+        // parent-changing path without one. The share-token scope identifies a client by its
+        // hierarchical NAME PATH, so two ACTIVE roots named "Michael" in one profile collapse
+        // into a SINGLE scope and either one's link reads the other's tasks, invoices and
+        // files. "Bob > Michael" alongside a root "Michael" is legal (the unique index keys on
+        // profile + parent + name), which makes detaching the way that pair gets created.
+        // Guard and write in ONE transaction behind a per-profile advisory lock. Checking then
+        // updating as two statements let two concurrent detaches — "A > Acme" and "B > Acme",
+        // no root Acme yet — each see no conflict and both land, producing exactly the pair of
+        // same-named ACTIVE roots that resolveShareToken then reads as a SINGLE client scope.
+        // The database index that would catch this lives in a MANUAL migration whose own header
+        // says it may not be applied, and postinstall runs `prisma db push`, which does not
+        // create it — so the lock is the real guarantee here, not a belt over a braces.
+        const result: { success: boolean; error?: string } = await withClientNameLock(workspacePrisma, profileId, workspaceId, async (tx) => {
+            const target = await tx.client.findUnique({
+                where: { id: clientId },
+                select: { name: true, parentId: true },
+            })
+            if (!target) return { success: false, error: 'Không tìm thấy khách hàng.' }
+            if (target.parentId !== null && await findDuplicateName(tx, target.name, null, clientId)) {
+                return { success: false, error: `Không thể tách: đã có khách hàng "${target.name.trim()}" ở cấp gốc. Đổi tên một trong hai trước khi tách.` }
+            }
+            await tx.client.update({ where: { id: clientId }, data: { parentId: null } })
+            return { success: true }
         })
+        if (!result.success) return result
 
         revalidatePath(`/${workspaceId}/admin/crm`)
         return { success: true }

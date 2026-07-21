@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
     Play, FolderOpen, ExternalLink, Clock, Check, RotateCcw, Info, CheckCircle2,
-    Download, KeyRound, Star, History, ChevronDown, Send,
+    Download, Star, History, ChevronDown, Send,
 } from 'lucide-react'
 import { Sheet, SheetHeader, Button, Avatar } from './ui'
 import { StatusPill } from './ui'
@@ -30,19 +30,27 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
     actions: DeliverableActions
     onClose: () => void
     onUpdated: (id: string, patch: Partial<Deliverable>) => void
-    /** Open the in-portal screening room for a same-origin /r review link. */
-    onOpenReview?: (url: string, title: string) => void
+    /** Open the in-portal screening room for a same-origin /r review link.
+     *  `deliverableId` lets DeskApp apply the decision the client makes INSIDE the frame. */
+    onOpenReview?: (url: string, title: string, deliverableId: string) => void
 }) {
     const [mode, setMode] = useState<null | 'changes'>(null)
     const [notes, setNotes] = useState('')
     const [busy, setBusy] = useState(false)
     const [err, setErr] = useState<string | null>(null)
     const [activity, setActivity] = useState<ActivityItem[]>([])
-    const [showCreds, setShowCreds] = useState(false)
     const [showActivity, setShowActivity] = useState(false)
 
     const brandName = d.client?.name || '—'
-    const rel = d.clientStatus === 'Completed' ? null : relDeadline(d.deadline)
+    /* [Tombstone] A cancelled production comes back to the portal as clientStatus 'Closed'
+       instead of vanishing retroactively. Every line below that describes work IN FLIGHT
+       has to be suppressed for it: cancelling deliberately keeps the old deadline on the
+       row, and this sheet's copy was written for live jobs. Unguarded, a closed job showed
+       an overdue date, "Your changes are being made", and "We're on it — you'll get a note
+       the moment this is ready", i.e. it told the client a cancelled video was being edited.
+       That is the same phantom-work failure the readmission was supposed to end. */
+    const closed = d.clientStatus === 'Closed'
+    const rel = d.clientStatus === 'Completed' || closed ? null : relDeadline(d.deadline)
     const done = d.clientStatus === 'Completed'
 
     useEffect(() => {
@@ -52,26 +60,41 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [d.id])
 
+    /* These two await SERVER ACTIONS, which reject on a network drop, a redeploy mid-flight, or any
+       server-side throw — and a rejection is not the `{success:false}` the else-branch handles. With
+       the await bare, that rejection escaped, `setBusy(false)` never ran, and the client was left
+       with a permanently disabled Approve button and no message at all. try/finally, and surface
+       the failure instead of swallowing it. */
     const approve = async () => {
         setBusy(true); setErr(null)
-        const res = await actions.approve(d.id)
-        setBusy(false)
-        if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Hoàn tất', clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
-            actions.activity(d.id).then(setActivity).catch(() => {})
-        } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
+        try {
+            const res = await actions.approve(d.id)
+            if ('success' in res && res.success) {
+                onUpdated(d.id, { clientStatus: 'Completed', needsYou: false, clientReview: 'APPROVED' })
+                actions.activity(d.id).then(setActivity).catch(() => {})
+            } else setErr(('error' in res && res.error) || 'Could not approve. Please try again.')
+        } catch {
+            setErr('Could not reach the server. Please check your connection and try again.')
+        } finally {
+            setBusy(false)
+        }
     }
 
     const requestChanges = async () => {
         if (!notes.trim()) return
         setBusy(true); setErr(null)
-        const res = await actions.requestChanges(d.id, notes.trim())
-        setBusy(false)
-        if ('success' in res && res.success) {
-            onUpdated(d.id, { status: 'Revision', clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
-            setMode(null); setNotes('')
-            actions.activity(d.id).then(setActivity).catch(() => {})
-        } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')
+        try {
+            const res = await actions.requestChanges(d.id, notes.trim())
+            if ('success' in res && res.success) {
+                onUpdated(d.id, { clientStatus: 'In revision', needsYou: false, clientReview: 'CHANGES', clientFeedback: notes.trim() })
+                setMode(null); setNotes('')
+                actions.activity(d.id).then(setActivity).catch(() => {})
+            } else setErr(('error' in res && res.error) || 'Could not send your request. Please try again.')
+        } catch {
+            setErr('Could not reach the server. Please check your connection and try again.')
+        } finally {
+            setBusy(false)
+        }
     }
 
     return (
@@ -86,8 +109,24 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                     </div>
                 )}
 
-                {/* Review board link */}
-                {!(d.reviewUrl || d.productLink) ? (
+                {/* Review board link. `closed` short-circuits it: a cancelled job that still
+                    carries an external productLink was rendering "Open the screening room —
+                    watch, comment and approve", i.e. an invitation to review work nobody is
+                    doing, on a task every write path refuses.
+                    An earlier version of this comment claimed the files "remain in Files &
+                    masters". That was FALSE, and review caught it: buildClientDocuments scopes
+                    on isArchived:false, so a cancelled task's library entries are excluded
+                    before anything else is considered. Suppressing the anchor as well meant an
+                    APPROVED-then-cancelled job left the client with no route to a master they
+                    had already accepted — manufacturing the disappearance this work exists to
+                    end. So the link survives for a closed job; only its LABEL changes, from an
+                    invitation to review into what it actually is: your delivered files. */}
+                {closed && d.productLink ? (
+                    <a href={safeHref(d.productLink)} target="_blank" rel="noopener noreferrer" className="desk-btn desk-btn--quiet" style={{ width: '100%', justifyContent: 'center' }}>
+                        <Download size={15} /> Your delivered files
+                    </a>
+                ) : null}
+                {closed || !(d.reviewUrl || d.productLink) ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 16, borderRadius: 8, background: 'var(--paper-sunken)', border: '1px dashed var(--hairline-strong)' }}>
                         <span style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper-raised)', border: '1px solid var(--hairline)', color: 'var(--ink-3)' }}><Clock size={20} /></span>
                         {/* [Client escalation 2026-07] A task that HAS client feedback on record is
@@ -95,14 +134,19 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                             link is intentionally dark until an admin re-approves the new cut. Saying
                             "Not uploaded yet" there told the client their delivered revision had
                             vanished, which is exactly what they reported as work "going missing". */}
+                        {/* A closed job is checked FIRST: it can carry clientFeedback from before it
+                            was cancelled, which would otherwise promise a revision that will never
+                            arrive. */}
                         <div style={{ minWidth: 0 }}>
                             <div className="desk-serif" style={{ fontSize: '1rem', color: 'var(--ink)' }}>
-                                {d.clientFeedback ? 'Your changes are being made' : 'Not uploaded yet'}
+                                {closed ? 'This project was closed' : d.clientFeedback ? 'Your changes are being made' : 'Not uploaded yet'}
                             </div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>
-                                {d.clientFeedback
-                                    ? 'The new cut appears here as soon as it clears our check.'
-                                    : 'The screening link appears here once editing begins.'}
+                                {closed
+                                    ? 'It is kept here for your records. Nothing further is in progress — message us if that looks wrong.'
+                                    : d.clientFeedback
+                                        ? 'The new video appears here as soon as it clears our check.'
+                                        : 'The screening link appears here once editing begins.'}
                             </div>
                         </div>
                     </div>
@@ -114,7 +158,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                             // productLink (frame.io etc.) always opens in a new tab.
                             if (d.reviewUrl && onOpenReview && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
                                 e.preventDefault()
-                                onOpenReview(d.reviewUrl, d.title)
+                                onOpenReview(d.reviewUrl, d.title, d.id)
                             }
                         }}
                         style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 8, background: 'var(--paper-raised)', border: '1px solid var(--hairline)', textDecoration: 'none', transition: 'border-color .15s, background .15s' }}
@@ -122,28 +166,16 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--hairline)'; e.currentTarget.style.background = 'var(--paper-raised)' }}>
                         <span style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--accent-tint)', border: '1px solid var(--accent-line)', color: 'var(--accent)' }}>{done ? <FolderOpen size={21} /> : <Play size={21} style={{ marginLeft: 2 }} />}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="desk-serif" style={{ fontSize: '1.02rem', color: 'var(--ink)' }}>{done ? 'View delivered files' : 'Open the screening desk'}</div>
+                            <div className="desk-serif" style={{ fontSize: '1.02rem', color: 'var(--ink)' }}>{done ? 'View delivered files' : 'Open the screening room'}</div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>{done ? 'Final masters & exports' : 'Watch, comment and approve'}{d.duration ? <> · <span className="desk-mono">{d.duration}</span></> : null}</div>
                         </div>
                         <ExternalLink size={17} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
                     </a>
                 )}
 
-                {/* Frame review login */}
-                {(d.frameUsername || d.framePassword) && (
-                    <div>
-                        <button onClick={() => setShowCreds(s => !s)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', fontSize: '0.82rem', fontWeight: 600, padding: 0 }}>
-                            <KeyRound size={13} /> {showCreds ? 'Hide review login' : 'Need a login to review?'}
-                        </button>
-                        {showCreds && (
-                            <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 6, background: 'var(--paper-sunken)', border: '1px solid var(--hairline)', fontSize: '0.82rem', color: 'var(--ink-2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {d.frameUsername && <div><span className="desk-muted">User:</span> <span className="desk-mono">{d.frameUsername}</span></div>}
-                                {d.framePassword && <div><span className="desk-muted">Pass:</span> <span className="desk-mono">{d.framePassword}</span></div>}
-                                {d.frameNote && <div className="desk-muted" style={{ fontSize: '0.76rem', marginTop: 2 }}>{d.frameNote}</div>}
-                            </div>
-                        )}
-                    </div>
-                )}
+                {/* The "Need a login to review?" block is gone: it printed a stored
+                    frameUsername/framePassword to the client, and nothing in the data says
+                    whose account those belong to. The screening room above needs no login. */}
 
                 {/* Status sentence */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -167,7 +199,7 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                 {/* Contextual action */}
                 {d.needsYou && mode === null && (
                     <div style={{ padding: 16, borderRadius: 8, background: 'var(--accent-tint)', border: '1px solid var(--accent-line)' }}>
-                        <p className="desk-serif" style={{ margin: '0 0 12px', fontSize: '1.02rem', color: 'var(--ink)' }}>This cut is ready for your review.</p>
+                        <p className="desk-serif" style={{ margin: '0 0 12px', fontSize: '1.02rem', color: 'var(--ink)' }}>This video is ready for your review.</p>
                         <div style={{ display: 'flex', gap: 10 }}>
                             <Button variant="primary" full disabled={busy} onClick={approve}><Check size={16} /> Approve</Button>
                             <Button variant="quiet" full disabled={busy} onClick={() => setMode('changes')}><RotateCcw size={15} /> Request changes</Button>
@@ -193,7 +225,9 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                         {d.productLink && <a href={safeHref(d.productLink)} target="_blank" rel="noopener noreferrer" className="desk-btn desk-btn--quiet" style={{ width: '100%' }}><Download size={15} /> Download files</a>}
                     </div>
                 )}
-                {!d.needsYou && !done && (
+                {/* needsYou is forced false for a closed job, so without the !closed guard this
+                    reassurance ("we're on it") is exactly what a cancelled production renders. */}
+                {!d.needsYou && !done && !closed && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 15px', borderRadius: 6, background: 'var(--paper-sunken)', border: '1px solid var(--hairline)' }}>
                         <Info size={16} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
                         <span style={{ fontSize: '0.88rem', color: 'var(--ink-2)' }}>We&apos;re on it — you&apos;ll get a note the moment this is ready for your review.</span>
@@ -208,14 +242,15 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px' }}>
                         <DetailItem label="Format" value={d.type} />
                         <DetailItem label="Runtime" value={d.duration || '—'} />
-                        <DetailItem label={done ? 'Delivered' : 'Target date'} value={fmtDate(done ? d.clientReviewedAt : d.deadline)} valueColor={rel && rel.urgent ? 'var(--brick)' : undefined} />
+                        {/* "Target date" on a closed job reads as a live commitment. */}
+                        <DetailItem label={closed ? 'Was due' : done ? 'Delivered' : 'Target date'} value={fmtDate(done ? d.clientReviewedAt : d.deadline)} valueColor={rel && rel.urgent ? 'var(--brick)' : undefined} />
                         <DetailItem label="Channel" value={brandName} />
                         {d.manager && <DetailItem label="Managed by" value={d.manager} />}
                     </div>
                 </div>
 
                 {/* Comments */}
-                <DeskComments taskId={d.id} actions={actions} />
+                <DeskComments taskId={d.id} actions={actions} closed={closed} />
 
                 {/* Activity */}
                 {activity.length > 0 && (
@@ -314,7 +349,7 @@ function Stars({ label, value, onChange }: { label: string; value: number; onCha
 
 /* ── Comments (CLIENT-visibility, token-scoped) ──────────────────────────── */
 type Feed = Awaited<ReturnType<NonNullable<DeliverableActions['getCommentFeed']>>>
-function DeskComments({ taskId, actions }: { taskId: string; actions: DeliverableActions }) {
+function DeskComments({ taskId, actions, closed }: { taskId: string; actions: DeliverableActions; closed?: boolean }) {
     const [feed, setFeed] = useState<Feed>([])
     const [body, setBody] = useState('')
     const [busy, setBusy] = useState(false)
@@ -342,8 +377,15 @@ function DeskComments({ taskId, actions }: { taskId: string; actions: Deliverabl
         <div>
             <p className="kicker" style={{ marginBottom: 12 }}>Messages</p>
             <div ref={scrollRef} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 12 }}>
+                {/* A closed job's feed always comes back empty — every read routes through
+                    findScopedTask, which refuses archived rows. "No messages yet" would then
+                    claim a conversation the client remembers having never happened. */}
                 {loaded && feed.length === 0 && (
-                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-3)' }}>No messages yet — say hello to the studio.</p>
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-3)' }}>
+                        {closed
+                            ? 'Messages on a closed project aren’t shown here. Ask us and we’ll dig them out.'
+                            : 'No messages yet — say hello to the studio.'}
+                    </p>
                 )}
                 {feed.map(item => item.kind === 'event' ? (
                     <div key={item.id} className="desk-mono" style={{ fontSize: '0.66rem', letterSpacing: '0.04em', color: 'var(--ink-3)', textAlign: 'center' }}>
@@ -367,12 +409,19 @@ function DeskComments({ taskId, actions }: { taskId: string; actions: Deliverabl
                     </div>
                 ))}
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                <textarea value={body} onChange={e => setBody(e.target.value)} rows={1} placeholder="Message the studio…" className="desk-input"
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-                    style={{ minHeight: 40, maxHeight: 120 }} />
-                <Button variant="primary" disabled={busy || !body.trim()} onClick={send} aria-label="Send"><Send size={15} /></Button>
-            </div>
+            {/* postComment routes through findScopedTask too, so on a closed job Send is a
+                button that silently does nothing. Say the thread is shut rather than let the
+                client type a message that quietly evaporates. */}
+            {closed ? (
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-3)' }}>This thread is closed. Reply to your last email and we&apos;ll pick it up there.</p>
+            ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <textarea value={body} onChange={e => setBody(e.target.value)} rows={1} placeholder="Message the studio…" className="desk-input"
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                        style={{ minHeight: 40, maxHeight: 120 }} />
+                    <Button variant="primary" disabled={busy || !body.trim()} onClick={send} aria-label="Send"><Send size={15} /></Button>
+                </div>
+            )}
         </div>
     )
 }

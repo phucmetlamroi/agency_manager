@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { MessageSquare, ArrowRightCircle } from 'lucide-react'
 import type { Fps } from '@/lib/review/timecode'
 import type { CommentDto } from '@/lib/review/comment-client'
@@ -164,10 +164,63 @@ export function CommentsPanel({
     const otherWithComments = feed.otherVersions.filter((o) => o.commentCount > 0)
     const otherTotal = otherWithComments.reduce((s, o) => s + o.commentCount, 0)
 
+    /** Default OPEN: the first question either side has is "what's still outstanding". */
+    const [onlyOpen, setOnlyOpen] = useState(true)
+
+    /* [Open notes 2026-07] The one thing Frame.io has that this did not.
+     *
+     * `completedAt` has always been on the DTO and has always reached the guest
+     * (dto.ts:292) — a resolved note even renders its tick. But there was no count and no
+     * way to filter, so neither side could answer "which of my notes are still
+     * outstanding". Worse, confirmFixDone bulk-resolves every open note on an asset in one
+     * updateMany (task-sync.ts), so a note nobody addressed can be marked done behind the
+     * client's back. A visible open-count is what makes that legible instead of silent.
+     *
+     * Purely client-side over comments already loaded: no new query, no new endpoint, and
+     * it lands for STAFF and CLIENT at once, which is the parity the owner asked for. */
+    /* A thread is open if the note OR ANY REPLY under it is unresolved. Judging the parent
+     * alone loses the single most costly message in the system: the client replying "this is
+     * still wrong" under a note staff already ticked off. Replies are rendered only through
+     * their parent, and resolving does not lock the Reply button, so that reply would sit in
+     * the default Open view as literally nothing — staff sees "Open (0), every note here has
+     * been marked done" while new client feedback waits underneath a resolved note. That is
+     * "we're getting behind on changes", manufactured by the filter itself. */
+    const isOpenThread = (c: CommentDto) =>
+        !c.completedAt || (repliesByParent.get(c.id) ?? []).some((r) => !r.completedAt)
+    const openCount = parents.filter(isOpenThread).length
+    const doneCount = parents.length - openCount
+    const shown = onlyOpen ? parents.filter(isOpenThread) : parents
+
     return (
         <div className="flex h-full flex-col">
+            {/* Only worth a toolbar once something HAS been resolved — otherwise "Open" and
+                "All" are the same list and the control is just noise. */}
+            {doneCount > 0 && (
+                <div className="flex items-center gap-1.5 border-b border-white/10 px-3.5 py-2">
+                    {([true, false] as const).map((v) => (
+                        <button
+                            key={String(v)}
+                            onClick={() => setOnlyOpen(v)}
+                            aria-pressed={onlyOpen === v}
+                            className={
+                                'rounded-full px-2.5 py-1 text-xs transition-colors ' +
+                                (onlyOpen === v ? 'bg-primary/25 text-primary-accent' : 'text-white/55 hover:text-white/80')
+                            }
+                        >
+                            {v ? L.filterOpen(openCount) : L.filterAll(parents.length)}
+                        </button>
+                    ))}
+                </div>
+            )}
             <div className="min-h-0 flex-1 space-y-2.5 overflow-auto p-3.5">
-                {parents.length === 0 ? (
+                {parents.length > 0 && shown.length === 0 ? (
+                    <div className="grid h-full place-items-center px-6 text-center">
+                        <div className="flex flex-col items-center gap-2 text-white/55">
+                            <MessageSquare className="h-8 w-8 text-white/45" />
+                            <p className="text-sm">{L.emptyNoOpen}</p>
+                        </div>
+                    </div>
+                ) : parents.length === 0 ? (
                     <div className="grid h-full place-items-center px-6 text-center">
                         <div className="flex flex-col items-center gap-2 text-white/55">
                             <MessageSquare className="h-8 w-8 text-white/45" />
@@ -188,7 +241,7 @@ export function CommentsPanel({
                         </div>
                     </div>
                 ) : (
-                    parents.map((c) => (
+                    shown.map((c) => (
                         <CommentThread
                             key={c.id}
                             comment={c}

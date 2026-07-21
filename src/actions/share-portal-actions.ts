@@ -171,12 +171,35 @@ export async function getShareSnapshot(token: string) {
             where: {
                 clientId: { in: scope.clientIds },
                 workspaceId: { in: scope.workspaceIds },
-                isArchived: false,
+                // [Vanishing work 2026-07] Cancelling a task sets isArchived (task-actions),
+                // so `isArchived: false` erased it from the client's history RETROACTIVELY —
+                // a production they discussed last week simply was not in the list, with no
+                // tombstone and no count. Any mis-click, any cancel-and-recreate, any bulk
+                // tidy-up did that. Keep archived work OUT by default, but keep the ones the
+                // client demonstrably knew about: clientReview is only ever written once a
+                // deliverable has been through their hands, so it is the tightest possible
+                // "they saw this" marker and it survives the cancel. Those come back as a
+                // read-only 'Closed' row (portal-derive maps 'Đã hủy'), never as work in
+                // progress and never actionable — findScopedTask still refuses every write
+                // on an archived task.
+                // Only SETTLED decisions come back. Readmitting 'AWAITING' was actively
+                // harmful: deriveClientStatus reads clientReview BEFORE status, so a
+                // cancelled task would render 'Awaiting your review', deriveNeedsYou would
+                // return true, and it would sit in the Action tray with a live Approve
+                // button — which every write path then refuses, because findScopedTask
+                // still requires isArchived:false. The client would be left with a badge
+                // saying one video is waiting on them, attached to a button that answers
+                // "this link is invalid", forever. Worse than the vanishing it replaced.
+                OR: [
+                    { isArchived: false },
+                    { AND: [{ isArchived: true }, { clientReview: { in: ['APPROVED', 'CHANGES'] } }] },
+                ],
             },
             select: {
                 id: true,
                 title: true,
                 status: true,
+                isArchived: true,
                 deadline: true,
                 createdAt: true,
                 updatedAt: true,
@@ -196,9 +219,14 @@ export async function getShareSnapshot(token: string) {
                 references: true,
                 resources: true,
                 collectFilesLink: true,
-                frameUsername: true,
-                framePassword: true,
-                frameNote: true,
+                // [Authz 2026-07] frameUsername / framePassword / frameNote are NOT selected.
+                // They were being shipped to the client page and rendered behind a "Need a
+                // login to review?" toggle. Nothing in the data says whose Frame.io account
+                // they are — some tasks may carry the agency's shared login — and a stored
+                // password reaching a party who may not own it is not a risk worth carrying
+                // for a convenience link. frameNote goes with them: it is free text written
+                // by staff for staff, in Vietnamese. Owner confirmed: strip, re-enable later
+                // if a client-owned credential field is ever wanted as its own field.
                 duration: true,
                 clientReview: true,
                 clientFeedback: true,
@@ -207,7 +235,20 @@ export async function getShareSnapshot(token: string) {
                     select: { id: true, name: true, parent: { select: { name: true } } },
                 },
                 project: { select: { id: true, name: true } },
-                rating: true,
+                // [Authz 2026-07] Narrowed from `rating: true`. The DTO type declares four
+                // fields, but the type does not strip at runtime — `...task` spread the WHOLE
+                // Rating row, which carries staffId. That is the editor's stable identity,
+                // handed to the client on every rated task, re-opening exactly the leak
+                // `assignee: null` two lines below exists to close (the client works with the
+                // manager and must not know who edited). clientId and shareLinkId rode along too.
+                rating: {
+                    select: {
+                        creativeQuality: true,
+                        responsiveness: true,
+                        communication: true,
+                        qualitativeFeedback: true,
+                    },
+                },
                 assignee: { select: { username: true, nickname: true } },
                 // [Trial P0] Manager ("Người quản lý") — the ONLY staff identity the client may see.
                 assignedBy: { select: { username: true, nickname: true } },
@@ -333,13 +374,19 @@ export async function getShareSnapshot(token: string) {
         // R5 gate: only surface a review board when the task is in a CLIENT-facing phase.
         const asset = readyAssetByTask.get(task.id)
         let reviewUrl: string | null = null
-        if (asset && isClientFacingPhase(task.status, task.clientReview)) {
+        // A cancelled task must never reach the minting branch. isClientFacingPhase is true
+        // whenever clientReview != null regardless of status, so without this guard a mere
+        // portal READ could CREATE a fresh open, download-enabled /r/ board for work the
+        // admin had cancelled and whose old board they had deliberately revoked.
+        if (!task.isArchived && asset && isClientFacingPhase(task.status, task.clientReview)) {
             const known = slugByAsset.get(asset.id)
             if (known) {
                 reviewUrl = `${guestBase}/r/${known}`
             } else {
                 try {
-                    reviewUrl = `${guestBase}/r/${await getOrCreateClientReviewSlug(asset)}`
+                    // null = an admin revoked this asset's client board; the kill switch holds.
+                    const minted = await getOrCreateClientReviewSlug(asset)
+                    reviewUrl = minted ? `${guestBase}/r/${minted}` : null
                 } catch {
                     // Any hiccup minting the share → degrade to "Not uploaded yet" rather than 500.
                     reviewUrl = null
@@ -359,8 +406,14 @@ export async function getShareSnapshot(token: string) {
         // links (frame.io / Drive) are ALWAYS preserved — they back the sheet's "Download files" button.
         const clientProductLink = isOwnReviewLink(task.productLink) ? (reviewUrl ?? null) : task.productLink
         const effProductLink = clientProductLink
+        // [Authz 2026-07] The raw internal status never leaves the server. It is a Vietnamese
+        // staff-workflow label — including the four internalOnly ones ("Đã nộp video (nội bộ)"
+        // and friends) — and it was being spread straight into the client's page payload by
+        // `...task`. No portal component reads it: everything renders `clientStatus`, which is
+        // derived below. It stayed on the wire only because the spread was never pruned.
+        const { status: _internalStatus, ...taskSafe } = task
         return {
-        ...task,
+        ...taskSafe,
         productLink: clientProductLink,
         // [Trial P0 — isolation] The client must NEVER receive the editor's identity;
         // ship the Manager instead ("client làm việc với manager, không biết editor").
@@ -374,8 +427,13 @@ export async function getShareSnapshot(token: string) {
         createdAt: iso(task.createdAt)!,
         updatedAt: iso(task.updatedAt)!,
         clientReviewedAt: iso(task.clientReviewedAt),
-        clientStatus: deriveClientStatus(task.status, effClientReview),
-        needsYou: deriveNeedsYou({ status: task.status, productLink: effProductLink, clientReview: effClientReview }),
+        // A cancelled row is a tombstone: it exists so the client's history is honest,
+        // never as live work. Force it past deriveClientStatus, which would otherwise
+        // read the surviving clientReview and label it 'Completed' or 'In revision'.
+        clientStatus: task.isArchived ? 'Closed' : deriveClientStatus(task.status, effClientReview),
+        needsYou: task.isArchived
+            ? false
+            : deriveNeedsYou({ status: task.status, productLink: effProductLink, clientReview: effClientReview }),
         clientPath: formatClientHierarchy(task.client),
         workspaceName: task.workspaceId ? wsNameById.get(task.workspaceId) ?? null : null,
         reviewUrl,
@@ -464,6 +522,45 @@ function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
 </div>`
 }
 
+/**
+ * Collapse an address to the mailbox it actually reaches, for rate-limit keys ONLY.
+ * Never store or send this — it is deliberately lossy. `+tag` suffixes are stripped for every
+ * provider (universally a same-inbox alias); dots are stripped only for Gmail, which is the one
+ * major provider that ignores them.
+ */
+const PLUS_ALIAS_DOMAINS = new Set([
+    'gmail.com', 'googlemail.com',
+    'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+    'yahoo.com', 'ymail.com',
+    'icloud.com', 'me.com', 'mac.com',
+    'protonmail.com', 'proton.me', 'pm.me',
+    'fastmail.com', 'zoho.com', 'aol.com',
+])
+
+function notifyInboxKey(email: string): string {
+    const at = email.lastIndexOf('@')
+    if (at < 1) return email
+    let local = email.slice(0, at)
+    const domain = email.slice(at + 1)
+    // [Review round 2] Only for providers that DEFINITELY treat +tag as an alias of one
+    // mailbox. Stripping it everywhere was wrong: a company running its own mail server can
+    // provision ops@ and ops+vip@ as two real, separate mailboxes, and collapsing them meant
+    // three code requests to the first told the second "Too many attempts for this email"
+    // before it had ever asked for one. Unknown domains keep their local part intact — the
+    // worst case there is a cap that is merely per-address, which is where it started.
+    if (PLUS_ALIAS_DOMAINS.has(domain)) {
+        const plus = local.indexOf('+')
+        if (plus > 0) local = local.slice(0, plus)
+    }
+    // Dots are ignored by Gmail only — and googlemail.com is the SAME mailbox as gmail.com,
+    // so it has to fold into one key or the alias this exists to close survives at half
+    // strength (a.b@googlemail.com and ab@gmail.com are one inbox, two buckets).
+    if (domain === 'gmail.com' || domain === 'googlemail.com') {
+        return `${local.replace(/\./g, '')}@gmail.com`
+    }
+    return `${local}@${domain}`
+}
+
 /** Current notify-email state for the portal Settings panel. Null = invalid token. */
 export async function getPortalNotifyEmail(
     token: string,
@@ -496,7 +593,11 @@ export async function requestPortalNotifyEmail(
     // (survives serverless cold-starts, unlike the in-memory rateLimit below). Without a per-inbox
     // cap keyed on the destination address, the portal could be abused to email-bomb an arbitrary
     // victim inbox (the per-link+ip cap doesn't bound how many distinct addresses one caller hits).
-    const inboxRl = await limitDb(`portal-notify-inbox:${email}`, 3, 60 * 60)
+    // [Authz 2026-07] Key on the DELIVERY inbox, not the typed string. The cap existed to stop
+    // this endpoint being used to email-bomb an arbitrary victim, but keying on the raw address
+    // meant victim+1@gmail.com, victim+2@… and v.i.c.t.i.m@… were three separate buckets
+    // delivering to one mailbox — 3/hour became unbounded for the cost of typing a plus sign.
+    const inboxRl = await limitDb(`portal-notify-inbox:${notifyInboxKey(email)}`, 3, 60 * 60)
     if (!inboxRl.success) {
         return { success: false, error: 'Too many attempts for this email. Please try again later.' }
     }
@@ -680,8 +781,25 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
         return { success: false, error: 'This deliverable is not currently awaiting your review.' }
     }
 
-    await prisma.task.update({
-        where: { id: taskId },
+    // [Client escalation 2026-07-21] PIN the state the gates above were decided on, and the
+    // tenancy. This was a bare `update({ where: { id: taskId } })`, i.e. every check above was
+    // advisory: between the read and the write an admin can cancel the job or a new cut can land
+    // (revokeClientExposureOnNewVersion pulls the task back to A2 and nulls clientReview), and the
+    // write still stamped 'Hoàn tất' — which is the editor's payroll signal. The bulk sibling
+    // approveDeliverablesViaToken already pins exactly this; the single-deliverable path, the one
+    // a client actually clicks, did not. A lost race is not an error for the client: re-read and
+    // report the truth rather than claiming an approval that did not happen.
+    const applied = await prisma.task.updateMany({
+        where: {
+            id: taskId,
+            // Every field the eligibility test above relied on, restated — including the TENANCY
+            // scope and isArchived. Same restatement, same reason, as the bulk sibling.
+            isArchived: false,
+            status: task.status,
+            clientReview: task.clientReview,
+            clientId: { in: scope.clientIds },
+            workspaceId: { in: scope.workspaceIds },
+        },
         data: {
             status: 'Hoàn tất',
             deadline: null,
@@ -690,6 +808,9 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
             version: { increment: 1 },
         },
     })
+    if (applied.count === 0) {
+        return { success: false, error: 'This deliverable just changed. Please refresh and try again.' }
+    }
 
     await notifyStaff(
         task, taskId,
@@ -771,10 +892,46 @@ export async function approveDeliverablesViaToken(
 
     // One transaction: a half-applied batch would leave the client unsure what they
     // approved, and payroll reading a partial month.
-    await prisma.$transaction(
-        eligible.map((t) =>
-            prisma.task.update({
-                where: { id: t.id },
+    //
+    // [Authz 2026-07] The precondition is re-stated INSIDE the write. This used to be
+    // `update({ where: { id } })` — the eligibility test above ran against a snapshot read
+    // moments earlier, so an admin cancelling or completing a task in that window was
+    // silently overwritten: 'Đã hủy' flipped back to 'Hoàn tất', which is a payroll-bearing
+    // status. updateMany with the same conditions makes the check and the write one atomic
+    // step; a row that stopped qualifying reports count 0 and is counted as skipped instead
+    // of clobbered. Interactive transaction so a mid-batch failure still rolls back whole.
+    //
+    // [Review round 2] The first version of this precondition was still incomplete, and one
+    // gap was serious. It pinned `status: { not: 'Hoàn tất' }` rather than the status actually
+    // READ, so a task seen at 'Đã gửi video (khách)' with clientReview null — the ordinary
+    // awaiting-client state — could be moved BACK to 'Đã nộp video (nội bộ)' by a re-upload
+    // (a documented A5→A2 transition) and this write would still stamp it 'Hoàn tất':
+    // approving an internal cut the client never saw, and creating payroll for it. It also
+    // omitted clientId/workspaceId, so a task reassigned to another client mid-request stayed
+    // writable by the old client's token. Every field the eligibility test relied on is now
+    // restated, including the tenancy scope.
+    //
+    // Still ONE STATEMENT PER TASK, deliberately: updateMany reports only a count, and both the
+    // honest approved/skipped figures and the per-recipient notifications need to know exactly
+    // WHICH ids landed. What changed is the budget. Prisma's interactive-transaction default is
+    // 5s and db.ts configures none, so 50 sequential round-trips to Neon could blow it and roll
+    // the WHOLE batch back, leaving the client staring at "Approving..." having approved
+    // nothing. 20s covers 50 round-trips several times over.
+    const approvedIds = await prisma.$transaction(async (tx) => {
+        const done: string[] = []
+        for (const t of eligible) {
+            const res = await tx.task.updateMany({
+                where: {
+                    id: t.id,
+                    isArchived: false,
+                    // Pin the status that was READ, not merely "not completed" - see above.
+                    status: t.status,
+                    clientReview: t.clientReview,
+                    // Tenancy, restated: a task reassigned to another client mid-request must
+                    // stop being writable by this token.
+                    clientId: { in: scope.clientIds },
+                    workspaceId: { in: scope.workspaceIds },
+                },
                 data: {
                     status: 'Hoàn tất',
                     deadline: null,
@@ -782,43 +939,62 @@ export async function approveDeliverablesViaToken(
                     clientReviewedAt: new Date(),
                     version: { increment: 1 },
                 },
-            }),
-        ),
-    )
+            })
+            if (res.count > 0) done.push(t.id)
+        }
+        return done
+    }, { timeout: 20_000, maxWait: 10_000 })
 
-    // ONE notification for the batch — 20 separate bells for one client action is noise
-    // that gets muted, which is how a change request goes unnoticed in the first place.
-    const titles = eligible.map((t) => t.title).filter(Boolean)
-    const preview = titles.slice(0, 3).join(', ') + (titles.length > 3 ? `, +${titles.length - 3} nữa` : '')
-    const recipients = new Set<string>()
-    for (const t of eligible) {
-        if (t.assigneeId) recipients.add(t.assigneeId)
-        if (t.assignedById) recipients.add(t.assignedById)
+    const approvedSet = new Set(approvedIds)
+    const applied = eligible.filter((t) => approvedSet.has(t.id))
+    if (applied.length === 0) {
+        return { success: false, approved: 0, skipped: ids.length, error: 'Those have already been updated. Please refresh.' }
     }
-    const body = `Khách hàng "${scope.clientName}" đã duyệt ${eligible.length} video qua link chia sẻ: ${preview}. Các task được đánh dấu Hoàn tất.`
-    // Every editor/manager touched by the batch gets exactly ONE summary. notifyStaff
-    // fans out to a task's assignee+manager, so drive it once per unique recipient
-    // rather than once per task — 20 bells for one client click is noise people mute,
-    // and a muted bell is how the next change request goes unseen.
-    for (const uid of recipients) {
+
+    // ONE notification per person — 20 separate bells for one client action is noise that
+    // gets muted, which is how a change request goes unnoticed in the first place.
+    //
+    // [Authz 2026-07] Grouped BY RECIPIENT. Every notification used to be built from
+    // eligible[0]: the same deep link for everyone (so an editor clicking their bell landed
+    // on a colleague's task) and a body listing every title in the batch (so each editor was
+    // shown the names of other clients' work they have nothing to do with). Each person now
+    // gets their own tasks, their own count, and a link that goes where it says.
+    const byRecipient = new Map<string, typeof applied>()
+    for (const t of applied) {
+        // Set, not array: on a small team the assignee IS the manager, and pushing per role
+        // counted that task twice — "Khách đã duyệt 2 video" listing one title twice, from one
+        // approval. A person hears about each task once.
+        for (const uid of new Set([t.assigneeId, t.assignedById].filter(Boolean) as string[])) {
+            const arr = byRecipient.get(uid) ?? []
+            arr.push(t)
+            byRecipient.set(uid, arr)
+        }
+    }
+    for (const [uid, mine] of byRecipient) {
+        const titles = mine.map((t) => t.title).filter(Boolean)
+        const preview = titles.slice(0, 3).join(', ') + (titles.length > 3 ? `, +${titles.length - 3} nữa` : '')
         await notifyStaff(
-            { assigneeId: uid, assignedById: null, title: eligible[0].title },
-            eligible[0].id,
-            'Khách đã duyệt nhiều sản phẩm 🎉',
-            body,
+            { assigneeId: uid, assignedById: null, title: mine[0].title },
+            mine[0].id,
+            mine.length > 1 ? 'Khách đã duyệt nhiều sản phẩm 🎉' : 'Khách đã duyệt sản phẩm 🎉',
+            `Khách hàng "${scope.clientName}" đã duyệt ${mine.length} video qua link chia sẻ: ${preview}. Các task được đánh dấu Hoàn tất.`,
         )
     }
 
-    for (const t of eligible) {
-        void audit({
+    // Awaited, not fire-and-forget. These are the only record that a payroll-bearing status
+    // change came from a share link rather than a staff member; `void audit(...)` after a
+    // committed transaction means the batch can land with no trail at all if the process is
+    // torn down first, which on a serverless function is the normal case, not an edge one.
+    await Promise.all(applied.map((t) =>
+        audit({
             workspaceId: t.workspaceId, actorUserId: null, action: 'task.client_approved',
             targetType: 'Task', targetId: t.id,
             before: { status: t.status },
             after: { status: 'Hoàn tất', clientReview: 'APPROVED', viaShareLinkId: scope.shareLinkId, bulk: true },
-        })
-    }
+        }).catch(() => { /* one failed audit row must not fail the client's approval */ }),
+    ))
 
-    const workspaces = new Set(eligible.map((t) => t.workspaceId).filter(Boolean) as string[])
+    const workspaces = new Set(applied.map((t) => t.workspaceId).filter(Boolean) as string[])
     for (const ws of workspaces) {
         try {
             revalidatePath(`/${ws}/admin`)
@@ -826,7 +1002,9 @@ export async function approveDeliverablesViaToken(
         } catch { /* best-effort */ }
     }
 
-    return { success: true, approved: eligible.length, skipped }
+    // Report what actually landed, not what we hoped would: ids.length - applied.length
+    // counts both the never-eligible and anything an admin changed underneath us.
+    return { success: true, approved: applied.length, skipped: ids.length - applied.length }
 }
 
 /** Client requests changes via the public link → task 'Revision' + feedback. */
@@ -848,8 +1026,19 @@ export async function requestChangesViaToken(token: string, taskId: string, feed
         return { success: false, error: 'This deliverable is not currently awaiting your review.' }
     }
 
-    await prisma.task.update({
-        where: { id: taskId },
+    // Same restatement as approveDeliverableViaToken — this action was copied from the same
+    // unconditional original and kept the same hole: an admin cancelling the job, or the task
+    // moving to another client, in the window between findScopedTask and this write still got
+    // 'Revision' + the client's feedback stamped on it.
+    const applied = await prisma.task.updateMany({
+        where: {
+            id: taskId,
+            isArchived: false,
+            status: task.status,
+            clientReview: task.clientReview,
+            clientId: { in: scope.clientIds },
+            workspaceId: { in: scope.workspaceIds },
+        },
         data: {
             status: 'Revision',
             deadline: null,
@@ -859,6 +1048,9 @@ export async function requestChangesViaToken(token: string, taskId: string, feed
             version: { increment: 1 },
         },
     })
+    if (applied.count === 0) {
+        return { success: false, error: 'This deliverable just changed. Please refresh and try again.' }
+    }
 
     await notifyStaff(
         task, taskId,
@@ -1083,6 +1275,8 @@ export async function createTaskViaToken(
 const DESIRED_TYPES = new Set(['Short form', 'Long form', 'Trial'])
 /** Max ACTIVE sub-brands a client may create under one parent via the portal. */
 const SUBCLIENT_CAP = 20
+/** Deepest ancestor chain a client may create through the portal. See createSubClientViaToken. */
+const MAX_SUBCLIENT_DEPTH = 4
 
 /**
  * Realtime + bespoke-VN-email fan-out to every profile OWNER/ADMIN about a fresh
@@ -1267,7 +1461,9 @@ export async function createSubClientViaToken(token: string, input: { name: stri
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    const rl = await rateLimit(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60 * 1000)
+    // DB-backed, like every other portal write: the in-memory limiter resets on each cold start,
+    // so on serverless it capped almost nothing.
+    const rl = await limitDb(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60)
     if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
 
     if (!input || typeof input.parentId !== 'number') return { success: false, error: 'Missing information.' }
@@ -1276,29 +1472,116 @@ export async function createSubClientViaToken(token: string, input: { name: stri
     const name = sanitizeClientText(input.name || '', TITLE_MAX_LEN)
     if (!name) return { success: false, error: 'Please enter a brand name.' }
 
-    // Parent must belong to the link's profile (defense-in-depth beyond scope).
+    // Everything from here to the lock is a CHEAP EARLY REJECTION, not the authorization — the
+    // decision that matters is re-derived inside the transaction below. Kept so an obviously bad
+    // request costs one indexed read instead of a lock acquisition.
     const parent = await prisma.client.findFirst({
         where: { id: input.parentId, profileId: scope.profileId, status: 'ACTIVE' },
         select: { id: true },
     })
     if (!parent) return { success: false, error: 'Invalid parent brand.' }
 
-    const existing = await prisma.client.count({
-        where: { parentId: input.parentId, status: 'ACTIVE' },
-    })
-    if (existing >= SUBCLIENT_CAP) return { success: false, error: 'You have reached the maximum number of sub-brands.' }
 
+    // [Authz 2026-07 round 6] EVERYTHING THAT DECIDES now happens under the lock, and the
+    // authorization is re-derived from the canonical source rather than approximated.
+    //
+    // Round 5 pinned the parent's own (profileId, status, parentId). Review showed that is one
+    // EDGE, while the scope is a whole PATH: with Root > Division > Parent, an admin detaching
+    // Division moves Parent out of this token's scope entirely, yet Parent's own parentId is
+    // still Division, so the pin matched and the write landed in a hierarchy the client no
+    // longer owns. Renaming an ancestor, merging a branch, or soft-deleting the PROFILE do the
+    // same. Rather than reimplement path derivation here and get it subtly wrong a fourth time,
+    // ask the function that defines it. One extra token resolution on a rare action is cheap;
+    // being approximately right about who owns a client is not.
     let client: { id: number; name: string }
     try {
-        client = await prisma.client.create({
-            data: {
-                name,
-                parentId: input.parentId,
-                profileId: scope.profileId,   // forced from scope, never client input
-                status: 'ACTIVE',
-            },
-            select: { id: true, name: true },
-        })
+        const outcome: { ok: true; row: { id: number; name: string } } | { ok: false; error: string } =
+            await prisma.$transaction(async (tx) => {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope.profileId}, 0))`
+
+                // Re-derived AFTER the lock, on the TRANSACTION'S OWN connection. Two reasons:
+                //   • the global client would check out a second connection while this one holds
+                //     the first, and N concurrent creates can then all wait for a connection that
+                //     never frees — pool starvation, which Postgres cannot see as a deadlock;
+                //   • skipRateLimit, because this request was already charged for its first
+                //     resolution. Charging again could spend the final allowance and then deny
+                //     the request its own write while reporting "that brand has just changed".
+                //
+                // It covers ancestor detach, ancestor rename and branch merge, because every CRM
+                // writer takes this same lock key so none can be mid-flight. It does NOT cover
+                // profile deactivation — deleteProfileAction takes no such lock. That race leaves
+                // an inert row in a profile whose token no longer resolves at all, so nothing can
+                // read it; saying so here beats claiming a guarantee this does not give.
+                const fresh = await resolveShareToken(token, { db: tx, skipRateLimit: true })
+                if (!fresh || !fresh.clientIds.includes(input.parentId)) {
+                    return { ok: false as const, error: 'That brand has just changed. Please reload and try again.' }
+                }
+
+                const freshParent = await tx.client.findFirst({
+                    where: { id: input.parentId, profileId: fresh.profileId, status: 'ACTIVE' },
+                    select: { id: true },
+                })
+                if (!freshParent) {
+                    return { ok: false as const, error: 'That brand has just changed. Please reload and try again.' }
+                }
+
+                // DEPTH, also decided here. SUBCLIENT_CAP bounds the WIDTH of one parent; depth is
+                // the expensive dimension, because resolveShareToken rebuilds a name path for every
+                // ACTIVE client in the profile on EVERY portal request — cost is O(clients x depth).
+                // Unbounded chaining would let the public side permanently slow an agency's every
+                // page load with no staff action. Measured under the lock because an admin merging
+                // this branch under another root deepens it after any earlier measurement.
+                let depth = 0
+                let cursor: number | null = input.parentId
+                const walked = new Set<number>()
+                while (cursor != null && depth < MAX_SUBCLIENT_DEPTH && !walked.has(cursor)) {
+                    walked.add(cursor)
+                    const row: { parentId: number | null } | null = await tx.client.findUnique({
+                        where: { id: cursor },
+                        select: { parentId: true },
+                    })
+                    depth++
+                    cursor = row?.parentId ?? null
+                }
+                if (cursor != null || depth >= MAX_SUBCLIENT_DEPTH) {
+                    return { ok: false as const, error: 'This brand is already nested as deeply as we allow. Ask the studio to add it for you.' }
+                }
+
+                // Recounted here too: two concurrent creates with DIFFERENT names both read 19
+                // outside the lock and both committed, taking the parent to 21.
+                const liveCount = await tx.client.count({
+                    where: { parentId: input.parentId, status: 'ACTIVE' },
+                })
+                if (liveCount >= SUBCLIENT_CAP) {
+                    return { ok: false as const, error: 'You have reached the maximum number of sub-brands.' }
+                }
+
+                const norm = (s: string) => (s ?? '').normalize('NFC').trim().toLowerCase()
+                const siblings = await tx.client.findMany({
+                    where: { parentId: input.parentId, status: 'ACTIVE' },
+                    select: { name: true },
+                })
+                if (siblings.some((s) => norm(s.name) === norm(name))) {
+                    return { ok: false as const, error: `You already have a brand called "${name.trim()}".` }
+                }
+
+                const row = await tx.client.create({
+                    data: {
+                        name,
+                        parentId: input.parentId,
+                        profileId: fresh.profileId,   // forced from scope, never client input
+                        status: 'ACTIVE',
+                    },
+                    select: { id: true, name: true },
+                })
+                return { ok: true as const, row }
+            // A deep delete/restore in the same profile can hold this lock; the wait is spent
+            // INSIDE the advisory-lock statement, which bills the transaction `timeout`, not
+            // `maxWait`. The 5s default would have failed a perfectly valid create under
+            // ordinary CRM contention.
+            }, { timeout: 20_000, maxWait: 10_000 })
+        if (!outcome.ok) return { success: false, error: outcome.error }
+        client = outcome.row
     } catch (err) {
         console.error('[createSubClientViaToken] create failed', err)
         return { success: false, error: 'Could not create the brand. Please try again.' }

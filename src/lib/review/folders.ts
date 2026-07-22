@@ -33,7 +33,7 @@ import {
     type ItemType,
     type UserRef,
 } from './dto'
-import { buildMediaLinks } from './media-links'
+import { buildMediaLinks, buildPosterUrl } from './media-links'
 import { buildSystemKey } from './upload-helpers'
 
 const MAX_DEPTH = 20 // API-SPEC §1.1 (block abuse)
@@ -532,11 +532,65 @@ export async function listChildren(input: {
         for (const r of rows) recAgg.set(r.folderId, { cnt: Number(r.cnt), bytes: r.bytes })
     }
 
+    // [Owner review 2026-07-22 — "folder mù"] Content mosaic for the folder cards. For each visible
+    // folder, take its first up-to-2 DIRECT child assets (head version), so the card can show what
+    // is inside instead of a blank icon. ONE window-function query over all the page's folders — no
+    // N+1: ROW_NUMBER partitioned by folderId, keep rn ≤ 2. `currentVersionId` is the head; assets
+    // still UPLOADING have none and are skipped by the INNER JOIN (they have nothing to preview).
+    //
+    // Gated to `scope.unrestricted`, exactly like the recursive counters above: a folder-scoped
+    // editor (FR-03) already gets the plain icon + gated counters, and must not receive a poster of
+    // a child asset outside their writable subtree. Admins/unrestricted editors get the mosaic.
+    // First page only (folders are only listed there).
+    // Cap: each preview tile of a video costs one RSA signature (buildPosterUrl), and the folder
+    // list is unbounded, so a folder with hundreds of subfolders would block the event loop on signs.
+    // Bound the work to the first N folders (already name-ordered); the rest show the plain icon.
+    const PREVIEW_FOLDER_CAP = 60
+    const previewByFolder = new Map<string, { assetId: string; muxPlaybackId: string | null; thumbTime: number | null; mediaKind: string }[]>()
+    const previewFolderRows = visibleFolderRows.slice(0, PREVIEW_FOLDER_CAP)
+    if (scope.unrestricted && previewFolderRows.length) {
+        const pvIds = previewFolderRows.map((f) => f.id)
+        const pv = await prisma.$queryRaw<{ folderId: string; assetId: string; muxPlaybackId: string | null; thumbTime: number | null; mediaKind: string }[]>`
+            SELECT t."folderId", t."assetId", t."muxPlaybackId", t."thumbTime", t."mediaKind"
+            FROM (
+                SELECT a."folderId" AS "folderId", a.id AS "assetId", a."mediaKind"::text AS "mediaKind",
+                       v."muxPlaybackId" AS "muxPlaybackId", v."thumbTime" AS "thumbTime",
+                       ROW_NUMBER() OVER (PARTITION BY a."folderId" ORDER BY a."createdAt" ASC, a.id ASC) AS rn
+                FROM "ReviewAsset" a
+                JOIN "ReviewVersion" v ON v.id = a."currentVersionId"
+                WHERE a."folderId" IN (${Prisma.join(pvIds)}) AND a."deletedAt" IS NULL
+            ) t
+            WHERE t.rn <= 2
+        `
+        for (const r of pv) {
+            const list = previewByFolder.get(r.folderId)
+            if (list) list.push(r); else previewByFolder.set(r.folderId, [r])
+        }
+    }
+
     const folders = visibleFolderRows.map((f) => {
-        const dto = serializeFolder(f, { createdBy: f.createdById ? userRefs.get(f.createdById) ?? null : null })
+        const cnt = scope.unrestricted ? recAgg.get(f.id)?.cnt ?? 0 : f.itemCount
+        // Build the mosaic: video tiles first (a poster is minted only for a Mux-ready video; an
+        // image or a still-processing video yields poster:null → the card shows a kind glyph), then
+        // the "+N" overflow. Sub-folder tiles are NOT synthesized here — when a folder has fewer
+        // than 2 child assets the remaining slots stay empty and the overflow count carries the
+        // rest, which keeps this to the single asset query. `more` mirrors the client portal: total
+        // direct children minus the tiles actually shown.
+        const pvRows = previewByFolder.get(f.id) ?? []
+        const tiles = pvRows.map((r) => ({
+            // buildPosterUrl = ONE RSA sign (not buildMediaLinks' three) — a tile needs only the
+            // thumbnail token, and this runs up to 2× per folder over the whole page.
+            poster: buildPosterUrl({ muxPlaybackId: r.muxPlaybackId, thumbTime: r.thumbTime }),
+            kind: (r.mediaKind === 'IMAGE' ? 'image' : 'video') as 'image' | 'video',
+        }))
+        const preview = tiles.length > 0 ? { tiles, more: Math.max(0, cnt - tiles.length) } : null
+        const dto = serializeFolder(f, {
+            createdBy: f.createdById ? userRefs.get(f.createdById) ?? null : null,
+            preview,
+        })
         // Unrestricted → live-recomputed counters (direct-child count + recursive bytes);
         // restricted → keep the denormalized/gated value untouched.
-        return scope.unrestricted ? { ...dto, itemCount: recAgg.get(f.id)?.cnt ?? 0, totalBytes: recAgg.get(f.id)?.bytes ?? '0' } : dto
+        return scope.unrestricted ? { ...dto, itemCount: cnt, totalBytes: recAgg.get(f.id)?.bytes ?? '0' } : dto
     })
     const assets = pageAssets.map((a) => {
         const v = a.currentVersion

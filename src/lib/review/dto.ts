@@ -126,6 +126,14 @@ const MEDIA_KIND_TO_DTO: Record<ReviewMediaKind, MediaKindDto> = {
     IMAGE: 'image',
 }
 
+/** One tile in a folder card's content mosaic (owner review 2026-07-22 — "folder mù").
+ *  `poster` null → the UI shows a `kind` glyph (an image asset, a not-yet-Mux-ready video, or a
+ *  sub-folder tile). */
+export interface FolderPreviewTile {
+    poster: string | null
+    kind: 'video' | 'image' | 'folder'
+}
+
 export interface FolderDto {
     id: string
     workspaceId: string
@@ -141,12 +149,15 @@ export interface FolderDto {
     createdAt: string
     rowVersion: number
     deletedAt: string | null
+    /** Up to 2 content tiles + an overflow count, for the card mosaic. Absent = show the plain
+     *  folder icon (e.g. an empty folder, or a folder-scoped editor for whom previews are gated). */
+    preview?: { tiles: FolderPreviewTile[]; more: number } | null
 }
 
 /** Serialize a ReviewFolder → FolderDto. `createdBy` resolved by caller (batched). */
 export function serializeFolder(
     folder: ReviewFolder,
-    opts: { createdBy?: UserRef | null } = {},
+    opts: { createdBy?: UserRef | null; preview?: FolderDto['preview'] } = {},
 ): FolderDto {
     return {
         id: folder.id,
@@ -160,6 +171,7 @@ export function serializeFolder(
         createdAt: folder.createdAt.toISOString(),
         rowVersion: folder.rowVersion,
         deletedAt: folder.deletedAt ? folder.deletedAt.toISOString() : null,
+        preview: opts.preview ?? null,
     }
 }
 

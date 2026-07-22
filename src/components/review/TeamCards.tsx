@@ -18,7 +18,7 @@ import {
 import { Folder as FolderIcon, Film, Image as ImageIcon, MessageSquare, Loader2, AlertTriangle, X, Check, Layers, UploadCloud } from 'lucide-react'
 import { statusLabel } from '@/lib/display-labels'
 import { formatBytes } from '@/lib/review/upload-store'
-import type { FolderDto, AssetDto } from '@/lib/review/dto'
+import type { FolderDto, AssetDto, FolderPreviewTile } from '@/lib/review/dto'
 import type { ItemRef } from '@/lib/review/team-actions'
 import type { Aspect, ThumbScale } from '@/lib/review/view-prefs'
 import { aspectCss, msToClock, formatDate, formatDateTime, statusColor } from '@/lib/review/view-prefs'
@@ -90,6 +90,66 @@ export function StatusChip({ status }: { status: string | null }) {
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: c }} />
             <span className="truncate">{statusLabel(status)}</span>
         </span>
+    )
+}
+
+/* [Owner review 2026-07-22 — "folder mù"] The 40×40 tile that used to be a bare folder icon now
+   shows what is inside: up to two content tiles (a video's Mux poster, or a kind glyph for an
+   image / not-yet-ready video), and a "+N" chip when the folder holds more. `preview` is null for
+   empty folders and for folder-scoped editors (previews are gated server-side), which keep the
+   plain icon. Each poster <img> self-heals to a glyph on error, since Mux tokens are short-lived. */
+function FolderThumb({ preview }: { preview: FolderDto['preview'] }) {
+    const tiles = preview?.tiles ?? []
+    if (tiles.length === 0) {
+        return (
+            <div className="pointer-events-none flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
+                <FolderIcon size={20} />
+            </div>
+        )
+    }
+    // "+N" is a corner BADGE, not a grid cell — as a cell it left an empty quadrant (2 tiles + more
+    // = 3 items in a 2-col grid). w-12 (wider than tall) crops 16:9 posters far better than a square.
+    return (
+        // pointer-events-none: the mosaic is decorative — every click/drag must reach the card
+        // beneath (open/select + HTML5 drag), and a native <img> would otherwise start an image drag.
+        <div className="pointer-events-none relative h-10 w-12 shrink-0 overflow-hidden rounded-lg bg-black/40">
+            <div
+                className="grid h-full w-full gap-px"
+                style={{ gridTemplateColumns: tiles.length > 1 ? '1fr 1fr' : '1fr' }}
+            >
+                {tiles.map((t, i) => (
+                    <FolderThumbCell key={i} tile={t} />
+                ))}
+            </div>
+            {preview && preview.more > 0 && (
+                <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[8.5px] font-semibold leading-[13px] text-white">
+                    +{preview.more}
+                </span>
+            )}
+        </div>
+    )
+}
+
+function FolderThumbCell({ tile }: { tile: FolderPreviewTile }) {
+    const [failed, setFailed] = useState(false)
+    if (tile.poster && !failed) {
+        return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+                src={tile.poster}
+                alt=""
+                loading="lazy"
+                draggable={false}
+                referrerPolicy="no-referrer"
+                onError={() => setFailed(true)}
+                className="h-full w-full object-cover"
+            />
+        )
+    }
+    return (
+        <div className="grid h-full w-full place-items-center bg-violet-500/10 text-violet-300/70">
+            {tile.kind === 'image' ? <ImageIcon size={12} /> : <Film size={12} />}
+        </div>
     )
 }
 
@@ -282,9 +342,7 @@ export function FolderCardGrid({
             )}
             <SelectCheckbox checked={selected} onToggle={onToggle} />
             <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
-                    <FolderIcon size={20} />
-                </div>
+                <FolderThumb preview={folder.preview} />
                 <div className="min-w-0 flex-1">
                     {renaming && onCommitRename && onCancelRename ? (
                         <InlineRename initial={folder.name} onCommit={onCommitRename} onCancel={onCancelRename} />

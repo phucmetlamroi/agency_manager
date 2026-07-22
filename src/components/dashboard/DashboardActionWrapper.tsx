@@ -136,9 +136,6 @@ export default function DashboardActionWrapper({
     },
   ) => {
     const client = clients.find((c) => c.id === data.clientId)
-    const clientLabel = client?.parent
-      ? `${client.parent.name} / ${client.name}`
-      : client?.name ?? "Untitled Task"
 
     // Parse video names from the multiline textarea (one per line)
     const videoNames = data.videoList
@@ -146,12 +143,25 @@ export default function DashboardActionWrapper({
       .map((line) => line.trim())
       .filter((line) => line.length > 0)
 
-    // Build titles: "ClientName · VideoName" for each video
-    // If no video names provided, fall back to just the client label
+    // [Owner bug report 2026-07-22] The title is the VIDEO NAME, nothing else.
+    //
+    // It used to be built as `${clientLabel} · ${videoName}` where clientLabel was
+    // "Parent / Child" — so a task came out as "Jordan / Georgie MiCosmetics · What to expect
+    // from IPL consultation". That prefix is pure duplication: `clientId` is stored as a real
+    // relation on the same row (passed separately in all three branches below), and every task
+    // surface already renders the client hierarchy on its own line from that relation
+    // (formatClientHierarchy in TitleCell / NewDesktopTaskTable / MobileTaskCard / TaskDrawer).
+    // The result was the client name showing twice on one row, and the actual name the user
+    // typed pushed to the end.
+    //
+    // Fallback when the user names nothing: the client label is a poor title (it re-creates the
+    // duplication), so use the neutral placeholder and let the row's own client line carry the
+    // identity. This branch is near-unreachable in practice — the modal treats videoList as the
+    // task name and Velox always fills it.
     const titles =
       videoNames.length > 0
-        ? videoNames.map((vn) => `${clientLabel} · ${vn}`)
-        : [clientLabel]
+        ? videoNames
+        : [client?.name ? `Task mới — ${client.name}` : "Task mới"]
 
     // [BUG FIX] AddTaskModal field mapping — match TaskDetailModal's packed format expectations.
     // CRITICAL bug user reported: `script` was sent to `productLink` (delivery field) →

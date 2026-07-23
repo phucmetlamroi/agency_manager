@@ -27,12 +27,13 @@ import {
     RotateCcw,
     Clapperboard,
     CheckCircle2,
+    CheckCheck,
 } from 'lucide-react'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
 import { useTaskUploads } from '@/lib/review/use-upload-store'
 import { formatBytes, type UploadItem } from '@/lib/review/upload-store'
 import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
-import { apiConfirmTaskComplete } from '@/lib/review/team-actions'
+import { apiConfirmTaskComplete, apiConfirmFix } from '@/lib/review/team-actions'
 import type { TaskAssetsResult, TaskDeliverableDto } from '@/lib/review/task-assets'
 import type { ReviewStateDto } from '@/lib/review/dto'
 
@@ -42,12 +43,17 @@ export function TaskReviewUploadSection({
     taskId,
     taskStatus,
     onTaskCompleted,
+    onTaskStatusChanged,
 }: {
     taskId: string
     /** Current task status — drives the "Chuyển task sang Hoàn tất?" banner (FR-D02). */
     taskStatus?: string | null
     /** Called after the task is flipped to Hoàn tất, so the drawer can sync its own state. */
     onTaskCompleted?: () => void
+    /** Called after ANY status flip this block triggers (F9 confirm-fix) with the status the
+     *  server actually wrote, so the drawer's chip stops lying. Separate from onTaskCompleted,
+     *  which hardcodes 'Hoàn tất' at both call sites. */
+    onTaskStatusChanged?: (newStatus: string) => void
 }) {
     const uploads = useTaskUploads(taskId)
     const [confirmingComplete, setConfirmingComplete] = useState(false)
@@ -55,6 +61,14 @@ export function TaskReviewUploadSection({
     const [pendingFile, setPendingFile] = useState<File | null>(null)
     const [dragOver, setDragOver] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    // [status-audit 2026-07-23] F9 from the drawer — see fixConfirm in task-assets.ts.
+    const [confirmingFix, setConfirmingFix] = useState(false)
+    /** The id of the ONE upload the editor ticked "đây là bản sửa feedback" for; consumed once
+     *  THAT upload lands, so the manager is never told "đã sửa xong" for bytes that never
+     *  arrived. Storing the id, not a boolean, is load-bearing: `uploads` keeps finished rows
+     *  in the module-singleton store, so a plain "any upload is settled" test both fires for
+     *  the WRONG file and — when a previous upload was already 'done' — never re-fires at all. */
+    const pendingFixUploadIdRef = useRef<string | null>(null)
 
     const refetch = useCallback(async () => {
         try {
@@ -122,11 +136,19 @@ export function TaskReviewUploadSection({
         void refetch()
     }
 
-    const startUpload = () => {
+    const startUpload = (markAsFix: boolean) => {
         if (!pendingFile) return
         const crumbs = data?.uploadContext.breadcrumb ?? []
         const leaf = crumbs.length ? crumbs[crumbs.length - 1].name : undefined
-        uploadEngine.enqueue(pendingFile, { kind: 'task', taskId }, leaf ? { targetLabel: leaf } : undefined)
+        const uploadId = uploadEngine.enqueue(
+            pendingFile,
+            { kind: 'task', taskId },
+            leaf ? { targetLabel: leaf } : undefined,
+        )
+        // [status-audit / owner decision D1 2026-07-23] Arm the confirm, don't fire it. The flip
+        // happens when THIS upload's bytes actually land (effect below) — an upload that fails or
+        // is cancelled must not leave the manager reading "đã sửa xong" with no new cut to look at.
+        pendingFixUploadIdRef.current = markAsFix ? uploadId : null
         setPendingFile(null)
         // reflect the new placeholder card quickly
         setTimeout(() => void refetch(), 400)
@@ -145,6 +167,69 @@ export function TaskReviewUploadSection({
     // offer to sync the task. The server (confirmTaskHoanTat) re-checks RBAC + the status FSM.
     const approvedAsset = serverAssets.find((a) => a.statusId === REVIEW_STATUS_MAP.approved) ?? null
     const showCompleteBanner = !!approvedAsset && taskStatus !== REVIEW_STATUS_MAP.approved
+
+    // [status-audit 2026-07-23] The A3/A6 exit, in the drawer. Same endpoint the player header
+    // uses; the server re-checks the predecessor + assignee-or-admin, so this is not a new
+    // authz surface — only a second door onto the one that already existed.
+    const fixConfirm = data?.fixConfirm ?? null
+    const confirmFix = useCallback(
+        async (assetId: string) => {
+            setConfirmingFix(true)
+            const tid = toast.loading('Đang xác nhận đã sửa xong…')
+            try {
+                const res = await apiConfirmFix(assetId)
+                toast.success(`Đã chuyển task sang “${res.status}”.`, { id: tid })
+                // Retire the banner from the LOCAL snapshot first. `refetch` swallows non-OK
+                // responses and errors, so relying on it alone means a flaky GET right after a
+                // successful POST leaves the banner up, inviting a second click that 409s.
+                setData((prev) => (prev ? { ...prev, fixConfirm: null } : prev))
+                await refetch()
+                onTaskStatusChanged?.(res.status)
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không xác nhận được. Thử lại.', { id: tid })
+            } finally {
+                setConfirmingFix(false)
+            }
+        },
+        [refetch, onTaskStatusChanged],
+    )
+
+    // [status-audit / owner decision D1] The "đây là bản đã sửa feedback" tick does NOT write the
+    // status by itself. It arms a HIGHLIGHT on the confirm banner, and the editor clicks once.
+    //
+    // Two earlier drafts tried to fire it automatically and both were wrong, for the same reason:
+    // any client-side write races the Mux-ready webhook. applyMuxReady commits its PROCESSING→READY
+    // transaction and only AFTERWARDS calls syncTaskFromReviewEvent(..., A2) (inngest.ts). So the
+    // upload poll can observe READY — and therefore fire — in the window before that sync runs. The
+    // sync then finds A4, which IS a legal predecessor of A2 (task-statuses.ts, deliberately, so a
+    // re-upload at A4 loops back into review), and drags the task backwards. The editor's confirm
+    // disappears and the manager gets two contradictory notifications: precisely the class of bug
+    // this whole change set exists to remove. Firing at 'processing' instead of 'done' only widened
+    // that window; it never closed it, and 'processing' additionally fires while Mux can still
+    // ERROR the version, reporting "đã sửa xong" for a cut nobody can watch.
+    //
+    // A human click is not a workaround for the race — it eliminates it. By the time anyone reads
+    // the banner and clicks, the webhook has long since run and no-op'd (at A3, which is NOT a
+    // predecessor of A2), so the confirm is unambiguously the last writer. The editor still never
+    // has to REMEMBER anything, which is the whole point of D1: the system tells them.
+    const armedUpload = uploads.find((it) => it.id === pendingFixUploadIdRef.current)
+    const armedUploadStatus = armedUpload?.status
+    /** true once the upload the editor marked has landed and its confirm is still pending. */
+    const fixArmed = armedUploadStatus === 'done'
+    useEffect(() => {
+        // Disarm on a terminal failure so a later, unrelated upload never inherits the highlight.
+        if (armedUploadStatus === 'canceled' || armedUploadStatus === 'failed') {
+            pendingFixUploadIdRef.current = null
+        }
+    }, [armedUploadStatus])
+
+    // Any upload still moving for this task. While one is in flight the confirm banner is hidden:
+    // clicking it mid-transcode writes A4 (or A7) that the imminent Mux-ready handler can undo —
+    // and on the CLIENT round revokeClientExposureOnNewVersion additionally revokes the share and
+    // resets to A2, so the "Revised" email the confirm sends would carry a link about to die.
+    const uploadInFlight = uploads.some((it) =>
+        ['queued', 'uploading', 'paused', 'completing', 'processing'].includes(it.status),
+    )
 
     const confirmComplete = useCallback(async () => {
         setConfirmingComplete(true)
@@ -177,6 +262,48 @@ export function TaskReviewUploadSection({
                 Video review
                 <span className="font-normal normal-case text-muted-foreground">— khách duyệt trực tiếp</span>
             </div>
+
+            {/* [status-audit 2026-07-23] The A3/A6 exit, right where the editor works. Before this
+                banner existed, "Xác nhận đã sửa xong" lived ONLY in the review-player header — so an
+                editor who fixed the cut and uploaded it from this very block had no way to say so,
+                and the task sat at "Đang sửa feedback (nội bộ)" until an admin retyped the status. */}
+            {fixConfirm && !uploadInFlight && (
+                <div
+                    className={`mb-2 flex items-center gap-2.5 rounded-xl border p-2.5 ${
+                        fixArmed
+                            ? 'border-teal-400/60 bg-teal-500/[0.16] ring-1 ring-teal-400/30'
+                            : 'border-teal-500/30 bg-teal-500/[0.08]'
+                    }`}
+                >
+                    <CheckCheck size={16} className="shrink-0 text-teal-300" />
+                    <div className="min-w-0 flex-1">
+                        <div className="text-[12px] font-medium text-teal-100">
+                            {fixArmed
+                                ? 'Bản vừa tải lên được đánh dấu là bản đã sửa'
+                                : fixConfirm.onBehalf
+                                  ? 'Editor đã sửa xong đợt này?'
+                                  : 'Bạn đã sửa xong đợt feedback này?'}
+                        </div>
+                        <div className="truncate text-[11px] text-teal-200/70">
+                            {fixArmed
+                                ? `Bấm xác nhận để chuyển task sang “${fixConfirm.targetStatus}” và báo quản lý duyệt.`
+                                : `Xác nhận để chuyển task sang “${fixConfirm.targetStatus}” và báo quản lý duyệt.`}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            pendingFixUploadIdRef.current = null
+                            void confirmFix(fixConfirm.assetId)
+                        }}
+                        disabled={confirmingFix}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-teal-500 px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-teal-400 disabled:opacity-60"
+                    >
+                        {confirmingFix ? <Loader2 size={13} className="animate-spin" /> : <CheckCheck size={13} />}
+                        {fixConfirm.onBehalf ? 'Xác nhận editor đã sửa' : 'Xác nhận đã sửa xong'}
+                    </button>
+                </div>
+            )}
 
             {/* P3.7 — sync task → Hoàn tất when a linked deliverable is at the approved status */}
             {showCompleteBanner && (
@@ -224,8 +351,27 @@ export function TaskReviewUploadSection({
             {/* confirm strip after a pick (renders even before context loads) */}
             {pendingFile ? (
                 <ConfirmStrip
+                    // Remount when the picked file changes, so the "đây là bản đã sửa feedback"
+                    // tick can never carry over from a file the editor replaced (drag a new one
+                    // in while the strip is open) onto a file they never opted in for.
+                    key={`${pendingFile.name}:${pendingFile.size}:${pendingFile.lastModified}`}
                     file={pendingFile}
                     ctx={data?.uploadContext ?? null}
+                    // [owner decision D1] Offer the question only on the INTERNAL round, and only
+                    // when this viewer may actually confirm.
+                    //
+                    // Never on the client round (A6→A7): a new version landing while the client
+                    // holds a live link makes revokeClientExposureOnNewVersion revoke the share and
+                    // force the task back to A2 — by design (R5: an un-re-approved cut must not
+                    // reach the client). Coupling an auto-confirm to that upload would mail the
+                    // client "Revised" with a link the revoke is about to kill, and stamp an A7 the
+                    // reset then erases. The manual banner still covers A6 for an editor who
+                    // deliberately confirms a client fix.
+                    fixTargetStatus={
+                        fixConfirm?.targetStatus === REVIEW_STATUS_MAP.internalFixDone
+                            ? fixConfirm.targetStatus
+                            : null
+                    }
                     onCancel={() => setPendingFile(null)}
                     onStart={startUpload}
                 />
@@ -262,15 +408,21 @@ export function TaskReviewUploadSection({
 function ConfirmStrip({
     file,
     ctx,
+    fixTargetStatus,
     onCancel,
     onStart,
 }: {
     file: File
     ctx: TaskAssetsResult['uploadContext'] | null
+    /** Non-null when the task is mid-revision and this viewer may confirm the round. */
+    fixTargetStatus: string | null
     onCancel: () => void
-    onStart: () => void
+    onStart: (markAsFix: boolean) => void
 }) {
     const path = ctx ? ctx.breadcrumb.map((b) => b.name).join(' / ') : ''
+    // [owner decision D1 2026-07-23] Default OFF: editors also upload work-in-progress cuts
+    // mid-round, and auto-advancing those would tell the manager "đã sửa xong" about a draft.
+    const [markAsFix, setMarkAsFix] = useState(false)
     return (
         <div className="mt-2 rounded-xl border border-violet-500/30 bg-violet-500/[0.06] p-3">
             <div className="flex items-center gap-2 text-[12px] text-zinc-200">
@@ -303,6 +455,23 @@ function ConfirmStrip({
                 </p>
             )}
 
+            {fixTargetStatus && (
+                <label className="mt-2.5 flex cursor-pointer items-start gap-2 rounded-lg border border-teal-500/25 bg-teal-500/[0.06] px-2.5 py-2">
+                    <input
+                        type="checkbox"
+                        checked={markAsFix}
+                        onChange={(e) => setMarkAsFix(e.target.checked)}
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-teal-400"
+                    />
+                    <span className="text-[11.5px] leading-relaxed text-teal-100/90">
+                        Đây là bản đã sửa feedback
+                        <span className="block text-[11px] text-teal-200/60">
+                            Tải lên xong sẽ tự chuyển task sang “{fixTargetStatus}” và báo quản lý duyệt.
+                        </span>
+                    </span>
+                </label>
+            )}
+
             <div className="mt-2.5 flex items-center justify-end gap-2">
                 <button
                     type="button"
@@ -313,7 +482,7 @@ function ConfirmStrip({
                 </button>
                 <button
                     type="button"
-                    onClick={onStart}
+                    onClick={() => onStart(markAsFix)}
                     className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-primary-accent"
                 >
                     <UploadCloud size={13} /> Bắt đầu tải lên

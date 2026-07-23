@@ -36,6 +36,7 @@ export function TaskMainSection({
     onSaveFinance,
     setEditingFinance,
     onTaskCompleted,
+    onTaskStatusChanged,
 }: {
     localTask: TaskWithUser
     form: TaskDetailForm
@@ -60,6 +61,8 @@ export function TaskMainSection({
     onSaveFinance: () => void
     setEditingFinance: (v: boolean) => void
     onTaskCompleted: () => void
+    /** [status-audit] F9 confirm-fix from the BÀN GIAO block — carries the status the server wrote. */
+    onTaskStatusChanged: (newStatus: string) => void
 }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -119,6 +122,7 @@ export function TaskMainSection({
                         taskId={localTask.id}
                         taskStatus={localTask.status}
                         onTaskCompleted={onTaskCompleted}
+                        onTaskStatusChanged={onTaskStatusChanged}
                     />
                 )}
             </Card>

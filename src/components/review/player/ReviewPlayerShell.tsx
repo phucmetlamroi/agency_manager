@@ -313,18 +313,50 @@ function ReviewPlayerShellInner({
 
   // [P3-B] Derived task/role context for the F8/F9/F10 staff actions (server re-checks all).
   const isAssignee = !!asset?.assigneeId && asset.assigneeId === currentUserId;
-  // F9 gate: parent comments on the CURRENT version still open. F8 gate: any comment exists.
+  // Unresolved TOP-LEVEL comments on the current version. Gates the goBack prompt and feeds the
+  // F9 dialog warning.
+  //
+  // A draft also counted "a reply arrived after the parent was resolved" as open, to rescue the
+  // case where a manager answers a resolved note instead of writing a new one. That LATCHES:
+  // confirmFixDone only touches parents with resolvedAt == null, so an already-resolved parent
+  // keeps its old timestamp forever, the later reply stays "newer" forever, and F8 plus the exit
+  // prompt would fire on every visit with no way out but hand-editing the thread. A count that
+  // can never reach zero is worse than one that occasionally reads low, so this stays parents-only
+  // and the reply case is covered by leaving the F8 BUTTON reachable instead (see canFeedback).
   const unresolvedCount = useMemo(
     () =>
       feed.comments.filter((c) => c.parentId == null && c.completedAt == null)
         .length,
     [feed.comments],
   );
+  /** Any comment at all on this version — keeps the deliberate F8 button reachable. */
   const hasComments = feed.comments.length > 0;
-  // A feedback session is "open" when an admin has feedback on a just-submitted (A2) cut.
+  // A feedback session is "open" when an admin has UNRESOLVED feedback on a just-submitted
+  // (A2) cut — and only then may leaving the page offer to close it (goBack confirm +
+  // beforeunload).
+  //
+  // [status-audit 2026-07-23] This used to be `hasComments && canAutoTransition(status, A3)`,
+  // which silently regressed finished work. `canAutoTransition(…, A3)` admits A4 too (F8's
+  // predecessors are A2 *and* A4 — A4 is the legitimate "re-open a NEW round" entry), and
+  // `hasComments` counts comments the editor already RESOLVED. So on a task the editor had
+  // confirmed fixed (A3→A4), an admin who merely opened the player to check the work and
+  // pressed the back arrow got "Đã gửi xong feedback cho editor?" — and OK dragged the task
+  // back to A3. The owner's 2026-07-23 report ("editor sửa xong, upload v2, trạng thái vẫn
+  // Đang sửa") is reproducible this way, and with no StatusHistory for video statuses it was
+  // indistinguishable from the editor never confirming at all.
+  //
+  // The `unresolvedCount > 0` term ALONE kills the regression: F9 resolves every open parent on
+  // the asset, so a task the editor already confirmed has a count of 0 and the prompt is dead.
+  //
+  // An earlier draft ALSO pinned this to A2. That over-corrected and silently broke round 2: an
+  // admin who writes fresh comments on an A4 task and leaves via the back arrow got no prompt at
+  // all, so the round was never handed to the editor — the task sat at A4 ("editor already fixed
+  // it, awaiting approval") with three unanswered notes and nobody notified. Keep the predecessor
+  // test, which admits A2 and A4 exactly like ReviewFlowActions' own canFeedback, so the button
+  // and the exit prompt can never disagree.
   const feedbackSessionOpen =
     isAdmin &&
-    hasComments &&
+    unresolvedCount > 0 &&
     canAutoTransition(
       asset?.taskStatus ?? "",
       REVIEW_STATUS_MAP.internalFeedbackOpen,
@@ -521,7 +553,8 @@ function ReviewPlayerShellInner({
       : folderId
         ? `/${workspaceId}/team/folder/${folderId}`
         : `/${workspaceId}/team`;
-    // [FR-08] Leaving an OPEN feedback session (admin · task "Đã nộp video (nội bộ)" · ≥1 comment):
+    // [FR-08] Leaving an OPEN feedback session (admin · task "Đã nộp video (nội bộ)" · ≥1 góp ý
+    // CHƯA xử lý — see feedbackSessionOpen, which now actually enforces both):
     // offer to close it on the way out. OK = chốt phiên (flip → A3 + notify editor) rồi thoát;
     // Cancel = thoát mà chưa chốt. Comments are already persisted on Enter — this only flips state.
     if (feedbackSessionOpen) {

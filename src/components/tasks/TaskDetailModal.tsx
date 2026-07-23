@@ -698,6 +698,9 @@ export function TaskDetailModal({
                                                 onTaskCompleted={() =>
                                                     setLocalTask((prev) => (prev ? { ...prev, status: 'Hoàn tất' } : prev))
                                                 }
+                                                onTaskStatusChanged={(s) =>
+                                                    setLocalTask((prev) => (prev ? { ...prev, status: s } : prev))
+                                                }
                                             />
                                         )}
 

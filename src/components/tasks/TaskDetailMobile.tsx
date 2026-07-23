@@ -404,6 +404,7 @@ export function TaskDetailMobile({
                                     onSaveFinance={handleSaveFinance}
                                     setEditingFinance={setEditingFinance}
                                     onTaskCompleted={() => setLocalTask((prev) => ({ ...prev, status: 'Hoàn tất' }))}
+                                    onTaskStatusChanged={(s) => setLocalTask((prev) => ({ ...prev, status: s }))}
                                 />
                             )}
 

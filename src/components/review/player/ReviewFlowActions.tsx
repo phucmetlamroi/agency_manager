@@ -29,9 +29,11 @@ interface ReviewFlowActionsProps {
     taskStatus: string | null
     isAdmin: boolean
     isAssignee: boolean
-    /** parent comments on the CURRENT version still open (resolvedAt == null). Shown in the F9 confirm dialog. */
+    /** Parent comments on the CURRENT version still open (resolvedAt == null). Shown in the F9
+     *  confirm dialog. NOTE: the server's F9 resolves parents across EVERY version of the asset,
+     *  so this number can under-report what the confirm will actually close. */
     unresolvedCount: number
-    /** any comment on the current version — gates F8 (don't "close feedback" with none). */
+    /** Any comment on the current version — gates the deliberate F8 button (see canFeedback). */
     hasComments: boolean
     /** re-fetch the asset/version so the buttons reflect the new status. */
     onDone: () => void
@@ -51,19 +53,38 @@ export function ReviewFlowActions({
     const cur = taskStatus ?? ''
 
     const canApprove = isAdmin && canAutoTransition(cur, REVIEW_STATUS_MAP.sentToClient) // F10 (A2/A4/A7 → A5)
-    const canFeedback = isAdmin && hasComments && canAutoTransition(cur, REVIEW_STATUS_MAP.internalFeedbackOpen) // F8 (A2/A4 → A3)
+    // F8 (A2/A4 → A3) — a DELIBERATE, labelled admin click, so it stays available whenever the
+    // FSM allows and the version has any discussion on it.
+    //
+    // [status-audit 2026-07-23] A draft narrowed this to `unresolvedCount > 0`. That looked
+    // tidier but created a worse failure: replies can never be resolved anywhere in the system,
+    // so an admin who answers an already-resolved note (the natural move — the reply keeps the
+    // timecode) produced a thread that the parents-only count could not see. F8 then vanished and
+    // the only button left in the header was "Duyệt & gửi khách" — i.e. the sole remaining action
+    // was to ship the un-fixed cut to the client. Losing the ability to send feedback back is far
+    // worse than an admin re-opening a round they meant to re-open. The accidental-regression
+    // case this was meant to catch is handled where it actually happened: `feedbackSessionOpen`
+    // in ReviewPlayerShell, which gates the automatic back-arrow prompt on unresolvedCount.
+    const canFeedback = isAdmin && hasComments && canAutoTransition(cur, REVIEW_STATUS_MAP.internalFeedbackOpen)
     // F9 — internal round (A3→A4) or client round (A6→A7).
     const fixTarget = canAutoTransition(cur, REVIEW_STATUS_MAP.internalFixDone)
         ? REVIEW_STATUS_MAP.internalFixDone
         : canAutoTransition(cur, REVIEW_STATUS_MAP.clientFixDone)
           ? REVIEW_STATUS_MAP.clientFixDone
           : null
-    // [feedback-flow spec] "Xác nhận đã sửa xong" is the EDITOR's action only. The admin's
-    // moves are "Kết thúc feedback" (F8) and "Duyệt & gửi khách" (F10) — never F9. Gating on
-    // assignee-only means a non-assignee admin correctly waits during A3/A6 instead of seeing
-    // the editor's confirm button. (The server still allows admin as a fallback via the API.)
-    const canFix = isAssignee && fixTarget != null
+    // [status-audit 2026-07-23] F9 is the EDITOR's action — but gating the BUTTON on
+    // assignee-only made A3 and A6 absorbing states in practice. The server
+    // (confirmFixDone, task-sync.ts) has always accepted admin-OR-assignee; the UI was
+    // strictly narrower than the server, so an admin sitting on a task the editor forgot to
+    // confirm saw an EMPTY player header and the only remaining control was the raw status
+    // dropdown on the board. That is exactly what the owner had to do by hand.
+    //
+    // The button is still the editor's by default — the label changes for an admin so nobody
+    // mistakes it for "the system says this is done", and the confirm dialog still gates it.
+    const canFix = (isAssignee || isAdmin) && fixTarget != null
     const isClientFix = fixTarget === REVIEW_STATUS_MAP.clientFixDone
+    /** An admin confirming on the editor's behalf — different wording, same action. */
+    const fixOnBehalf = !isAssignee && isAdmin
 
     if (!canApprove && !canFeedback && !canFix) return null
 
@@ -99,11 +120,21 @@ export function ReviewFlowActions({
                     onClick={() => setConfirmFix(true)}
                     disabled={busy !== null}
                     className="flex items-center gap-1.5 rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-sm font-medium text-teal-300 hover:bg-teal-500/20 disabled:opacity-50"
-                    title="Xác nhận bạn đã sửa xong feedback của đợt này"
+                    title={
+                        fixOnBehalf
+                            ? 'Xác nhận thay editor rằng đợt feedback này đã sửa xong'
+                            : 'Xác nhận bạn đã sửa xong feedback của đợt này'
+                    }
                 >
                     {busy === 'fix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4" />}
-                    <span className="hidden sm:inline">
-                        {isClientFix ? 'Xác nhận đã sửa (khách)' : 'Xác nhận đã sửa xong'}
+                    {/* The label is load-bearing here, not decoration: without it this is an
+                        unlabelled tick icon on the one screen that can leave A3. Keep it visible. */}
+                    <span>
+                        {fixOnBehalf
+                            ? 'Xác nhận editor đã sửa'
+                            : isClientFix
+                              ? 'Xác nhận đã sửa (khách)'
+                              : 'Xác nhận đã sửa xong'}
                     </span>
                 </button>
             )}
@@ -125,6 +156,7 @@ export function ReviewFlowActions({
                 <ConfirmFixDialog
                     unresolvedCount={unresolvedCount}
                     isClientFix={isClientFix}
+                    onBehalf={fixOnBehalf}
                     busy={busy === 'fix'}
                     onCancel={() => setConfirmFix(false)}
                     onConfirm={async () => {
@@ -140,12 +172,15 @@ export function ReviewFlowActions({
 function ConfirmFixDialog({
     unresolvedCount,
     isClientFix,
+    onBehalf,
     busy,
     onConfirm,
     onCancel,
 }: {
     unresolvedCount: number
     isClientFix: boolean
+    /** true when an ADMIN is confirming for the assignee — the copy must not say "bạn đã sửa". */
+    onBehalf: boolean
     busy: boolean
     onConfirm: () => void
     onCancel: () => void
@@ -170,11 +205,14 @@ function ConfirmFixDialog({
                     </div>
                     <div className="min-w-0">
                         <h3 className="text-base font-semibold text-white">
-                            Xác nhận đã sửa xong{isClientFix ? ' (khách)' : ''}?
+                            {onBehalf ? 'Xác nhận editor đã sửa xong' : 'Xác nhận đã sửa xong'}
+                            {isClientFix ? ' (khách)' : ''}?
                         </h3>
                         <p className="mt-1 text-sm text-white/60">
-                            Bạn chắc chắn đã sửa toàn bộ feedback của đợt này? Sau khi xác nhận, task sẽ chuyển sang
-                            {' '}
+                            {onBehalf
+                                ? 'Bạn xác nhận THAY editor rằng đợt feedback này đã được sửa xong. '
+                                : 'Bạn chắc chắn đã sửa toàn bộ feedback của đợt này? '}
+                            Sau khi xác nhận, task sẽ chuyển sang{' '}
                             <span className="text-white/80">“{targetLabel}”</span> và quản lý sẽ được thông báo để duyệt.
                         </p>
                         {unresolvedCount > 0 && (

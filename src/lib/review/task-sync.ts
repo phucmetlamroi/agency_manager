@@ -209,7 +209,7 @@ export async function syncTaskOnChangesRequested(
 async function loadAssetTaskContext(assetId: string): Promise<{
     asset: { id: string; workspaceId: string; taskId: string }
     access: Awaited<ReturnType<typeof requireReviewAccess>>
-    task: { status: string; assigneeId: string | null; version: number }
+    task: { status: string; assigneeId: string | null; version: number; isArchived: boolean }
 }> {
     const asset = await prisma.reviewAsset.findFirst({
         where: { id: assetId, deletedAt: null },
@@ -220,9 +220,20 @@ async function loadAssetTaskContext(assetId: string): Promise<{
     const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
     const task = await prisma.task.findFirst({
         where: { id: asset.taskId, workspaceId: asset.workspaceId },
-        select: { status: true, assigneeId: true, version: true },
+        select: { status: true, assigneeId: true, version: true, isArchived: true },
     })
     if (!task) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy task của bản dựng.')
+    // [status-audit 2026-07-23] Refuse an ARCHIVED (cancelled) task. The event-driven writer
+    // syncTaskFromReviewEvent has always refused these, but the three session-path actions that
+    // share this loader (F8 / F9 / F10) did not — and neither does the updateTaskStatus predicate
+    // they delegate to. So a cancelled task could still be walked forward through the review
+    // lifecycle, emitting "đã sửa xong" / "đã gửi khách" notifications for work that was called
+    // off. A guard the other path does not share is not a guard.
+    if (task.isArchived) {
+        throw apiError(409, 'STATE_INVALID', 'Task này đã bị hủy/lưu trữ — không đổi được trạng thái.', {
+            reason: 'archived',
+        })
+    }
     return { asset: { id: asset.id, workspaceId: asset.workspaceId, taskId: asset.taskId }, access, task }
 }
 

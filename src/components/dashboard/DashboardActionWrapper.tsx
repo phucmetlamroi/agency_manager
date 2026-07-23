@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { Plus } from "lucide-react"
 import DashboardActionBar from "./DashboardActionBar"
 import AddTaskModal from "./AddTaskModal"
+import McAddTaskModal from "@/components/mission-control/McAddTaskModal"
 import { toast } from "sonner"
 import { createTask } from "@/actions/admin-actions"
 import { markRequestAccepted } from "@/actions/client-request-actions"
@@ -42,6 +44,29 @@ interface DashboardActionWrapperProps {
   /** [Quick Create] Current exchange rate snapshot */
   exchangeRate?: number
   onTaskCreated?: () => void
+  /** [Giao diện 2] Hide the default DashboardActionBar (workspace picker + "Thêm task mới").
+   *  Mission Control supplies its OWN trigger (topbar button + ⌘K) and only needs the modal.
+   *  Default false → /admin renders the bar exactly as before. */
+  hideBar?: boolean
+  /** [Giao diện 2] Controlled open state. When `onOpenChange` is provided the host owns the
+   *  modal's open/close; otherwise the wrapper keeps its own internal state (unchanged /admin
+   *  behavior). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /**
+   * [Mobile P2 §2b] 'bar' (default) = the desktop DashboardActionBar; 'fab' = a floating
+   * "+" button (mobile Task tab) that opens the SAME AddTaskModal + submit flow. Desktop is
+   * byte-identical because it never passes this prop.
+   */
+  variant?: 'bar' | 'fab'
+  /** [Giao diện 2] Portal the AddTaskModal to <body> — needed when the host sits inside a
+   *  `backdrop-filter` container (the MC topbar), which would otherwise trap the modal's
+   *  `fixed inset-0` scrim in that box. Default false → /admin renders inline, unchanged. */
+  portalToBody?: boolean
+  /** [Giao diện 2 · M10] 'wizard' (default) = the /admin 5-step AddTaskModal — byte-identical.
+   *  'mc' = the faithful single-screen 3-column "Thêm Task mới" (McAddTaskModal), submitting
+   *  through the SAME money-safe handleSubmit. Deep Velox bridges back to the wizard. */
+  layout?: 'wizard' | 'mc'
 }
 
 // [QA R1 — user decision] A Multi-Hook Map can't fan out across a batch — attach it to
@@ -78,8 +103,25 @@ export default function DashboardActionWrapper({
   canCreateWorkspace = false,
   pricingRules = [],
   exchangeRate = 26300,
+  hideBar = false,
+  open,
+  onOpenChange,
+  variant = 'bar',
+  portalToBody = false,
+  layout = 'wizard',
 }: DashboardActionWrapperProps) {
-  const [modalOpen, setModalOpen] = useState(false)
+  // [M10] Deep-Velox bridge: the MC screen hands off folder scanning to the vetted wizard.
+  const [mcVelox, setMcVelox] = useState(false)
+  // [Giao diện 2] Controlled vs uncontrolled open. When the host passes `onOpenChange`
+  // it owns the state (Mission Control); otherwise the wrapper keeps its own — /admin
+  // behavior is byte-identical because neither prop is passed there.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = onOpenChange !== undefined
+  const modalOpen = isControlled ? !!open : uncontrolledOpen
+  const setModalOpen = (v: boolean) => {
+    if (isControlled) onOpenChange!(v)
+    else setUncontrolledOpen(v)
+  }
   const router = useRouter()
   const [, startTransition] = useTransition()
 
@@ -101,7 +143,7 @@ export default function DashboardActionWrapper({
   const clearSeed = () => {
     if (seed) { setSeed(null); router.replace(`/${workspaceId}/admin`) }
   }
-  const closeModal = () => { setModalOpen(false); clearSeed() }
+  const closeModal = () => { setModalOpen(false); setMcVelox(false); clearSeed() }
 
   const handleSubmit = async (
     data: {
@@ -406,25 +448,57 @@ export default function DashboardActionWrapper({
 
   return (
     <>
-      <DashboardActionBar
-        workspaceId={workspaceId}
-        onAddTask={() => setModalOpen(true)}
-        workspaces={workspaces}
-        userRole={userRole}
-        canCreateWorkspace={canCreateWorkspace}
-      />
-      <AddTaskModal
-        open={modalOpen}
-        onClose={closeModal}
-        workspaceId={workspaceId}
-        clients={clients}
-        users={users}
-        onSubmit={handleSubmitWrapped}
-        pricingRules={pricingRules}
-        exchangeRate={exchangeRate}
-        veloxInitialFolderUrl={seed?.folder}
-        veloxInitialClientId={seed?.clientId}
-      />
+      {/* [Merge] Mission Control hides the trigger entirely (hideBar → supplies its own
+          topbar/⌘K); otherwise the mobile Task tab shows a floating "+" (variant='fab') and
+          the desktop /admin shows the DashboardActionBar (default). */}
+      {!hideBar &&
+        (variant === 'fab' ? (
+          // [Mobile P2 §2b] Floating "+" — thumb-zone, above the bottom tab bar + safe-area.
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            aria-label="Tạo task"
+            className="fixed right-4 bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/30 transition-transform active:scale-95"
+          >
+            <Plus className="h-6 w-6" strokeWidth={2.5} />
+          </button>
+        ) : (
+          <DashboardActionBar
+            workspaceId={workspaceId}
+            onAddTask={() => setModalOpen(true)}
+            workspaces={workspaces}
+            userRole={userRole}
+            canCreateWorkspace={canCreateWorkspace}
+          />
+        ))}
+      {layout === 'mc' && !mcVelox ? (
+        <McAddTaskModal
+          open={modalOpen}
+          onClose={closeModal}
+          workspaceId={workspaceId}
+          clients={clients}
+          users={users}
+          onSubmit={handleSubmitWrapped}
+          pricingRules={pricingRules}
+          exchangeRate={exchangeRate}
+          portalToBody={portalToBody}
+          onOpenVelox={() => setMcVelox(true)}
+        />
+      ) : (
+        <AddTaskModal
+          open={modalOpen}
+          onClose={closeModal}
+          workspaceId={workspaceId}
+          clients={clients}
+          users={users}
+          onSubmit={handleSubmitWrapped}
+          pricingRules={pricingRules}
+          exchangeRate={exchangeRate}
+          veloxInitialFolderUrl={seed?.folder}
+          veloxInitialClientId={seed?.clientId}
+          portalToBody={portalToBody}
+        />
+      )}
     </>
   )
 }

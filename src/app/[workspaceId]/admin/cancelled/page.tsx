@@ -3,7 +3,11 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { getCancelledTasks } from '@/actions/task-actions'
+import { getTrashedClients } from '@/actions/crm-actions'
+import { getMyTrashedProfiles } from '@/actions/profile-actions'
 import CancelledTasksClient from '@/components/tasks/CancelledTasksClient'
+import MobileTrash from '@/components/admin/MobileTrash'
+import { isMobileDevice } from '@/lib/device'
 
 /**
  * [Design decision — auto-archive on cancel] Cancelled / archived tasks view.
@@ -22,6 +26,14 @@ export default async function CancelledTasksPage({
 
     const res = await getCancelledTasks(workspaceId)
     const tasks = res.success ? res.data : []
+
+    // [Mobile 3k] Gộp 3 thùng rác (task/khách/tổ chức) thành 1 màn segmented. Desktop giữ nguyên.
+    if (await isMobileDevice()) {
+        const [cliRes, profRes] = await Promise.all([getTrashedClients(workspaceId), getMyTrashedProfiles()])
+        const clients = cliRes.success ? cliRes.data : []
+        const profiles = profRes.profiles || []
+        return <MobileTrash workspaceId={workspaceId} tasks={tasks as any} clients={clients as any} profiles={profiles as any} />
+    }
 
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>

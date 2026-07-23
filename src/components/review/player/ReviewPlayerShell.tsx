@@ -89,6 +89,13 @@ interface ReviewPlayerShellProps {
   /** [F6/P5] LIVE ?cmp=<left>.<right> from the URL (NOT a seed) — drives Compare mode.
    *  Live so browser Back (which drops cmp + re-runs this force-dynamic page) exits compare. */
   compareParam: string | null;
+  /** [Giao diện 2 · MC M23/M11] Prefix cho URL asset khi shell tự điều hướng (vào so-sánh,
+   *  đổi version, viết ?cmp). Mặc định `/[ws]/team/asset` → GĐ1 byte-identical; MC truyền
+   *  `/[ws]/mc/asset` để chế độ so sánh + đổi version Ở LẠI namespace Mission Control. */
+  assetBasePath?: string;
+  /** [Giao diện 2 · MC M11] Đích nút thoát player về trình duyệt Tệp. Mặc định folder-aware
+   *  `/[ws]/team/folder/[id]` | `/[ws]/team`; MC truyền `/[ws]/mc/tep`. */
+  browserHref?: string;
 }
 
 /** P5.3: the internal shell provides the INTERNAL PlayerEnv (VN copy, /api/review/*,
@@ -118,6 +125,8 @@ function ReviewPlayerShellInner({
   initialVersionId,
   initialCommentId,
   compareParam,
+  assetBasePath,
+  browserHref,
 }: ReviewPlayerShellProps) {
   const router = useRouter();
   const [data, setData] = useState<AssetVersions | null>(null);
@@ -169,6 +178,11 @@ function ReviewPlayerShellInner({
     [data, currentVersionId],
   );
   const isVideo = asset?.mediaKind === "video";
+  // [Mobile PR#8 §4] Adaptive aspect (dọc⇄ngang): a portrait (9:16) video takes a TALLER
+  // stage + a peek panel; a landscape (16:9) video gets a shorter stage + a wider panel.
+  // Ratio comes from the Mux metadata (version.width/height); desktop layout is unaffected.
+  const isPortraitMedia =
+    isVideo && !!version?.width && !!version?.height && version.height > version.width;
 
   // [Download] Fetch a short-lived presigned R2 GET of the ORIGINAL file (byte-identical to the
   // uploaded file — not a Mux rendition) and let the browser save it. Member route re-guards
@@ -267,7 +281,7 @@ function ReviewPlayerShellInner({
     ],
   );
 
-  const compareBase = `/${workspaceId}/team/asset/${assetId}`;
+  const compareBase = `${assetBasePath ?? `/${workspaceId}/team/asset`}/${assetId}`;
   // Enter: default pairing = left is the version adjacent to current (older neighbor, else newer),
   // right is the current version. push() = new history entry so Back exits compare.
   const enterCompare = useCallback(() => {
@@ -534,9 +548,11 @@ function ReviewPlayerShellInner({
 
   const goBack = useCallback(async () => {
     const folderId = asset?.folderId;
-    const dest = folderId
-      ? `/${workspaceId}/team/folder/${folderId}`
-      : `/${workspaceId}/team`;
+    const dest = browserHref
+      ? browserHref
+      : folderId
+        ? `/${workspaceId}/team/folder/${folderId}`
+        : `/${workspaceId}/team`;
     // [FR-08] Leaving an OPEN feedback session (admin · task "Đã nộp video (nội bộ)" · ≥1 góp ý
     // CHƯA xử lý — see feedbackSessionOpen, which now actually enforces both):
     // offer to close it on the way out. OK = chốt phiên (flip → A3 + notify editor) rồi thoát;
@@ -696,7 +712,7 @@ function ReviewPlayerShellInner({
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             onClick={goBack}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-white/70 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-white/70 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300"
             aria-label="Quay lại thư mục"
             title="Quay lại thư mục"
           >
@@ -711,7 +727,7 @@ function ReviewPlayerShellInner({
             className="flex min-w-0 items-center gap-1 text-[13px]"
             aria-label="Vị trí tệp"
           >
-            <FileVideo className="hidden h-4 w-4 shrink-0 text-violet-300 sm:block" />
+            <FileVideo className="hidden h-4 w-4 shrink-0 text-indigo-300 lg:text-violet-300 sm:block" />
             <button
               onClick={goBack}
               className="hidden shrink-0 text-white/50 transition hover:text-white md:inline"
@@ -750,7 +766,7 @@ function ReviewPlayerShellInner({
           <div className="relative shrink-0">
             <button
               onClick={() => setSelectorOpen((open) => !open)}
-              className="flex h-8 items-center gap-1 rounded-md border border-white/[0.12] bg-white/[0.045] px-2 text-xs font-medium text-white transition hover:border-white/[0.22] hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+              className="flex h-8 items-center gap-1 rounded-md border border-white/[0.12] bg-white/[0.045] px-2 text-xs font-medium text-white transition hover:border-white/[0.22] hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300"
               aria-label="Chọn phiên bản"
               aria-expanded={selectorOpen}
               title="Chọn phiên bản"
@@ -774,11 +790,11 @@ function ReviewPlayerShellInner({
                       }}
                       className={
                         item.id === currentVersionId
-                          ? "flex w-full items-center gap-2 rounded-md bg-violet-400/[0.12] px-2.5 py-2 text-left text-sm text-white"
+                          ? "flex w-full items-center gap-2 rounded-md bg-indigo-400/[0.12] lg:bg-violet-400/[0.12] px-2.5 py-2 text-left text-sm text-white"
                           : "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-white/75 transition hover:bg-white/[0.08] hover:text-white"
                       }
                     >
-                      <span className="grid h-7 w-8 shrink-0 place-items-center rounded bg-white/[0.07] text-xs font-semibold text-violet-200">
+                      <span className="grid h-7 w-8 shrink-0 place-items-center rounded bg-white/[0.07] text-xs font-semibold text-indigo-200 lg:text-violet-200">
                         v{item.versionNumber}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -813,7 +829,7 @@ function ReviewPlayerShellInner({
                     className={
                       data.versions.length < 2
                         ? "mt-1 hidden w-full items-center gap-2 border-t border-white/[0.10] px-2.5 py-2.5 text-left text-sm text-white/25 md:flex"
-                        : "mt-1 hidden w-full items-center gap-2 border-t border-white/[0.10] px-2.5 py-2.5 text-left text-sm text-violet-200 transition hover:bg-white/[0.08] md:flex"
+                        : "mt-1 hidden w-full items-center gap-2 border-t border-white/[0.10] px-2.5 py-2.5 text-left text-sm text-indigo-200 lg:text-violet-200 transition hover:bg-white/[0.08] md:flex"
                     }
                   >
                     <Columns2 className="h-4 w-4 shrink-0" /> So sánh phiên bản
@@ -825,7 +841,7 @@ function ReviewPlayerShellInner({
 
           <button
             onClick={() => versionInputRef.current?.click()}
-            className="hidden h-8 w-8 shrink-0 place-items-center rounded-md text-white/65 transition hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 sm:grid"
+            className="hidden h-8 w-8 shrink-0 place-items-center rounded-md text-white/65 transition hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300 sm:grid"
             aria-label="Tải phiên bản mới"
             title="Tải phiên bản mới"
           >
@@ -879,7 +895,7 @@ function ReviewPlayerShellInner({
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="flex h-8 items-center gap-1.5 rounded-md bg-violet-500 px-2.5 text-xs font-semibold text-white shadow-[0_5px_14px_rgba(124,58,237,0.26)] transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-8 items-center gap-1.5 rounded-md bg-indigo-500 lg:bg-violet-500 px-2.5 text-xs font-semibold text-white shadow-[0_5px_14px_rgba(99,102,241,0.26)] lg:shadow-[0_5px_14px_rgba(124,58,237,0.26)] transition hover:bg-indigo-400 lg:hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
               title="Tải file gốc về máy"
             >
               {downloading ? (
@@ -896,8 +912,8 @@ function ReviewPlayerShellInner({
             onClick={() => setPanelOpen((open) => !open)}
             className={
               panelOpen
-                ? "grid h-8 w-8 place-items-center rounded-md bg-white/[0.08] text-white transition hover:bg-white/[0.13] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
-                : "grid h-8 w-8 place-items-center rounded-md text-white/70 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+                ? "grid h-8 w-8 place-items-center rounded-md bg-white/[0.08] text-white transition hover:bg-white/[0.13] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300"
+                : "grid h-8 w-8 place-items-center rounded-md text-white/70 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300"
             }
             aria-label={panelOpen ? "Ẩn panel review" : "Hiện panel review"}
             title={panelOpen ? "Ẩn panel review" : "Hiện panel review"}
@@ -1005,7 +1021,11 @@ function ReviewPlayerShellInner({
 
         {/* Review panel can collapse for distraction-free playback, like Frame.io's panel controls. */}
         {panelOpen && (
-          <aside className="flex h-[42vh] shrink-0 flex-col border-t border-white/[0.12] bg-[#121417] shadow-[-16px_0_32px_rgba(0,0,0,0.18)] lg:h-auto lg:w-[380px] lg:border-l lg:border-t-0">
+          <aside
+            className={`flex shrink-0 flex-col border-t border-white/[0.12] bg-[#121417] shadow-[-16px_0_32px_rgba(0,0,0,0.18)] lg:h-auto lg:w-[380px] lg:border-l lg:border-t-0 ${
+              isPortraitMedia ? "h-[32vh]" : "h-[46vh]"
+            }`}
+          >
             <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.10] bg-[#16191d] px-3">
               <TabBtn
                 active={tab === "comments"}
@@ -1075,7 +1095,7 @@ function TabBtn({
       onClick={onClick}
       className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-semibold transition ${
         active
-          ? "border-violet-400 bg-violet-400/[0.07] text-white"
+          ? "border-indigo-400 bg-indigo-400/[0.07] lg:border-violet-400 lg:bg-violet-400/[0.07] text-white"
           : "border-transparent text-white/55 hover:bg-white/[0.04] hover:text-white/90"
       }`}
     >

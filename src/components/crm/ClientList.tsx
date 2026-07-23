@@ -85,7 +85,7 @@ function getClientStatus(tasks: Task[]): 'ACTIVE' | 'PENDING' | 'INACTIVE' {
 /* ── Grid template for columns ── */
 const GRID_TEMPLATE = '2.2fr 0.8fr 0.6fr 0.7fr 0.8fr 60px'
 
-export default function ClientList({ clients, workspaceId, onOpenClient }: { clients: Client[], workspaceId: string, onOpenClient?: (id: number) => void }) {
+export default function ClientList({ clients, workspaceId, onOpenClient, clarifyStatus = false }: { clients: Client[], workspaceId: string, onOpenClient?: (id: number) => void, clarifyStatus?: boolean }) {
     const [editingClient, setEditingClient] = useState<Client | null>(null)
     const [newName, setNewName] = useState('')
     const [draggingId, setDraggingId] = useState<number | null>(null)
@@ -249,6 +249,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient }: { cli
                     onDragEnd={() => { setDraggingId(null); setDragOverId(null) }}
                     onDragOver={(id) => setDragOverId(id)}
                     onDrop={handleDrop}
+                    clarify={clarifyStatus}
                 />
             ))}
 
@@ -291,19 +292,27 @@ type ClientItemProps = {
     onDragOver: (id: number) => void
     onDrop: (targetId: number) => void
     isSubsidiary?: boolean
+    clarify?: boolean
 }
 
 /* ── Status pill component ── */
-function StatusPill({ status }: { status: 'ACTIVE' | 'PENDING' | 'INACTIVE' }) {
+// [MC M25] `clarify` fixes the reversed semantics of the PENDING pill: it fires
+// when a client HAS tasks and every one is 'Hoàn tất' (i.e. all done) — the old
+// "Chờ xử lý" ("awaiting") reads as the opposite. Under clarify it becomes the
+// neutral/positive "Đã xong hết" in indigo (not amber-warning). Defaulted OFF →
+// GĐ1 (/admin/crm) unchanged; Mission Control turns it on.
+function StatusPill({ status, clarify = false }: { status: 'ACTIVE' | 'PENDING' | 'INACTIVE'; clarify?: boolean }) {
     const config = {
         ACTIVE: { bg: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.25)', color: '#34d399', dot: '#34d399' },
-        PENDING: { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)', color: '#fbbf24', dot: '#fbbf24' },
+        PENDING: clarify
+            ? { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.25)', color: '#a5b4fc', dot: '#6366f1' }
+            : { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)', color: '#fbbf24', dot: '#fbbf24' },
         INACTIVE: { bg: 'rgba(113,113,122,0.10)', border: 'rgba(113,113,122,0.25)', color: '#71717a', dot: '#71717a' },
     }
     const c = config[status]
     const labels: Record<'ACTIVE' | 'PENDING' | 'INACTIVE', string> = {
         ACTIVE: 'Đang hoạt động',
-        PENDING: 'Chờ xử lý',
+        PENDING: clarify ? 'Đã xong hết' : 'Chờ xử lý',
         INACTIVE: 'Ngừng',
     }
     return (
@@ -359,7 +368,7 @@ function ClientItem({
     client, onEdit, workspaceId, onOpenClient,
     draggingId, dragOverId,
     onDragStart, onDragEnd, onDragOver, onDrop,
-    isSubsidiary = false
+    isSubsidiary = false, clarify = false
 }: ClientItemProps) {
     const { confirm } = useConfirm()
     const [isExpanded, setIsExpanded] = useState(false)
@@ -635,7 +644,7 @@ function ClientItem({
 
                 {/* ── Status cell ── */}
                 <div>
-                    <StatusPill status={status} />
+                    <StatusPill status={status} clarify={clarify} />
                 </div>
 
                 {/* ── Actions cell ── */}
@@ -853,6 +862,7 @@ function ClientItem({
                                     onDragOver={onDragOver}
                                     onDrop={onDrop}
                                     isSubsidiary={true}
+                                    clarify={clarify}
                                 />
                             ))}
                         </div>

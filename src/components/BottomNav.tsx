@@ -6,15 +6,29 @@
 // - touch target ≥44×44 (flex-1 + h≥64). glass-2 + z-nav + safe-area (§3.4).
 // - KHÔNG ẩn theo scroll (bài học ClickUp); CHỈ ẩn khi bàn phím mở (§6.4).
 import Link from 'next/link'
+import { useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { getTabsForRole } from '@/config/mobile-nav'
 import { useKeyboardInset } from '@/hooks/useKeyboardInset'
+import { useRadialNav } from '@/components/radial-nav/RadialNavProvider'
 
 export default function BottomNav({ role, workspaceId }: { role: string; workspaceId: string }) {
     const pathname = usePathname()
     const { open: keyboardOpen } = useKeyboardInset()
     const tabs = getTabsForRole(role, workspaceId)
+
+    // [Mobile PR#6] Giữ nút Menu ≥420ms → mở RadialMenu (quick-nav 6 slot); tap nhanh = vào hub.
+    const { openMenu } = useRadialNav()
+    const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const lpStart = useRef<{ x: number; y: number } | null>(null)
+    const suppressTap = useRef(0)
+    const clearLp = () => {
+        if (lpTimer.current) {
+            clearTimeout(lpTimer.current)
+            lpTimer.current = null
+        }
+    }
 
     // Longest-match: tab có href khớp DÀI NHẤT là active (vd /admin/crm/123 → tab Khách,
     // không phải Trang chủ /admin).
@@ -39,11 +53,35 @@ export default function BottomNav({ role, workspaceId }: { role: string; workspa
                 const active = t.key === activeKey
                 const Icon = t.icon
                 const badge = t.badge && t.badge > 0 ? (t.badge > 99 ? '99+' : String(t.badge)) : null
+                const isMenu = t.key === 'menu'
                 return (
                     <Link
                         key={t.key}
                         href={t.href}
                         aria-current={active ? 'page' : undefined}
+                        onTouchStart={isMenu ? (e) => {
+                            const tt = e.touches[0]
+                            lpStart.current = { x: tt.clientX, y: tt.clientY }
+                            clearLp()
+                            lpTimer.current = setTimeout(() => {
+                                openMenu({ x: Math.round(window.innerWidth / 2), y: Math.round(window.innerHeight * 0.46) })
+                                suppressTap.current = Date.now()
+                                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(25)
+                            }, 420)
+                        } : undefined}
+                        onTouchMove={isMenu ? (e) => {
+                            if (!lpStart.current || !lpTimer.current) return
+                            const tt = e.touches[0]
+                            if (Math.abs(tt.clientX - lpStart.current.x) > 10 || Math.abs(tt.clientY - lpStart.current.y) > 10) clearLp()
+                        } : undefined}
+                        onTouchEnd={isMenu ? clearLp : undefined}
+                        onTouchCancel={isMenu ? clearLp : undefined}
+                        onClick={isMenu ? (e) => {
+                            if (Date.now() - suppressTap.current < 600) {
+                                e.preventDefault()
+                                suppressTap.current = 0
+                            }
+                        } : undefined}
                         className={cn(
                             'relative flex flex-1 flex-col items-center justify-center gap-1 min-w-[44px] transition-colors duration-200',
                             active ? 'text-primary-accent' : 'text-muted-foreground hover:text-zinc-300'

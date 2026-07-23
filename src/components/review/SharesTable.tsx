@@ -23,7 +23,9 @@ const STATE_CHIP: Record<ShareState, { label: string; cls: string }> = {
     expired: { label: 'Hết hạn', cls: 'bg-red-500/10 text-red-300' },
 }
 
-export function SharesTable({ workspaceId }: { workspaceId: string }) {
+// [Giao diện 2 · MC M21] `backHref` = đích nút ← (mặc định /team → GĐ1 byte-identical); MC truyền
+// /mc/tep để ở lại namespace Mission Control.
+export function SharesTable({ workspaceId, backHref }: { workspaceId: string; backHref?: string }) {
     const [items, setItems] = useState<ShareDto[] | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [stateFilter, setStateFilter] = useState<ShareState | 'all'>('all')
@@ -80,7 +82,7 @@ export function SharesTable({ workspaceId }: { workspaceId: string }) {
             <div className="mx-auto max-w-5xl">
                 <div className="flex flex-wrap items-center gap-3">
                     <a
-                        href={`/${workspaceId}/team`}
+                        href={backHref ?? `/${workspaceId}/team`}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100"
                         aria-label={`Quay lại ${REVIEW_MODULE_LABEL}`}
                     >

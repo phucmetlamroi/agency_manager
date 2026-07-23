@@ -25,7 +25,8 @@ import {
     Settings,
     ScrollText,
     LifeBuoy,
-    Clapperboard
+    Clapperboard,
+    LayoutGrid
 } from "lucide-react"
 
 import {
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Logo } from "@/components/brand/Logo"
 import { getUnreadRequestCount } from "@/actions/client-request-actions"
+import { setUiPref } from "@/actions/ui-actions"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -414,6 +416,18 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 <DropdownMenuItem onClick={() => window.location.href = switchRoleHref}>
                                     <ArrowRightLeft className="mr-2 h-4 w-4" />
                                     <span>Chuyển sang chế độ {otherViewRole === 'ADMIN' ? 'Quản trị' : 'Nhân viên'}</span>
+                                </DropdownMenuItem>
+                            )}
+                            {/* [Giao diện 2] additive toggle → Mission Control (admin-only; revenue-bearing UI).
+                                Persist the preference so /admin auto-lands here next visit; the MC
+                                "← Giao diện 1" control clears it. */}
+                            {isAdminUser && (
+                                <DropdownMenuItem onClick={async () => {
+                                    try { await setUiPref('mc') } catch { /* navigate regardless */ }
+                                    window.location.href = `/${workspaceId}/mc`
+                                }}>
+                                    <LayoutGrid className="mr-2 h-4 w-4" />
+                                    <span>Giao diện 2 · Mission Control</span>
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator style={{ background: DIVIDER }} />

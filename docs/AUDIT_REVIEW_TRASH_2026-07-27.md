@@ -5,8 +5,29 @@ Chạy kèm lúc truy lỗi "video đã giao không thấy trong Tệp" (xem [BU
 51 agent · 6 góc soi · mỗi phát hiện bị một agent khác **phản biện để bác bỏ** trước khi được giữ lại.
 **45 nghi vấn → 26 xác nhận, 19 bị bác bỏ.**
 
-> Đây là DANH SÁCH TỒN, **chưa sửa**. Chủ dự án nói trong video: *"Bạn cứ sửa lỗi kia chứ còn những cái này tính sau"*.
-> Hai mục đã sửa trong đợt này được đánh dấu ✅.
+## TRẠNG THÁI (cập nhật cuối phiên 27/07)
+
+Chủ dự án sau đó chốt: **sửa hết mức CAO**. Đã làm xong.
+
+13 mục CAO thực chất là **8 lỗi riêng biệt** (mấy mục bị báo trùng: `orphanedFromPurge` 2 lần, `listTrash` thiếu authz 2 lần, editor-scope 3 lần).
+
+| Lỗi | Trạng thái | Commit |
+|---|---|---|
+| 4 chỗ tra `systemKey` quên lọc `deletedAt` (lỗi gốc trong video) | ✅ sửa | `35d3268` |
+| Thư mục tự sinh cho editor quyền toàn workspace | ✅ sửa | `b3a3a72` |
+| `-` bị coi là dấu phân cách tên task | ✅ sửa | `b3a3a72` |
+| "Xóa phiên bản" = xoá vĩnh viễn có hẹn giờ | ✅ sửa (làm đúng lời hứa 30 ngày) | `50e97eb` |
+| `orphanedFromPurge` không bao giờ xoá cờ | ✅ sửa | `50e97eb` |
+| `restoreItems` phụ thuộc thứ tự hàng | ✅ sửa | `50e97eb` |
+| `restoreItems` thiếu guard lồng nhau | ✅ sửa | `50e97eb` |
+| Mux webhook đẩy version đã xoá lên trạng thái task | ✅ sửa | `50e97eb` |
+| `ensureRootFolder` vá path ngoài transaction | ✅ sửa | `50e97eb` |
+
+**Một mục là BÁO SAI:** *"listTrash và restoreItems không kiểm folder-scope / creator"*. Cả hai **đã có** từ các đợt audit trước — `folders.ts:1039-1048` (HT-028) và `folders.ts:1120-1133` (HT-027). Agent nhìn sót, và phát hiện sai này vẫn **lọt qua vòng phản biện**. Nhắc để lần sau đừng tin báo cáo mà không mở code ra đọc.
+
+Các mục **TRUNG BÌNH / THẤP** bên dưới vẫn **chưa sửa**.
+
+---
 
 
 ## CAO

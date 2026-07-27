@@ -18,119 +18,236 @@
  * SKIPPED, never forced:
  *   - a folder referenced by a share link (ShareLinkItem → folder is onDelete: Cascade, so
  *     deleting it would silently break a link already sent to a client)
- *   - a name collision in the destination: ReviewAsset has
- *     UNIQUE ("folderId", lower("name")) WHERE "deletedAt" IS NULL, and two tasks for one
- *     client can parse to the same video name. Those get a " (2)" suffix rather than a crash.
+ *   - a folder that does not hold exactly one live video, or that has sub-folders
+ *
+ * RUNS AGAINST A LIVE DATABASE people are uploading to, so:
+ *   - the plan is re-verified INSIDE each transaction. A folder that gained a second video
+ *     between planning and writing is skipped, not flattened.
+ *   - the destination name is chosen inside that same transaction, because ReviewAsset has
+ *     UNIQUE ("folderId", lower("name")) WHERE "deletedAt" IS NULL and a concurrent upload
+ *     can take the name a pre-computed map thought was free.
+ *   - one transaction per folder, and a failure is recorded and skipped rather than
+ *     aborting the run. ReviewAsset.folder is onDelete: Restrict, so a folder that just
+ *     received an upload refuses to be deleted instead of orphaning it.
+ *
+ * Every DB call carries BOTH a server-side statement_timeout and a client-side deadline.
+ * The server timeout alone is not enough: the failure that stalled three earlier runs for
+ * 76 minutes was a Neon connection that accepted the query and never answered, which no
+ * amount of statement_timeout can interrupt.
+ *
+ * Re-running is safe. Flattened folders no longer match the plan query, so a second run
+ * simply picks up whatever the first one skipped.
  *
  * DRY RUN BY DEFAULT — prints the plan and writes nothing:
  *   npx tsx scripts/flatten-single-video-folders.ts
  * Apply for real:
  *   npx tsx scripts/flatten-single-video-folders.ts --apply
  */
+import { appendFileSync } from 'fs'
 import { prisma } from '../src/lib/db'
 
 const APPLY = process.argv.includes('--apply')
+// Appended to after EACH successful folder, not dumped once up front. Deleting a folder row
+// is not reversible from the DB alone, and a run that dies halfway must still leave an
+// accurate record of what actually happened — not what was merely planned.
+const ROLLBACK_LOG = 'scripts/.flatten-rollback.jsonl'
+const DEADLINE_MS = 30_000
+const RETRIES = 3
 
-interface Plan {
-    folderId: string
-    folderName: string
+interface Row {
+    id: string
+    name: string
     parentId: string
-    assetId: string
-    assetName: string
-    finalName: string
     workspaceId: string
+    n_children: number
+    n_shares: number
+    n_assets: number
+    asset_id: string | null
+    asset_name: string | null
 }
+
+/** Client-side deadline. Guards the failure mode statement_timeout cannot: a connection that
+ *  swallows the query and never replies, leaving the driver waiting forever. */
+function deadline<T>(label: string, p: Promise<T>, ms = DEADLINE_MS): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`TIMEOUT sau ${ms}ms: ${label}`)), ms)
+        p.then(
+            (v) => {
+                clearTimeout(timer)
+                resolve(v)
+            },
+            (e) => {
+                clearTimeout(timer)
+                reject(e)
+            },
+        )
+    })
+}
+
+/** Retries exist for the flaky connection, not for the database saying no. A constraint
+ *  violation returns the same answer every time, so it fails on the first attempt. */
+function isDeterministic(e: unknown): boolean {
+    const code = (e as { code?: string })?.code
+    return typeof code === 'string' && code.startsWith('P2')
+}
+
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+    let last: unknown
+    for (let attempt = 1; attempt <= RETRIES; attempt++) {
+        try {
+            return await deadline(label, fn())
+        } catch (e) {
+            last = e
+            if (isDeterministic(e)) throw e
+            const msg = e instanceof Error ? e.message : String(e)
+            console.log(`  ! ${label} lần ${attempt}/${RETRIES} lỗi: ${msg}`)
+            if (attempt < RETRIES) await new Promise((r) => setTimeout(r, 2000 * attempt))
+        }
+    }
+    throw last
+}
+
+/** The whole plan in ONE round trip. The previous version issued four separate queries and
+ *  hung on the second; there is nothing here that needs more than one. */
+async function loadPlan(): Promise<Row[]> {
+    return withRetry('quét kế hoạch', () =>
+        prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = '20s'`)
+            return tx.$queryRawUnsafe<Row[]>(`
+                SELECT f.id, f.name, f."parentId", f."workspaceId",
+                       (SELECT count(*) FROM "ReviewFolder" c
+                         WHERE c."parentId" = f.id AND c."deletedAt" IS NULL)::int AS n_children,
+                       (SELECT count(*) FROM "ShareLinkItem" s WHERE s."folderId" = f.id)::int AS n_shares,
+                       (SELECT count(*) FROM "ReviewAsset" a
+                         WHERE a."folderId" = f.id AND a."deletedAt" IS NULL)::int AS n_assets,
+                       (SELECT a.id FROM "ReviewAsset" a
+                         WHERE a."folderId" = f.id AND a."deletedAt" IS NULL LIMIT 1) AS asset_id,
+                       (SELECT a.name FROM "ReviewAsset" a
+                         WHERE a."folderId" = f.id AND a."deletedAt" IS NULL LIMIT 1) AS asset_name
+                FROM "ReviewFolder" f
+                WHERE f."deletedAt" IS NULL
+                  AND f."parentId" IS NOT NULL
+                  AND f."systemKey" LIKE '%:video:%'
+                ORDER BY f.name
+            `)
+        }),
+    )
+}
+
+/** Move the one video up and drop the wrapper — re-checking every precondition inside the
+ *  transaction, because the plan was read while people were still uploading. */
+async function flattenOne(row: Row): Promise<'done' | 'skipped' | 'failed'> {
+    const finalName = await prisma
+        .$transaction(
+            async (tx) => {
+                await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = '20s'`)
+
+                // Re-verify against NOW, not against the plan.
+                const folder = await tx.reviewFolder.findFirst({
+                    where: { id: row.id, deletedAt: null },
+                    select: { id: true, parentId: true },
+                })
+                if (!folder?.parentId) throw new SkipError('thư mục đã biến mất hoặc đã lên gốc')
+
+                // Trashed rows count too. ReviewFolder.parent is onDelete: Restrict and the FK does
+                // not know about deletedAt, so a soft-deleted child still pins the folder in place.
+                // Lifting a trashed sub-tree would mean recomputing its whole materialized path, so
+                // these folders are left alone rather than half-migrated.
+                const children = await tx.reviewFolder.count({ where: { parentId: row.id } })
+                if (children > 0) throw new SkipError('còn thư mục con (kể cả trong thùng rác)')
+
+                const shares = await tx.shareLinkItem.count({ where: { folderId: row.id } })
+                if (shares > 0) throw new SkipError('vừa được gắn vào link chia sẻ')
+
+                const assets = await tx.reviewAsset.findMany({
+                    where: { folderId: row.id, deletedAt: null },
+                    select: { id: true, name: true },
+                })
+                if (assets.length !== 1) throw new SkipError(`đang chứa ${assets.length} video (chỉ gỡ khi đúng 1)`)
+                const asset = assets[0]
+
+                // Pick a free name here, inside the transaction, against the live sibling set.
+                const siblings = await tx.reviewAsset.findMany({
+                    where: { folderId: folder.parentId, deletedAt: null },
+                    select: { name: true },
+                })
+                const taken = new Set(siblings.map((s) => s.name.toLowerCase()))
+                let name = asset.name
+                for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${asset.name} (${n})`
+
+                await tx.reviewAsset.update({
+                    where: { id: asset.id },
+                    data: { folderId: folder.parentId, name },
+                })
+
+                // Videos already in the trash still carry folderId, and ReviewAsset.folder is
+                // onDelete: Restrict — leaving them behind makes the delete below fail outright.
+                // They ride up to the parent with the live one, so restoring them later lands them
+                // where their sibling now is. No rename needed: the uniqueness index is partial
+                // (WHERE "deletedAt" IS NULL), so trashed names cannot collide.
+                const lifted = await tx.reviewAsset.updateMany({
+                    where: { folderId: row.id, deletedAt: { not: null } },
+                    data: { folderId: folder.parentId },
+                })
+
+                // Safe now: nothing references the folder any more.
+                await tx.reviewFolder.delete({ where: { id: row.id } })
+
+                appendFileSync(
+                    ROLLBACK_LOG,
+                    JSON.stringify({
+                        folderId: row.id,
+                        folderName: row.name,
+                        parentId: folder.parentId,
+                        workspaceId: row.workspaceId,
+                        assetId: asset.id,
+                        nameBefore: asset.name,
+                        nameAfter: name,
+                        trashedAssetsLifted: lifted.count,
+                    }) + '\n',
+                    'utf8',
+                )
+                return name
+            },
+            { timeout: 25_000 },
+        )
+        .catch((e: unknown) => {
+            if (e instanceof SkipError) {
+                console.log(`  ↷ "${row.name}" — ${e.message}`)
+                return null
+            }
+            throw e
+        })
+
+    if (finalName === null) return 'skipped'
+    const renamed = finalName !== row.asset_name ? ` → đổi tên thành "${finalName}"` : ''
+    console.log(`  ✓ "${row.name}" — video đã lên thư mục cha${renamed}`)
+    return 'done'
+}
+
+class SkipError extends Error {}
 
 async function main() {
     console.log(APPLY ? '\n*** APPLY MODE — this WILL write ***\n' : '\n--- DRY RUN (no writes) ---\n')
 
-    // Auto-created per-task video folders that are still live.
-    const videoFolders = await prisma.reviewFolder.findMany({
-        where: { deletedAt: null, parentId: { not: null }, systemKey: { contains: ':video:' } },
-        select: { id: true, name: true, parentId: true, workspaceId: true },
-    })
-    if (!videoFolders.length) {
+    const rows = await loadPlan()
+    if (!rows.length) {
         console.log('No auto-created video folders found. Nothing to do.')
         return
     }
-    const ids = videoFolders.map((f) => f.id)
 
-    const [childFolders, assets, shareItems] = await Promise.all([
-        prisma.reviewFolder.findMany({
-            where: { parentId: { in: ids }, deletedAt: null },
-            select: { parentId: true },
-        }),
-        prisma.reviewAsset.findMany({
-            where: { folderId: { in: ids }, deletedAt: null },
-            select: { id: true, name: true, folderId: true },
-        }),
-        prisma.shareLinkItem.findMany({ where: { folderId: { in: ids } }, select: { folderId: true } }),
-    ])
-
-    const childCount = new Map<string, number>()
-    for (const c of childFolders) if (c.parentId) childCount.set(c.parentId, (childCount.get(c.parentId) ?? 0) + 1)
-    const assetsByFolder = new Map<string, typeof assets>()
-    for (const a of assets) {
-        const list = assetsByFolder.get(a.folderId) ?? []
-        list.push(a)
-        assetsByFolder.set(a.folderId, list)
-    }
-    const shared = new Set(shareItems.map((s) => s.folderId).filter((x): x is string => !!x))
-
-    const plans: Plan[] = []
+    const plans: Row[] = []
     const skipped: string[] = []
-
-    // Names already live in each destination folder — so the suffix check sees siblings that
-    // this run is about to add, not just what was there when it started.
-    const destNames = new Map<string, Set<string>>()
-    const parentIds = [...new Set(videoFolders.map((f) => f.parentId).filter((x): x is string => !!x))]
-    const existingInParents = await prisma.reviewAsset.findMany({
-        where: { folderId: { in: parentIds }, deletedAt: null },
-        select: { folderId: true, name: true },
-    })
-    for (const a of existingInParents) {
-        const set = destNames.get(a.folderId) ?? new Set<string>()
-        set.add(a.name.toLowerCase())
-        destNames.set(a.folderId, set)
+    for (const r of rows) {
+        if (r.n_shares > 0) skipped.push(`"${r.name}" — đang được chia sẻ qua link, giữ nguyên`)
+        else if (r.n_children > 0) skipped.push(`"${r.name}" — còn thư mục con`)
+        else if (r.n_assets !== 1 || !r.asset_id) skipped.push(`"${r.name}" — chứa ${r.n_assets} video (chỉ gỡ khi đúng 1)`)
+        else plans.push(r)
     }
 
-    for (const f of videoFolders) {
-        if (!f.parentId) continue
-        if (shared.has(f.id)) {
-            skipped.push(`"${f.name}" — đang được chia sẻ qua link, giữ nguyên`)
-            continue
-        }
-        if ((childCount.get(f.id) ?? 0) > 0) {
-            skipped.push(`"${f.name}" — còn thư mục con`)
-            continue
-        }
-        const inside = assetsByFolder.get(f.id) ?? []
-        if (inside.length !== 1) {
-            skipped.push(`"${f.name}" — chứa ${inside.length} video (chỉ gỡ khi đúng 1)`)
-            continue
-        }
-        const asset = inside[0]
-        const taken = destNames.get(f.parentId) ?? new Set<string>()
-        let finalName = asset.name
-        for (let n = 2; taken.has(finalName.toLowerCase()); n++) finalName = `${asset.name} (${n})`
-        taken.add(finalName.toLowerCase())
-        destNames.set(f.parentId, taken)
-        plans.push({
-            folderId: f.id,
-            folderName: f.name,
-            parentId: f.parentId,
-            assetId: asset.id,
-            assetName: asset.name,
-            finalName,
-            workspaceId: f.workspaceId,
-        })
-    }
-
+    console.log(`Tổng thư mục bọc đang sống: ${rows.length}`)
     console.log(`Thư mục sẽ gỡ bỏ: ${plans.length}`)
-    for (const p of plans) {
-        const renamed = p.finalName !== p.assetName ? `  → đổi tên thành "${p.finalName}" (trùng tên ở thư mục đích)` : ''
-        console.log(`  • "${p.folderName}" → thả video "${p.assetName}" lên thư mục cha${renamed}`)
-    }
+    for (const p of plans) console.log(`  • "${p.name}" → thả video "${p.asset_name}" lên thư mục cha`)
     if (skipped.length) {
         console.log(`\nBỏ qua: ${skipped.length}`)
         for (const s of skipped) console.log(`  • ${s}`)
@@ -141,19 +258,28 @@ async function main() {
         return
     }
 
+    console.log(`\nBắt đầu ghi. Nhật ký hoàn tác: ${ROLLBACK_LOG}\n`)
     let done = 0
-    for (const p of plans) {
-        await prisma.$transaction(async (tx) => {
-            await tx.reviewAsset.update({
-                where: { id: p.assetId },
-                data: { folderId: p.parentId, name: p.finalName },
-            })
-            // Safe now: ReviewAsset.folder is onDelete Restrict, and the folder is empty.
-            await tx.reviewFolder.delete({ where: { id: p.folderId } })
-        })
-        done++
+    let skip = 0
+    const failed: string[] = []
+    for (const [i, p] of plans.entries()) {
+        process.stdout.write(`[${i + 1}/${plans.length}] `)
+        try {
+            const r = await withRetry(`gỡ "${p.name}"`, () => flattenOne(p))
+            if (r === 'done') done++
+            else skip++
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            failed.push(`"${p.name}": ${msg}`)
+            console.log(`  ✗ "${p.name}" — bỏ qua sau ${RETRIES} lần thử: ${msg}`)
+        }
     }
-    console.log(`\nXong. Đã gỡ ${done} thư mục bọc.`)
+
+    console.log(`\nXong. Đã gỡ ${done} thư mục bọc, bỏ qua ${skip}, lỗi ${failed.length}.`)
+    if (failed.length) {
+        console.log('Các mục lỗi (chạy lại script sẽ thử lại chúng):')
+        for (const f of failed) console.log(`  • ${f}`)
+    }
 }
 
 main()

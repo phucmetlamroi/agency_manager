@@ -14,6 +14,7 @@ import { serializeVersion, toUserRef, type VersionDto } from './dto'
 import { buildMediaLinks } from './media-links'
 import { parseVideoTitle } from './parse-task-context'
 import { resolveTaskFolderPreview } from './task-folder'
+import { REVIEW_ACTIVITY } from './activity'
 import { REVIEW_MODULE_LABEL } from './labels'
 import { canAutoTransition } from '@/lib/task-statuses'
 import { REVIEW_STATUS_MAP } from './status-map'
@@ -36,8 +37,10 @@ export interface TaskUploadContextDto {
     breadcrumb: { name: string; exists: boolean }[]
     /** false = the "Khách / Brand · Video" convention didn't parse (show a warning). */
     parsedOk: boolean
-    /** Non-null when a second upload would stack a new version onto an existing card. */
-    existingAsset: { id: string; name: string; nextVersionNumber: number } | null
+    /** Non-null when a second upload would stack a new version onto an existing card.
+     *  `willRenameTo` is set when that card's name no longer matches the task title and the upload
+     *  will bring it back in sync — announced up front so an automatic rename is never a surprise. */
+    existingAsset: { id: string; name: string; nextVersionNumber: number; willRenameTo: string | null } | null
 }
 
 /**
@@ -212,7 +215,21 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
     }))
 
     // Existing-asset match = same rule initiateTaskUpload uses to auto-version.
-    const match = assetRows.find((a) => a.name.trim().toLowerCase() === parsed.video.trim().toLowerCase())
+    let match = assetRows.find((a) => a.name.trim().toLowerCase() === parsed.video.trim().toLowerCase())
+    // [owner request 2026-07-27] Mirror the server's single-deliverable adoption: when the task holds
+    // exactly ONE video, a single upload versions THAT one whatever it is currently named — otherwise
+    // renaming the task forked the stack into a second video. Requires the asset to be visible to
+    // this viewer (assetRows is folder-scoped); if it is not, we simply show no preview rather than
+    // reveal an out-of-scope name. The server still adopts it either way.
+    let willRenameTo: string | null = null
+    if (!match && assetRows.length === 1 && allAssetRows.length === 1) {
+        match = assetRows[0]
+        // Only report a rename when nobody has renamed it by hand — same rule the writer applies.
+        const renamedByHand = await prisma.reviewActivity.count({
+            where: { assetId: match.id, type: REVIEW_ACTIVITY.ASSET_RENAMED },
+        })
+        if (renamedByHand === 0 && match.name !== parsed.video) willRenameTo = parsed.video
+    }
     let existingAsset: TaskUploadContextDto['existingAsset'] = null
     if (match) {
         // Number from MAX(versionNumber) across ALL version rows — EXACTLY like initiateUpload
@@ -224,7 +241,7 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             where: { assetId: match.id },
             _max: { versionNumber: true },
         })
-        existingAsset = { id: match.id, name: match.name, nextVersionNumber: (agg._max.versionNumber ?? 0) + 1 }
+        existingAsset = { id: match.id, name: match.name, nextVersionNumber: (agg._max.versionNumber ?? 0) + 1, willRenameTo }
     }
 
     // [status-audit 2026-07-23] Mirror `confirmFixDone`'s guard exactly: pick whichever of A4/A7

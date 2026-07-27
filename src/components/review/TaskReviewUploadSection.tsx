@@ -477,11 +477,30 @@ function ConfirmStrip({
                 <p className="mt-2 text-[11.5px] text-zinc-300">
                     Sẽ tạo <span className="font-semibold text-violet-200">v{ctx.existingAsset.nextVersionNumber}</span>{' '}
                     cho “{ctx.existingAsset.name}”.
+                    {/* An automatic rename must be announced BEFORE it happens, like the grouping
+                        decision above — the owner has to be able to cancel if it is not what they want. */}
+                    {ctx.existingAsset.willRenameTo && (
+                        <>
+                            <br />
+                            <span className="text-[11px] text-zinc-400">
+                                Video sẽ được đổi tên thành{' '}
+                                <span className="text-violet-200">“{ctx.existingAsset.willRenameTo}”</span> cho khớp tên
+                                task. Đổi tên tay sau đó sẽ được giữ nguyên.
+                            </span>
+                        </>
+                    )}
                 </p>
             ) : (
                 <p className="mt-2 text-[11.5px] text-zinc-400">
                     Lưu vào: <span className="text-zinc-200">{path}</span>{' '}
                     <span className="text-muted-foreground">(không tạo thư mục riêng)</span>
+                    {/* The single case that made the owner think naming-from-the-task did not exist:
+                        the strip listed the FILE names and never said what the video would be called. */}
+                    <br />
+                    <span className="text-[11px] text-zinc-500">
+                        Video sẽ có tên <span className="text-zinc-300">“{crumbs[crumbs.length - 1] ?? ''}”</span> (lấy
+                        theo tên task, không theo tên file)
+                    </span>
                 </p>
             )}
 

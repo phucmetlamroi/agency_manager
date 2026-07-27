@@ -784,6 +784,42 @@ export async function initiateTaskUpload(input: {
                     select: { id: true },
                 })
                 if (existing) return { assetId: existing.id, createdNewAsset: false }
+
+                // [owner request 2026-07-27] Matching purely on the name broke the revise loop the
+                // moment a task was RENAMED: the next upload found nothing under the new name and
+                // started a SECOND deliverable instead of adding v2 — the stack forked in two, which
+                // is exactly what naming-from-the-task is supposed to prevent.
+                //
+                // For a single-file upload, when the task holds EXACTLY ONE live deliverable, that
+                // one IS the stack whatever it is currently called. More than one means a multi-hook
+                // set, where each hook has its own identity, so name matching stays authoritative.
+                if (!isBatch) {
+                    const solo = await tx.reviewAsset.findMany({
+                        where: { taskId: task.id, workspaceId, deletedAt: null },
+                        select: { id: true, name: true },
+                        take: 2, // only need to know "exactly one"
+                    })
+                    if (solo.length === 1) {
+                        const asset = solo[0]
+                        // Keep the name in sync with the task — but never overwrite one a PERSON
+                        // chose. renameAsset logs asset.renamed; its presence means hands off.
+                        if (asset.name !== assetName) {
+                            const renamedByHand = await tx.reviewActivity.count({
+                                where: { assetId: asset.id, type: REVIEW_ACTIVITY.ASSET_RENAMED },
+                            })
+                            if (renamedByHand === 0) {
+                                // A P2002 here (a sibling in the shared client folder already owns
+                                // this name) aborts the tx and the outer loop retries with " (2)".
+                                await tx.reviewAsset.update({
+                                    where: { id: asset.id },
+                                    data: { name: assetName, rowVersion: { increment: 1 } },
+                                })
+                            }
+                        }
+                        return { assetId: asset.id, createdNewAsset: false }
+                    }
+                }
+
                 if (!ensured) throw new NeedFolderChain()
                 const asset = await tx.reviewAsset.create({
                     data: {

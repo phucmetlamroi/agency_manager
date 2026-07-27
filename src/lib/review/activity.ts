@@ -37,6 +37,13 @@ export const REVIEW_ACTIVITY = {
     REVIEW_CHANGES_REQUESTED: 'review.changes_requested', // guest decision (meta {versionNumber}) — P5.4
     // ── P6: trash purge (FR-B13) ──
     TRASH_PURGED: 'trash.purged', // 30-day auto-purge OR manual Delete-forever (meta {kind, itemName, deleteBatchId})
+    // ── foldering 2026-07-27: a HUMAN renamed a deliverable (meta {old, new}) ──
+    // Renames left no trace at all before this, which was already a gap in a module that logs
+    // everything else. It is also load-bearing now: the task-upload path keeps a single-deliverable
+    // asset's name in sync with its task title, and must NOT overwrite a name someone chose by hand.
+    // The presence of this row is what tells the two apart — ReviewAsset.rowVersion cannot, since
+    // moves, status changes and the Mux webhook all bump it too.
+    ASSET_RENAMED: 'asset.renamed',
 } as const
 
 export type ReviewActivityType = (typeof REVIEW_ACTIVITY)[keyof typeof REVIEW_ACTIVITY]

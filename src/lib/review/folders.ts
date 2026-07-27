@@ -71,7 +71,15 @@ export interface TrashItemDto {
     purgeAt: string
     deletedBy: UserRef | null
     restorable: boolean
-    meta: { itemCount?: number; sizeBytes?: string; versionCount?: number }
+    meta: {
+        itemCount?: number
+        sizeBytes?: string
+        versionCount?: number
+        /** Folders only — descendants that are still LIVE under this trashed folder. Non-zero means
+         *  "Xóa vĩnh viễn" cannot complete: the purge refuses to destroy a folder that still holds
+         *  live rows (purge.ts folderHasDescendantRow). Surfaced so the UI can say so up front. */
+        liveDescendants?: number
+    }
 }
 
 // ─────────────────────────── helpers ───────────────────────────
@@ -629,6 +637,19 @@ export async function listChildren(input: {
                     JOIN "ReviewAsset" a ON a."folderId" = d.id AND a."deletedAt" IS NULL
                     JOIN "ReviewVersion" v ON v."assetId" = a.id AND v."deletedAt" IS NULL
                     WHERE d.path LIKE pf.path || '%' AND d."deletedAt" IS NULL
+                      -- [audit 2026-07-27 · MED] The deletedAt test above only clears the descendant
+                      -- ITSELF; a live folder sitting under a TRASHED one still qualified, so bytes
+                      -- nobody can see anywhere in the grid were charged to the header total. That is
+                      -- how a root could read "2 mục • 10.2 GB" while both visible folders held 200 MB,
+                      -- with no way to find the rest. Exclude a descendant with any trashed folder
+                      -- between it and pf.
+                      AND NOT EXISTS (
+                          SELECT 1 FROM "ReviewFolder" anc
+                          WHERE anc."deletedAt" IS NOT NULL
+                            AND anc.id <> d.id
+                            AND anc.path LIKE pf.path || '%'
+                            AND d.path LIKE anc.path || '%'
+                      )
                 ), 0)::text AS bytes
             FROM "ReviewFolder" pf
             WHERE pf.id IN (${Prisma.join(aggIds)})
@@ -1071,6 +1092,22 @@ export async function deleteItems(input: {
     const workspaceId = [...workspaces][0]
     const access = await requireReviewAccess({ workspaceId })
 
+    // [audit 2026-07-27 · MED] The workspace root is infrastructure, not a user artifact, and must
+    // never be trashable. Trashing it left /team rendering a healthy-looking EMPTY root — the root is
+    // resolved by systemKey, and that lookup does not filter deletedAt — while the sidebar went blank
+    // and every breadcrumb 404'd: a silent whole-workspace outage with no error anywhere. FR-B07 below
+    // does not catch it, because the auto-chain used to stamp the root with the first uploading
+    // editor's id, so that editor passes the creator check on it. The id is reachable: /api/review/tree
+    // hands it to the client. Narrower than the audit's "reject every systemKey folder" — auto-created
+    // client/video folders stay deletable, since reviveSystemFolderChain now un-squats a trashed key
+    // instead of letting it poison the workspace forever.
+    const rootRow = folderRows.find((f) => f.parentId === null)
+    if (rootRow) {
+        throw apiError(409, 'STATE_INVALID', 'Không thể xóa thư mục gốc của workspace — hãy xóa nội dung bên trong.', {
+            failedItemId: rootRow.id,
+        })
+    }
+
     // FR-B07 permission: a USER may only delete FOLDERS they created; ADMIN deletes any
     // (asset delete is unrestricted for members). Enforced server-side, not just in the UI.
     if (!access.isAdmin) {
@@ -1097,6 +1134,12 @@ export async function deleteItems(input: {
 
     const now = new Date()
     await prisma.$transaction(async (tx) => {
+        // [audit 2026-07-27 · LOW] Same workspace lock moveItems takes. Without it, an upload starting
+        // just before this tx could insert its ReviewAsset AFTER the subtree snapshot below is taken,
+        // leaving a live asset under a folder this call is trashing — invisible in the grid and enough
+        // to block that folder's purge forever. initiateUpload now takes the same lock, so the two
+        // serialize instead of interleaving.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${workspaceId}, 0))`
         for (const folder of folderRows) {
             if (nestedFolderIds.has(folder.id)) continue // covered by its selected ancestor's subtree sweep
             const batchId = randomUUID()
@@ -1220,6 +1263,41 @@ export async function listTrash(input: {
         if (!scope.unrestricted) rootVersions = rootVersions.filter((v) => isPathVisible(scope, v.asset.folder?.path ?? ''))
     }
 
+    // [audit 2026-07-27 · MED] Trash rows used to read `itemCount` / `totalSizeBytes` straight off the
+    // row. The task-upload auto-chain never maintains those counters (neither initiateUpload nor
+    // completeUpload calls addBytesToAncestors), so exactly the folders at the centre of the original
+    // incident presented as "0 mục · 0 B" — an admin hunting a missing video sees what looks like an
+    // empty stray and reaches for Xóa vĩnh viễn on the one container that could make it reachable.
+    // listChildren already self-heals this way ([L11] above); the trash list now does too.
+    //
+    // Counted WITHOUT a deletedAt filter on purpose: everything under a trashed folder is trashed, so
+    // filtering to live rows is what produced the 0 in the first place. `live` is tracked separately —
+    // it is the count that blocks Xóa vĩnh viễn (purge.ts folderHasDescendantRow), so the UI can warn
+    // instead of reporting a silent no-op as success.
+    const folderMeta = new Map<string, { cnt: number; bytes: string; live: number }>()
+    if (rootFolders.length) {
+        const metaRows = await prisma.$queryRaw<{ folderId: string; cnt: number; bytes: string; live: number }[]>`
+            SELECT pf.id AS "folderId",
+                ((SELECT COUNT(*) FROM "ReviewFolder" cf WHERE cf."parentId" = pf.id)
+                 + (SELECT COUNT(*) FROM "ReviewAsset" ca WHERE ca."folderId" = pf.id))::int AS cnt,
+                COALESCE((
+                    SELECT SUM(v."sizeBytes")
+                    FROM "ReviewFolder" d
+                    JOIN "ReviewAsset" a ON a."folderId" = d.id
+                    JOIN "ReviewVersion" v ON v."assetId" = a.id
+                    WHERE d.path LIKE pf.path || '%'
+                ), 0)::text AS bytes,
+                ((SELECT COUNT(*) FROM "ReviewFolder" lf
+                   WHERE lf.path LIKE pf.path || '%' AND lf.id <> pf.id AND lf."deletedAt" IS NULL)
+                 + (SELECT COUNT(*) FROM "ReviewAsset" la
+                     JOIN "ReviewFolder" ld ON ld.id = la."folderId"
+                    WHERE ld.path LIKE pf.path || '%' AND la."deletedAt" IS NULL))::int AS live
+            FROM "ReviewFolder" pf
+            WHERE pf.id IN (${Prisma.join(rootFolders.map((f) => f.id))})
+        `
+        for (const r of metaRows) folderMeta.set(r.folderId, { cnt: Number(r.cnt), bytes: r.bytes, live: Number(r.live) })
+    }
+
     const userRefs = await loadUserRefs([
         ...rootFolders.map((f) => f.deletedById),
         ...rootAssets.map((a) => a.deletedById),
@@ -1248,7 +1326,11 @@ export async function listTrash(input: {
             purgeAt: purgeAtOf(f.deletedAt!),
             deletedBy: f.deletedById ? userRefs.get(f.deletedById) ?? null : null,
             restorable: !f.orphanedFromPurge,
-            meta: { itemCount: f.itemCount, sizeBytes: f.totalSizeBytes.toString() },
+            meta: {
+                itemCount: folderMeta.get(f.id)?.cnt ?? f.itemCount,
+                sizeBytes: folderMeta.get(f.id)?.bytes ?? f.totalSizeBytes.toString(),
+                liveDescendants: folderMeta.get(f.id)?.live ?? 0,
+            },
         })),
         ...rootAssets.map((a): TrashItemDto => ({
             type: 'asset',
@@ -1427,11 +1509,28 @@ export async function restoreItems(input: {
             const landing = folder ?? { id: root.id, path: root.path }
             const movedToRoot = !folder
 
-            if (batchId) {
+            // [audit 2026-07-27 · MED] Clearing the WHOLE batch is only correct when this asset is the
+            // batch root — an asset-only delete, where deleteItems mints one batch id per asset, so the
+            // batch is just this asset and its versions. When the id instead came from a FOLDER's
+            // subtree sweep, the batch also holds the sibling assets and the folder rows. Clearing it
+            // here un-deleted every sibling while every folder stayed trashed, leaving them live under
+            // a trashed parent: invisible in the grid, 404 by folder, reachable only by direct id — the
+            // exact symptom from the original bug report, reproducible with no systemKey involved. It
+            // also pinned the parent forever, since purge refuses a folder with live descendants.
+            // Restore only what was asked for in that case; the re-home below then lands it somewhere
+            // visible rather than under the trashed folder.
+            const batchHasFolders = batchId ? (await tx.reviewFolder.count({ where: { deleteBatchId: batchId } })) > 0 : false
+            if (batchId && !batchHasFolders) {
                 await tx.reviewAsset.updateMany({ where: { deleteBatchId: batchId }, data: clear })
                 await tx.reviewVersion.updateMany({ where: { deleteBatchId: batchId }, data: clear })
             } else {
                 await tx.reviewAsset.update({ where: { id: asset.id }, data: clear })
+                // Only the versions that went down WITH this asset. Versions trashed separately
+                // earlier (their own batch, or none) were a deliberate act and stay in the trash.
+                await tx.reviewVersion.updateMany({
+                    where: { assetId: asset.id, deleteBatchId: batchId ?? null, deletedAt: { not: null } },
+                    data: clear,
+                })
             }
             if (movedToRoot) {
                 await tx.reviewAsset.update({ where: { id: asset.id }, data: { folderId: landing.id, orphanedFromPurge: true } })
@@ -1742,8 +1841,26 @@ export async function copyItems(input: {
                 parentPath = target.path
                 parentDepth = target.depth
             } else {
-                parentNewId = idMap.get(f.parentId!)! // parent is inside the subtree
-                const parentPlanned = folderMap.get(parentNewId)!
+                // [audit 2026-07-27 · MED] The subtree read above filters `deletedAt: null`, so a
+                // TRASHED intermediate folder is skipped while its LIVE children are kept — reachable
+                // whenever a task upload lands new content under a trashed ancestor. For such a child
+                // the parent was never added to idMap, and the two `!` assertions turned that into
+                // `TypeError: Cannot read properties of undefined (reading 'path')`: a raw 500 with no
+                // apiError envelope, i.e. Copy silently broken forever on that client folder with no
+                // message. Skip the orphan (and its assets, via the idMap delete) rather than crash —
+                // copying content whose parent the admin deliberately trashed is not wanted either.
+                const mappedParent = f.parentId ? idMap.get(f.parentId) : undefined
+                const parentPlanned = mappedParent ? folderMap.get(mappedParent) : undefined
+                if (!parentPlanned) {
+                    idMap.delete(f.id) // its assets resolve through idMap too — they drop with it
+                    reviewLog('warn', 'folders.copy_skipped_orphan_subtree', {
+                        folderId: f.id,
+                        parentId: f.parentId,
+                        sourceFolderId: sourceFolder.id,
+                    })
+                    continue
+                }
+                parentNewId = mappedParent!
                 parentPath = parentPlanned.path
                 parentDepth = parentPlanned.depth
             }
@@ -1771,7 +1888,12 @@ export async function copyItems(input: {
                 skippedAssets += 1
                 continue
             }
-            const folderNewId = idMap.get(a.folderId)!
+            // Its folder may have been dropped just above as an orphan under a trashed ancestor.
+            const folderNewId = idMap.get(a.folderId)
+            if (!folderNewId) {
+                skippedAssets += 1
+                continue
+            }
             planAsset(a, cv, folderNewId, a.name)
         }
 
@@ -1939,20 +2061,46 @@ export async function getFolderManifest(
         where: { path: { startsWith: folder.path }, deletedAt: null },
         select: { id: true, name: true, path: true },
     })
+    // [audit 2026-07-27 · LOW] `deletedAt: null` above clears each subfolder itself but says nothing
+    // about its ANCESTORS, so a live folder under a TRASHED one was included: the zip carried content
+    // the Files browser cannot show and the admin believes is deleted — and the same manifest builds
+    // the client-facing bundle, so "deleted" material went out to whoever received the archive. The
+    // trashed ancestor's id is also missing from nameById, which is how `?? '—'` below invented a
+    // real top-level directory literally named "—".
+    const liveIds = new Set(subFolders.map((f) => f.id))
+    const reachable = subFolders.filter((f) => {
+        const ids = pathIds(f.path)
+        const baseIdx = ids.indexOf(folder.id)
+        // Every id between the requested folder and this one must be a live subfolder.
+        return baseIdx < 0 || ids.slice(baseIdx + 1, -1).every((id) => liveIds.has(id))
+    })
+
     // [FR-03] chỉ liệt kê asset trong folder được giao (mutable) — folder tổ tiên xem-được
     // nhưng KHÔNG lộ filename asset của người khác.
     const includableFolderIds = scope.unrestricted
-        ? new Set(subFolders.map((f) => f.id))
-        : new Set(subFolders.filter((f) => isPathMutable(scope, f.path)).map((f) => f.id))
+        ? new Set(reachable.map((f) => f.id))
+        : new Set(reachable.filter((f) => isPathMutable(scope, f.path)).map((f) => f.id))
     // relative dir for a subfolder = names of the folders BELOW `folder` on its path.
-    const nameById = new Map(subFolders.map((f) => [f.id, f.name]))
-    const relDirOf = (f: { path: string }): string => {
+    const nameById = new Map(reachable.map((f) => [f.id, f.name]))
+    const relDirOf = (f: { path: string }): string | null => {
         const ids = pathIds(f.path)
         const baseIdx = ids.indexOf(folder.id)
         const belowBase = baseIdx >= 0 ? ids.slice(baseIdx + 1) : ids
-        return belowBase.map((id) => nameById.get(id) ?? '—').join('/')
+        const names: string[] = []
+        for (const id of belowBase) {
+            const name = nameById.get(id)
+            // Fail loudly instead of inventing a placeholder directory: a gap here means the path
+            // crosses a folder we deliberately excluded, so the file does not belong in the archive.
+            if (name == null) return null
+            names.push(name)
+        }
+        return names.join('/')
     }
-    const relDirByFolderId = new Map(subFolders.map((f) => [f.id, relDirOf(f)]))
+    const relDirByFolderId = new Map<string, string>()
+    for (const f of reachable) {
+        const dir = relDirOf(f)
+        if (dir != null) relDirByFolderId.set(f.id, dir)
+    }
 
     const assets = await prisma.reviewAsset.findMany({
         where: { folderId: { in: [...includableFolderIds] }, deletedAt: null },
@@ -1969,7 +2117,8 @@ export async function getFolderManifest(
             truncated = true
             break
         }
-        const dir = relDirByFolderId.get(a.folderId) ?? ''
+        const dir = relDirByFolderId.get(a.folderId)
+        if (dir == null) continue // unresolvable relative path — see relDirOf
         files.push({ versionId: cv.id, fileName: cv.fileName, relPath: dir ? `${dir}/${cv.fileName}` : cv.fileName })
     }
     return { folderName: folder.name, files, truncated }

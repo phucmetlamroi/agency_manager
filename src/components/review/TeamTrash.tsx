@@ -50,7 +50,7 @@ interface TrashItem {
     purgeAt: string
     deletedBy: { id: string; name: string; avatarUrl: string | null } | null
     restorable: boolean
-    meta: { itemCount?: number; sizeBytes?: string; versionCount?: number }
+    meta: { itemCount?: number; sizeBytes?: string; versionCount?: number; liveDescendants?: number }
 }
 interface TrashResult {
     items: TrashItem[]
@@ -232,7 +232,23 @@ export function TeamTrash({ workspaceId, isAdmin = false, backHref, chromeless =
             const tid = toast.loading('Đang xóa vĩnh viễn…')
             try {
                 const r = await apiPurgeItems(refs)
-                toast.success(`Đã xóa vĩnh viễn ${r.assets} asset · ${r.folders} thư mục.`, { id: tid })
+                // [audit 2026-07-27 · MED] A blocked folder used to come back as a green
+                // "Đã xóa vĩnh viễn 0 asset · 0 thư mục" while the row stayed put on refresh — the
+                // admin could not tell whether the action had worked, retried, and got the same
+                // nothing. Say plainly what survived and why.
+                const stuck = r.blocked?.filter((b) => b.reason === 'has_live_descendants') ?? []
+                const failed = r.blocked?.filter((b) => b.reason === 'delete_failed') ?? []
+                if (stuck.length) {
+                    toast.error(
+                        `Chưa xóa được ${stuck.length} thư mục — bên trong vẫn còn nội dung đang hoạt động. ` +
+                            'Hãy khôi phục thư mục rồi xử lý nội dung bên trong trước.',
+                        { id: tid, duration: 8000 },
+                    )
+                } else if (failed.length) {
+                    toast.error(`Không xóa được ${failed.length} thư mục. Thử lại sau.`, { id: tid })
+                } else {
+                    toast.success(`Đã xóa vĩnh viễn ${r.assets} asset · ${r.folders} thư mục.`, { id: tid })
+                }
                 setSelectedIds(new Set())
                 setRefreshKey((k) => k + 1)
             } catch (e) {
@@ -519,6 +535,10 @@ function TrashRow({
         : isVersion
           ? `Phiên bản · ${bytesLabel(item.meta.sizeBytes ?? '0')}`
           : `${item.meta.versionCount ?? 0} phiên bản`
+    // [audit 2026-07-27 · MED] A trashed folder can still hold LIVE content — a later task upload
+    // lands underneath it, or someone restored a child. The purge refuses those, so "Xóa vĩnh viễn"
+    // would do nothing. Say it on the row instead of letting the admin find out by clicking.
+    const liveInside = isFolder ? item.meta.liveDescendants ?? 0 : 0
 
     return (
         <li className={`flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${checked ? 'bg-violet-500/[0.06]' : ''}`}>
@@ -547,6 +567,17 @@ function TrashRow({
                     <span>{meta}</span>
                     <span className="text-zinc-700">·</span>
                     <span>Xóa bởi {item.deletedBy?.name ?? 'hệ thống'}</span>
+                    {liveInside > 0 && (
+                        <>
+                            <span className="text-zinc-700">·</span>
+                            <span
+                                className="text-amber-300/90"
+                                title="Thư mục này vẫn chứa nội dung đang hoạt động, nên không thể xóa vĩnh viễn. Khôi phục thư mục để xử lý phần bên trong."
+                            >
+                                còn {liveInside} mục đang hoạt động bên trong
+                            </span>
+                        </>
+                    )}
                 </div>
             </div>
 

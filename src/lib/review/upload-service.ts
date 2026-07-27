@@ -26,7 +26,7 @@ import {
 } from './media-constants'
 import { buildR2Key, buildSystemKey, computePartSize, computePartCount } from './upload-helpers'
 import { ensureTaskFolderPath, type BreadcrumbItem } from './task-folder'
-import { reviveSystemFolderChain } from './folders'
+import { reviveSystemFolderChain, pathIds } from './folders'
 import { parseVideoTitle } from './parse-task-context'
 import {
     createMultipart,
@@ -182,16 +182,29 @@ export async function initiateUpload(input: InitiateInput): Promise<InitiateResu
             // (không folderId) tạo asset của chính editor nên nhánh else không chặn.
             assertFolderPathMutable(await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin }), folder.path)
             folderId = folder.id
-            const asset = await prisma.reviewAsset.create({
-                data: {
-                    folderId,
-                    workspaceId,
-                    clientId: folder.clientId,
-                    taskId: folder.taskId,
-                    name: stripExt(input.fileName),
-                    mediaKind: toPrismaKind(kind),
-                    createdById: access.userId,
-                },
+            // [audit 2026-07-27 · LOW] The read above and this create used to be two independent
+            // round-trips, so an admin trashing the folder in between produced a LIVE asset under a
+            // TRASHED parent: deleteItems snapshots its subtree inside its own tx and never sees a row
+            // created afterwards. The upload then ran to completion — R2 stored the object, Mux billed
+            // the encode — for an asset that appears nowhere in /team (its parent is filtered out) and
+            // whose folder 404s. It also pins that folder's purge forever. Re-read the folder inside a
+            // transaction under the same advisory lock moveItems uses, so a concurrent delete either
+            // loses the row it is sweeping or is serialized behind us.
+            const asset = await prisma.$transaction(async (tx) => {
+                await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${workspaceId}, 0))`
+                const stillLive = await tx.reviewFolder.count({ where: { id: folderId, deletedAt: null } })
+                if (stillLive === 0) fail(404, 'NOT_FOUND', 'Thư mục vừa bị xóa — hãy chọn thư mục khác.')
+                return tx.reviewAsset.create({
+                    data: {
+                        folderId,
+                        workspaceId,
+                        clientId: folder.clientId,
+                        taskId: folder.taskId,
+                        name: stripExt(input.fileName),
+                        mediaKind: toPrismaKind(kind),
+                        createdById: access.userId,
+                    },
+                })
             })
             assetId = asset.id
         } else {
@@ -709,15 +722,23 @@ export async function initiateTaskUpload(input: {
     const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
     const clientIdStr = task.clientId != null ? String(task.clientId) : null
 
-    const { videoFolder, breadcrumb } = await ensureTaskFolderPath({
-        workspaceId,
-        rootName: task.workspace?.name ?? 'Team',
-        taskId: task.id,
-        clientId: clientIdStr,
-        parsed,
-        createdById: access.userId,
-        groupInFolder: isBatch,
-    })
+    // [audit 2026-07-27 · LOW] ensureTaskFolderPath used to run unconditionally, BEFORE anything
+    // checked whether this deliverable already exists. When it did, the new version landed on that
+    // asset wherever it currently lives — the auto-version match keys on (taskId, name) with no
+    // folderId constraint — while a brand-new, permanently EMPTY auto folder chain was materialised
+    // on every such upload. Resolve it lazily instead: only an upload that actually creates an asset
+    // needs the chain.
+    let ensured: Awaited<ReturnType<typeof ensureTaskFolderPath>> | null = null
+    const ensureChain = () =>
+        ensureTaskFolderPath({
+            workspaceId,
+            rootName: task.workspace?.name ?? 'Team',
+            taskId: task.id,
+            clientId: clientIdStr,
+            parsed,
+            createdById: access.userId,
+            groupInFolder: isBatch,
+        })
 
     // [foldering 2026-07-27] Asset identity. Single upload keeps naming from the TASK, so the
     // (taskId, name) match below still turns the next upload into v2 — the revise loop is untouched.
@@ -737,10 +758,23 @@ export async function initiateTaskUpload(input: {
     // DIFFERENT task whose title parses to the same video name. A P2002 aborts the surrounding
     // Postgres transaction, so the retry has to re-run the whole tx with the next suffix rather than
     // catch inside it.
+    // Sentinel for "the tx needs to create, but the folder chain was never resolved". Only reachable
+    // when the cheap pre-check below saw an existing asset that vanished before the lock was taken.
+    class NeedFolderChain extends Error {}
+
     let resolved: { assetId: string; createdNewAsset: boolean } | null = null
     for (let attempt = 0; attempt < MAX_VERSION_RETRIES; attempt++) {
         const assetName = attempt === 0 ? baseAssetName : `${baseAssetName} (${attempt + 1})`
         const lockKey = `${task.id}:${assetName.toLowerCase()}`
+        // Unlocked pre-check, purely to decide whether the folder chain is needed. The authoritative
+        // answer is the locked lookup inside the tx; being wrong here costs one retry, not an error.
+        if (!ensured) {
+            const pre = await prisma.reviewAsset.findFirst({
+                where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: assetName, mode: 'insensitive' } },
+                select: { id: true },
+            })
+            if (!pre) ensured = await ensureChain()
+        }
         try {
             resolved = await prisma.$transaction(async (tx) => {
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
@@ -750,9 +784,10 @@ export async function initiateTaskUpload(input: {
                     select: { id: true },
                 })
                 if (existing) return { assetId: existing.id, createdNewAsset: false }
+                if (!ensured) throw new NeedFolderChain()
                 const asset = await tx.reviewAsset.create({
                     data: {
-                        folderId: videoFolder.id,
+                        folderId: ensured.videoFolder.id,
                         workspaceId,
                         clientId: clientIdStr,
                         taskId: task.id,
@@ -765,6 +800,13 @@ export async function initiateTaskUpload(input: {
             })
             break
         } catch (e) {
+            if (e instanceof NeedFolderChain) {
+                // Resolve the chain and re-run THIS attempt (same name). Cannot recur: `ensured` is
+                // now set, so the throw above is unreachable on the repeat.
+                ensured = await ensureChain()
+                attempt--
+                continue
+            }
             // Name taken in this folder by an asset belonging to ANOTHER task → try "name (2)".
             // Anything else is a real failure.
             if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e
@@ -788,7 +830,32 @@ export async function initiateTaskUpload(input: {
             .catch(() => {})
     }
 
-    return { status: init.status, body: { ...init.body, createdNewAsset, folderPath: breadcrumb } }
+    // [audit 2026-07-27 · LOW] Report where the bytes ACTUALLY landed, not the chain we ensured.
+    // The auto-version match keys on (taskId, name) with no folderId constraint, so a deliverable
+    // that an admin moved into a curated folder still receives its next version there — while the
+    // tray announced "Đã lưu vào Team / ForTesting / Video 10000", a folder that is now empty. The
+    // editor navigates there, finds nothing, and re-uploads or reports the file lost. Derive the
+    // breadcrumb from the asset's own folder path; fall back to the ensured chain only if that read
+    // fails, since a wrong-but-present path still beats none.
+    const folderPath = (await breadcrumbForAsset(assetId)) ?? ensured?.breadcrumb ?? []
+
+    return { status: init.status, body: { ...init.body, createdNewAsset, folderPath } }
+}
+
+/** Breadcrumb of the folder an asset currently lives in, root → parent, using the materialized path. */
+async function breadcrumbForAsset(assetId: string): Promise<BreadcrumbItem[] | null> {
+    const asset = await prisma.reviewAsset
+        .findUnique({ where: { id: assetId }, select: { folder: { select: { path: true } } } })
+        .catch(() => null)
+    const path = asset?.folder?.path
+    if (!path) return null
+    const ids = pathIds(path)
+    if (!ids.length) return null
+    const rows = await prisma.reviewFolder.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+    const nameById = new Map(rows.map((r) => [r.id, r.name]))
+    // A missing id means the chain is broken; the ensured breadcrumb is the better answer then.
+    if (ids.some((id) => !nameById.has(id))) return null
+    return ids.map((id) => ({ id, name: nameById.get(id)! }))
 }
 
 // ── janitor reconcile (P1.6) ─────────────────────────────────────────────────

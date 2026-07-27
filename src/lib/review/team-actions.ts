@@ -91,7 +91,14 @@ export async function apiGroupAssets(assetIds: string[], name: string): Promise<
 }
 
 /** P6.2 "Delete forever" — ADMIN-only permanent purge (Mux + R2 + rows). */
-export async function apiPurgeItems(items: ItemRef[]): Promise<{ versions: number; assets: number; folders: number }> {
+/** `blocked` lists what the purge refused (a folder still holding live rows) or failed to delete.
+ *  Reporting a bare success used to hide both — see the purge.ts note. */
+export async function apiPurgeItems(items: ItemRef[]): Promise<{
+    versions: number
+    assets: number
+    folders: number
+    blocked: { type: 'folder' | 'asset'; id: string; name: string; reason: 'has_live_descendants' | 'delete_failed' | 'not_in_trash' }[]
+}> {
     return postJson('/api/review/trash/purge', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 

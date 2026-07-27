@@ -130,6 +130,55 @@ async function ensureFolder(args: {
 }
 
 /**
+ * READ-ONLY preview of where a task upload will land — the same systemKey chain the writer
+ * resolves, without creating anything.
+ *
+ * [audit 2026-07-27 · LOW] The "Lưu vào …" strip used to be pure string arithmetic over the task
+ * title: it issued zero queries against ReviewFolder and was therefore structurally incapable of
+ * naming the destination. ensureFolder matches by KEY and returns whatever that row is currently
+ * called, so a folder renamed in Tệp kept receiving uploads while the strip kept promising the old
+ * parsed string forever. Resolving the same keys here makes the promise checkable.
+ *
+ * `exists: false` means the level will be created by this upload — worth showing as "sẽ tạo mới"
+ * rather than as an existing location. A trashed level is reported but not fatal: the upload path
+ * revives a trashed system chain (see reviveSystemFolderChain), so it is no longer a dead end.
+ */
+export async function resolveTaskFolderPreview(args: {
+    workspaceId: string
+    rootName: string
+    taskId: string
+    clientId: string | null
+    parsed: ParsedTaskVideo
+}): Promise<{ name: string; exists: boolean; trashed: boolean }[]> {
+    const { workspaceId, rootName, taskId, clientId, parsed } = args
+    const clientKey = clientId ?? slugifyBrand(parsed.client)
+    const brandKey = parsed.brand ? slugifyBrand(parsed.brand) : null
+
+    const levels: { key: string; fallbackName: string }[] = [
+        { key: buildSystemKey({ workspaceId }), fallbackName: rootName || 'Team' },
+        { key: buildSystemKey({ workspaceId, clientId: clientKey }), fallbackName: parsed.client },
+    ]
+    if (parsed.brand) {
+        levels.push({ key: buildSystemKey({ workspaceId, clientId: clientKey, brandKey }), fallbackName: parsed.brand })
+    }
+    levels.push({
+        key: `${buildSystemKey({ workspaceId, clientId: clientKey, brandKey, taskId })}:video:${slugifyBrand(parsed.video)}`,
+        fallbackName: parsed.video,
+    })
+
+    // deletedAt is SELECTED, never filtered — the point is to see a trashed row, not to miss it.
+    const rows = await prisma.reviewFolder.findMany({
+        where: { systemKey: { in: levels.map((l) => l.key) } },
+        select: { systemKey: true, name: true, deletedAt: true },
+    })
+    const byKey = new Map(rows.map((r) => [r.systemKey!, r]))
+    return levels.map((l) => {
+        const row = byKey.get(l.key)
+        return { name: row?.name ?? l.fallbackName, exists: !!row, trashed: row?.deletedAt != null }
+    })
+}
+
+/**
  * Resolve/create root → client → [brand] → video for a task upload.
  * `clientId` is the review-scalar string form of the task's client (or null).
  * Returns the leaf (video) folder + the breadcrumb for the UI "saved to …" toast.

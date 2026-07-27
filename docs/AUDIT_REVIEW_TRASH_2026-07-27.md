@@ -25,7 +25,30 @@ Chủ dự án sau đó chốt: **sửa hết mức CAO**. Đã làm xong.
 
 **Một mục là BÁO SAI:** *"listTrash và restoreItems không kiểm folder-scope / creator"*. Cả hai **đã có** từ các đợt audit trước — `folders.ts:1039-1048` (HT-028) và `folders.ts:1120-1133` (HT-027). Agent nhìn sót, và phát hiện sai này vẫn **lọt qua vòng phản biện**. Nhắc để lần sau đừng tin báo cáo mà không mở code ra đọc.
 
-Các mục **TRUNG BÌNH / THẤP** bên dưới vẫn **chưa sửa**.
+### TRUNG BÌNH / THẤP — đã sửa hết (cùng ngày)
+
+8 mục TRUNG BÌNH + 5 mục THẤP, nhưng đọc kỹ thì có **hai cặp trùng nhau** (`purge.ts:347`/`:343` mô tả cùng một lỗi báo-cáo-sai; `upload-service.ts:697`/`:733` cùng một lỗi breadcrumb), nên thực chất là **11 lỗi riêng biệt**.
+
+| Lỗi | Mức | Sửa ở đâu |
+|---|---|---|
+| Thùng rác đọc counter chưa bao giờ được cập nhật → thư mục đầy video hiện "0 mục · 0 B" | TB | `listTrash` tự tính lại bằng 1 truy vấn, thêm `liveDescendants` |
+| `copyItems` ném TypeError 500 khi cây con có thư mục sống dưới cha đã xoá | TB | bỏ qua nhánh mồ côi thay vì `!` rồi crash |
+| Tổng dung lượng cộng cả byte nằm dưới tổ tiên đã xoá | TB | thêm loại trừ tổ tiên-đã-xoá vào truy vấn byte |
+| Thư mục gốc workspace vẫn xoá được → cả workspace "trống" trong im lặng | TB | `deleteItems` từ chối `parentId === null` |
+| Khôi phục 1 video kéo theo cả lô nhưng bỏ lại thư mục trong thùng rác | TB | chỉ xoá-cờ theo lô khi lô KHÔNG chứa thư mục |
+| "Xóa vĩnh viễn" ghi log đã-xoá cho thư mục chưa hề xoá được | TB | chỉ ghi `TRASH_PURGED` khi hàng thật sự bị xoá |
+| "Xóa vĩnh viễn" bị chặn nhưng báo thành công | TB | trả `blocked[]`, toast đỏ + nhãn cảnh báo ngay trên dòng |
+| Zip lôi nội dung dưới tổ tiên đã xoá, nhét vào thư mục tên `—` | Thấp | lọc theo tổ tiên sống; thiếu tên thì bỏ file, không bịa |
+| Dải "Lưu vào" chỉ ghép chuỗi, không hỏi thư mục thật | Thấp | `resolveTaskFolderPreview` (chỉ đọc) + nhãn gốc "Tệp" |
+| Tray báo lưu vào thư mục mà file không nằm đó | Thấp | breadcrumb suy từ thư mục THẬT của asset |
+| Thư mục bị xoá giữa lúc upload → asset sống dưới thư mục đã xoá | Thấp | khoá advisory chung cho `initiateUpload` + `deleteItems` |
+
+Hai chỗ tôi **cố ý làm hẹp hơn** khuyến nghị của báo cáo, ghi rõ để sau này còn cân nhắc lại:
+
+- Báo cáo đề nghị `deleteItems` từ chối **mọi** thư mục có `systemKey`. Làm vậy thì chủ dự án không còn xoá được thư mục tự sinh nào nữa — mất một thao tác dọn dẹp bình thường. Nguy hiểm thật sự của việc xoá thư mục hệ thống là **chiếm khoá `systemKey` vĩnh viễn**, mà `reviveSystemFolderChain` (đợt CAO) đã xử lý. Nên chỉ chặn đúng thư mục gốc workspace.
+- Báo cáo đề nghị **chặn upload** khi thư mục đích đang nằm trong thùng rác. Cũng đã thừa vì đường upload tự hồi sinh chuỗi thư mục hệ thống; chặn lúc này chỉ làm editor bế tắc với một thư mục họ thường không có quyền nhìn thấy.
+
+**Chưa kiểm bằng tay lần nào** — mới qua `tsc` + `next build`. Danh sách cần bấm thử nằm ở cuối phần này.
 
 ---
 

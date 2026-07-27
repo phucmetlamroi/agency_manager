@@ -13,6 +13,8 @@ import { apiError } from './errors'
 import { serializeVersion, toUserRef, type VersionDto } from './dto'
 import { buildMediaLinks } from './media-links'
 import { parseVideoTitle } from './parse-task-context'
+import { resolveTaskFolderPreview } from './task-folder'
+import { REVIEW_MODULE_LABEL } from './labels'
 import { canAutoTransition } from '@/lib/task-statuses'
 import { REVIEW_STATUS_MAP } from './status-map'
 
@@ -30,7 +32,8 @@ export interface TaskDeliverableDto {
 
 export interface TaskUploadContextDto {
     /** Destination folders top→leaf, e.g. Team / Michael / North… / Bathroom 1. */
-    breadcrumb: { name: string }[]
+    /** `exists: false` = this level does not exist yet and the upload will create it. */
+    breadcrumb: { name: string; exists: boolean }[]
     /** false = the "Khách / Brand · Video" convention didn't parse (show a warning). */
     parsedOk: boolean
     /** Non-null when a second upload would stack a new version onto an existing card. */
@@ -86,6 +89,9 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             // finance/assignee fields" property of this DTO still holds.
             status: true,
             assigneeId: true,
+            // Read only to resolve the destination folder chain (same clientKey the writer uses);
+            // never serialized into the DTO.
+            clientId: true,
             isArchived: true,
             client: { select: { name: true } },
             workspace: { select: { name: true } },
@@ -186,12 +192,24 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
         }
     })
 
-    // Upload-context preview: mirror parseVideoTitle + the ensureTaskFolderPath breadcrumb
-    // shape (root → client → [brand] → video), WITHOUT creating any folders.
+    // [audit 2026-07-27 · LOW] Upload-context preview. This used to be built purely from the task
+    // title — zero queries — so it named folders that no longer existed under that name and called
+    // the root by the workspace name while Tệp labels that same folder "Tệp". Resolve the real
+    // systemKey chain instead (read-only, creates nothing) and report each level's actual name.
     const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
-    const breadcrumb: { name: string }[] = [{ name: task.workspace?.name || 'Team' }, { name: parsed.client }]
-    if (parsed.brand) breadcrumb.push({ name: parsed.brand })
-    breadcrumb.push({ name: parsed.video })
+    const levels = await resolveTaskFolderPreview({
+        workspaceId,
+        rootName: task.workspace?.name || 'Team',
+        taskId: task.id,
+        clientId: task.clientId != null ? String(task.clientId) : null,
+        parsed,
+    })
+    const breadcrumb: { name: string; exists: boolean }[] = levels.map((l, i) => ({
+        // Crumb 0 is the workspace root, which every Files surface calls "Tệp". Naming it after the
+        // workspace sent the user looking for a folder that appears under a different label.
+        name: i === 0 ? REVIEW_MODULE_LABEL : l.name,
+        exists: l.exists,
+    }))
 
     // Existing-asset match = same rule initiateTaskUpload uses to auto-version.
     const match = assetRows.find((a) => a.name.trim().toLowerCase() === parsed.video.trim().toLowerCase())

@@ -141,6 +141,20 @@ export async function ensureTaskFolderPath(args: {
     clientId: string | null
     parsed: ParsedTaskVideo
     createdById: string
+    /** [foldering 2026-07-27] Create the per-task VIDEO folder, or drop the deliverable straight
+     *  into the client/brand folder?
+     *
+     *  The module used to ALWAYS wrap: root → client → [brand] → video → the one asset. That was a
+     *  deliberate bet on multi-hook sets, but for the overwhelmingly common single-deliverable task
+     *  it cost every viewer an extra click into a folder holding exactly one item, and the owner's
+     *  team and clients pushed back on it.
+     *
+     *  Now the wrapper is earned, not assumed: false (default) = flat, true = group. The caller
+     *  decides from the ONE unambiguous signal available — how many files were dropped in a single
+     *  action. Dropping several files onto one task means "these are siblings"; uploading one file
+     *  again later means "this is the next version", which must NOT become a folder or the whole
+     *  feedback→revise loop would fork into separate videos. */
+    groupInFolder?: boolean
 }): Promise<{ videoFolder: FolderRef; breadcrumb: BreadcrumbItem[] }> {
     const { workspaceId, rootName, taskId, clientId, parsed, createdById } = args
     // Stable client identity: the real clientId when present, else a slug of the parsed name.
@@ -181,6 +195,10 @@ export async function ensureTaskFolderPath(args: {
         breadcrumb.push({ id: brand.id, name: brand.name })
         parent = brand
     }
+
+    // [foldering 2026-07-27] Flat by default — the deliverable lands in the client/brand folder and
+    // the breadcrumb stops here. No empty-ish wrapper holding a single video.
+    if (!args.groupInFolder) return { videoFolder: parent, breadcrumb }
 
     // The video level is per (task, video-name): the task's own deliverable folder.
     const videoSystemKey = `${buildSystemKey({ workspaceId, clientId: clientKey, brandKey, taskId })}:video:${slugifyBrand(parsed.video)}`

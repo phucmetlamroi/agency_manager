@@ -669,9 +669,23 @@ export async function initiateTaskUpload(input: {
     sizeBytes: bigint
     mimeType: string
     idempotencyKey?: string | null
+    /** [foldering 2026-07-27] How many files the user dropped in THIS single action.
+     *
+     *  This one number decides the whole shape, because it is the only unambiguous signal we have:
+     *    1  → "here is the (next) cut of this task's video". Asset is named from the TASK title, so
+     *         the existing (taskId, name) match turns a later upload into v2 — the feedback→revise
+     *         loop, untouched. Lands FLAT in the client/brand folder: no wrapper.
+     *    N>1 → "here are N siblings" (a multi-hook set). Each file becomes its OWN asset named from
+     *         its FILENAME, and they are grouped into the per-task video folder.
+     *
+     *  Naming from the task title is exactly why N files used to collapse into one asset with N
+     *  versions: every file resolved to the same name and hit the auto-version match. Removing the
+     *  wrapper folder alone would NOT have fixed that — the folder was never the blocker. */
+    batchSize?: number
 }): Promise<TaskInitiateResult> {
     const kind = mediaKindFromMime(input.mimeType, input.fileName)
     if (kind !== 'VIDEO') fail(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ nhận file video ở mục bàn giao.')
+    const isBatch = (input.batchSize ?? 1) > 1
 
     const task = await prisma.task.findFirst({
         where: { id: input.taskId },
@@ -702,34 +716,61 @@ export async function initiateTaskUpload(input: {
         clientId: clientIdStr,
         parsed,
         createdById: access.userId,
+        groupInFolder: isBatch,
     })
 
-    // Auto-version: same task + same (case-insensitive) video name ⇒ a new version on the stack.
+    // [foldering 2026-07-27] Asset identity. Single upload keeps naming from the TASK, so the
+    // (taskId, name) match below still turns the next upload into v2 — the revise loop is untouched.
+    // A batch names each file from ITSELF, so N hooks become N sibling assets instead of N versions
+    // of one, and re-dropping the same filename later still versions THAT hook correctly.
+    const baseAssetName = isBatch ? stripExt(input.fileName) : parsed.video
+
+    // Auto-version: same task + same (case-insensitive) asset name ⇒ a new version on the stack.
     // ReviewAsset has no unique on (taskId, name), so serialize concurrent uploads to the SAME
-    // deliverable with a transaction-scoped advisory lock on the (unique) video folder → the
-    // find-or-create is atomic and can't fork the stack into two assets. Also scoped by workspaceId
-    // (defence-in-depth against denormalization drift).
-    const resolved = await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${videoFolder.id}, 0))`
-        const existing = await tx.reviewAsset.findFirst({
-            where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: parsed.video, mode: 'insensitive' } },
-            orderBy: { createdAt: 'asc' },
-            select: { id: true },
-        })
-        if (existing) return { assetId: existing.id, createdNewAsset: false }
-        const asset = await tx.reviewAsset.create({
-            data: {
-                folderId: videoFolder.id,
-                workspaceId,
-                clientId: clientIdStr,
-                taskId: task.id,
-                name: parsed.video,
-                mediaKind: ReviewMediaKind.VIDEO,
-                createdById: access.userId,
-            },
-        })
-        return { assetId: asset.id, createdNewAsset: true }
-    })
+    // deliverable with a transaction-scoped advisory lock. The lock key is (task, asset-name), not
+    // the folder: since flat uploads now share one client folder across many tasks, a folder-keyed
+    // lock would serialize every unrelated upload for that client.
+    // Scoped by workspaceId (defence-in-depth against denormalization drift).
+    //
+    // The retry loop exists because flat mode moved assets into a SHARED folder, where the DB's
+    // partial index UNIQUE ("folderId", lower("name")) WHERE "deletedAt" IS NULL can now be hit by a
+    // DIFFERENT task whose title parses to the same video name. A P2002 aborts the surrounding
+    // Postgres transaction, so the retry has to re-run the whole tx with the next suffix rather than
+    // catch inside it.
+    let resolved: { assetId: string; createdNewAsset: boolean } | null = null
+    for (let attempt = 0; attempt < MAX_VERSION_RETRIES; attempt++) {
+        const assetName = attempt === 0 ? baseAssetName : `${baseAssetName} (${attempt + 1})`
+        const lockKey = `${task.id}:${assetName.toLowerCase()}`
+        try {
+            resolved = await prisma.$transaction(async (tx) => {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
+                const existing = await tx.reviewAsset.findFirst({
+                    where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: assetName, mode: 'insensitive' } },
+                    orderBy: { createdAt: 'asc' },
+                    select: { id: true },
+                })
+                if (existing) return { assetId: existing.id, createdNewAsset: false }
+                const asset = await tx.reviewAsset.create({
+                    data: {
+                        folderId: videoFolder.id,
+                        workspaceId,
+                        clientId: clientIdStr,
+                        taskId: task.id,
+                        name: assetName,
+                        mediaKind: ReviewMediaKind.VIDEO,
+                        createdById: access.userId,
+                    },
+                })
+                return { assetId: asset.id, createdNewAsset: true }
+            })
+            break
+        } catch (e) {
+            // Name taken in this folder by an asset belonging to ANOTHER task → try "name (2)".
+            // Anything else is a real failure.
+            if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e
+        }
+    }
+    if (!resolved) fail(409, 'STATE_INVALID', 'Không đặt được tên cho bản dựng — thử đổi tên file rồi tải lại.')
     const { assetId, createdNewAsset } = resolved
 
     const init = await initiateUpload({

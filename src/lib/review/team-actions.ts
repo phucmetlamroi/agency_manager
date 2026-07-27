@@ -12,6 +12,13 @@ export interface ItemRef {
     type: ItemKind
     id: string
 }
+/** Trash can additionally hold a single VERSION deleted out of a live stack — see TrashItemType in
+ *  dto.ts. Move/copy/delete/purge stay folder|asset; only listing and RESTORE are wider. */
+export type TrashItemKind = ItemKind | 'version'
+export interface TrashItemRef {
+    type: TrashItemKind
+    id: string
+}
 export interface MoveRef extends ItemRef {
     rowVersion: number
 }
@@ -66,10 +73,10 @@ export async function apiDeleteItems(items: ItemRef[]): Promise<{ purgeAt: strin
 }
 
 export interface RestoreResult {
-    restored: { type: ItemKind; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[]
+    restored: { type: TrashItemKind; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[]
 }
 
-export async function apiRestoreItems(items: ItemRef[]): Promise<RestoreResult> {
+export async function apiRestoreItems(items: TrashItemRef[]): Promise<RestoreResult> {
     return postJson('/api/review/trash/restore', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 

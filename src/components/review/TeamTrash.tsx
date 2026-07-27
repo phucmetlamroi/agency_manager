@@ -28,7 +28,14 @@ import {
 } from 'lucide-react'
 import { X } from 'lucide-react'
 import { bytesLabel } from './TeamCards'
-import { apiPurgeItems, apiRestoreItems, type ItemKind, type ItemRef } from '@/lib/review/team-actions'
+import {
+    apiPurgeItems,
+    apiRestoreItems,
+    type ItemKind,
+    type ItemRef,
+    type TrashItemKind,
+    type TrashItemRef,
+} from '@/lib/review/team-actions'
 import { REVIEW_MODULE_LABEL } from '@/lib/review/labels'
 
 const RESTORE_CAP = 200 // restore route caps items at 200
@@ -36,7 +43,7 @@ const BULK_KEY = '__bulk__'
 const PURGE_BULK_KEY = '__purge_bulk__'
 
 interface TrashItem {
-    type: ItemKind
+    type: TrashItemKind
     id: string
     name: string
     deletedAt: string
@@ -186,7 +193,7 @@ export function TeamTrash({ workspaceId, isAdmin = false, backHref, chromeless =
     }, [anySelected, restorable])
 
     const doRestore = useCallback(
-        async (refs: ItemRef[], key: string) => {
+        async (refs: TrashItemRef[], key: string) => {
             if (refs.length === 0 || restoringKey) return // single global guard → no overlapping calls
             setRestoringKey(key)
             const tid = toast.loading('Đang khôi phục…')
@@ -209,7 +216,7 @@ export function TeamTrash({ workspaceId, isAdmin = false, backHref, chromeless =
     )
 
     const restoreSelected = useCallback(() => {
-        const refs: ItemRef[] = items
+        const refs: TrashItemRef[] = items
             .filter((i) => selectedIds.has(i.id) && i.restorable)
             .slice(0, RESTORE_CAP)
             .map((i) => ({ type: i.type, id: i.id }))
@@ -238,7 +245,15 @@ export function TeamTrash({ workspaceId, isAdmin = false, backHref, chromeless =
     )
 
     const purgeSelected = useCallback(() => {
-        const refs: ItemRef[] = items.filter((i) => selectedIds.has(i.id)).map((i) => ({ type: i.type, id: i.id }))
+        // "Xóa vĩnh viễn" is folder/asset only — the purge endpoint has no version branch, so a
+        // version row is simply left to the 30-day cron, which is exactly the promise made when it
+        // was deleted. Drop them from the selection rather than sending a payload the API rejects.
+        const selected = items.filter((i) => selectedIds.has(i.id))
+        const refs: ItemRef[] = selected
+            .filter((i): i is typeof i & { type: ItemKind } => i.type !== 'version')
+            .map((i) => ({ type: i.type, id: i.id }))
+        const skipped = selected.length - refs.length
+        if (skipped > 0) toast.info(`${skipped} phiên bản sẽ tự xóa khi hết 30 ngày — bỏ qua.`)
         if (!refs.length) return
         setPurgeConfirm({ refs, label: `${refs.length} mục đã chọn`, key: PURGE_BULK_KEY })
     }, [items, selectedIds])
@@ -399,7 +414,11 @@ export function TeamTrash({ workspaceId, isAdmin = false, backHref, chromeless =
                                         disabled={busy}
                                         isAdmin={isAdmin}
                                         onRestore={() => doRestore([{ type: it.type, id: it.id }], it.id)}
-                                        onPurge={() => setPurgeConfirm({ refs: [{ type: it.type, id: it.id }], label: `"${it.name}"`, key: it.id })}
+                                        onPurge={() => {
+                                            // versions have no purge endpoint — see purgeSelected.
+                                            if (it.type === 'version') return
+                                            setPurgeConfirm({ refs: [{ type: it.type, id: it.id }], label: `"${it.name}"`, key: it.id })
+                                        }}
                                     />
                                 ))}
                             </ul>
@@ -491,9 +510,15 @@ function TrashRow({
     isAdmin: boolean
 }) {
     const isFolder = item.type === 'folder'
+    // [audit 2026-07-27] 'version' rows are new here: a single version deleted out of a live stack
+    // used to be invisible in this list (and un-restorable) despite the confirm dialog promising a
+    // 30-day restore. It reads as one file, not a stack, so it shows its own size.
+    const isVersion = item.type === 'version'
     const meta = isFolder
         ? `${item.meta.itemCount ?? 0} mục · ${bytesLabel(item.meta.sizeBytes ?? '0')}`
-        : `${item.meta.versionCount ?? 0} phiên bản`
+        : isVersion
+          ? `Phiên bản · ${bytesLabel(item.meta.sizeBytes ?? '0')}`
+          : `${item.meta.versionCount ?? 0} phiên bản`
 
     return (
         <li className={`flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${checked ? 'bg-violet-500/[0.06]' : ''}`}>

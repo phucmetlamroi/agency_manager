@@ -11,6 +11,7 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma, ReviewMediaKind, ReviewPipelineStatus, ReviewState } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { requireReviewAccess, type ReviewAccessContext } from './access'
 import { getFolderScope, assertVersionInScope, assertAssetInScope, assertFolderPathMutable } from './folder-scope'
 import { apiError } from './errors'
@@ -102,11 +103,17 @@ async function ensureRootFolder(userId: string, workspaceId: string): Promise<st
         return existing.id
     }
     try {
+        // [audit 2026-07-27 · HIGH] The row used to be committed with the placeholder path '/' and
+        // patched by a SECOND, non-transactional statement. Between the two, the root was visible
+        // to every concurrent reader with a path that matches NOTHING (`path LIKE '/%'` prefix
+        // logic, ancestor walks, folder-scope) — and if the process died in that window the
+        // workspace was left with a permanently broken root that the unique systemKey prevents
+        // replacing. Generate the id first so the row is correct the instant it exists, exactly as
+        // ensureWorkspaceRoot in folders.ts already does.
+        const id = randomUUID()
         const created = await prisma.reviewFolder.create({
-            data: { workspaceId, systemKey, name: 'Team', path: '/', depth: 0, createdById: userId },
+            data: { id, workspaceId, systemKey, name: 'Team', path: `/${id}/`, depth: 0, createdById: userId },
         })
-        // Materialized path must include own id: "/{id}/".
-        await prisma.reviewFolder.update({ where: { id: created.id }, data: { path: `/${created.id}/` } })
         return created.id
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

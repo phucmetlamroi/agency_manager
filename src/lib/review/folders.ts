@@ -31,6 +31,7 @@ import {
     type FolderDto,
     type AssetDto,
     type ItemType,
+    type TrashItemType,
     type UserRef,
 } from './dto'
 import { buildMediaLinks, buildPosterUrl } from './media-links'
@@ -63,7 +64,7 @@ export interface ListChildrenResult {
 }
 
 export interface TrashItemDto {
-    type: ItemType
+    type: TrashItemType
     id: string
     name: string
     deletedAt: string
@@ -1053,10 +1054,53 @@ export async function listTrash(input: {
         : []
     const vCount = new Map(vCounts.map((r) => [r.assetId, r._count._all]))
 
-    const userRefs = await loadUserRefs([...rootFolders.map((f) => f.deletedById), ...rootAssets.map((a) => a.deletedById)])
+    // [audit 2026-07-27 · HIGH] Versions deleted one-at-a-time out of a multi-version stack were
+    // invisible here: listTrash only ever queried folders and assets. The confirm dialog promises
+    // "chuyển vào Đã xóa gần đây (khôi phục được trong 30 ngày)", the purge cron destroys exactly
+    // these rows at day 30, and in between nothing in the product could show or restore them.
+    // A trashed version is a trash ROOT only when its asset is still alive AND it is not riding
+    // along in the asset's/folder's delete batch — otherwise the stack row already represents it.
+    const delVersions = await prisma.reviewVersion.findMany({
+        where: {
+            workspaceId: input.workspaceId,
+            deletedAt: { not: null },
+            asset: { deletedAt: null },
+        },
+        select: {
+            id: true,
+            versionNumber: true,
+            deletedAt: true,
+            deletedById: true,
+            sizeBytes: true,
+            asset: { select: { id: true, name: true, folder: { select: { path: true } } } },
+        },
+    })
+    let rootVersions = delVersions
+    if (!access.isAdmin) {
+        const scope = await getFolderScope({ userId: access.userId, workspaceId: input.workspaceId, isAdmin: access.isAdmin })
+        if (!scope.unrestricted) rootVersions = rootVersions.filter((v) => isPathVisible(scope, v.asset.folder?.path ?? ''))
+    }
+
+    const userRefs = await loadUserRefs([
+        ...rootFolders.map((f) => f.deletedById),
+        ...rootAssets.map((a) => a.deletedById),
+        ...rootVersions.map((v) => v.deletedById),
+    ])
     const purgeAtOf = (deletedAt: Date) => new Date(deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
     const all: TrashItemDto[] = [
+        ...rootVersions.map((v): TrashItemDto => ({
+            type: 'version',
+            id: v.id,
+            // The stack name alone would be ambiguous — several versions of one asset can sit in
+            // the trash at once. Name the version so the admin can tell them apart.
+            name: `${v.asset.name} · v${v.versionNumber}`,
+            deletedAt: v.deletedAt!.toISOString(),
+            purgeAt: purgeAtOf(v.deletedAt!),
+            deletedBy: v.deletedById ? userRefs.get(v.deletedById) ?? null : null,
+            restorable: true,
+            meta: { sizeBytes: v.sizeBytes.toString() },
+        })),
         ...rootFolders.map((f): TrashItemDto => ({
             type: 'folder',
             id: f.id,
@@ -1098,21 +1142,28 @@ export async function listTrash(input: {
 // ─────────────────────── restore ───────────────────────
 
 export async function restoreItems(input: {
-    items: { type: ItemType; id: string }[]
-}): Promise<{ restored: { type: ItemType; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[] }> {
+    items: { type: TrashItemType; id: string }[]
+}): Promise<{ restored: { type: TrashItemType; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[] }> {
     if (input.items.length < 1 || input.items.length > BULK_CAP) {
         throw apiError(400, 'VALIDATION_ERROR', `Số mục phải từ 1–${BULK_CAP}.`)
     }
     const folderIds = input.items.filter((i) => i.type === 'folder').map((i) => i.id)
     const assetIds = input.items.filter((i) => i.type === 'asset').map((i) => i.id)
-    const [folderRows, assetRows] = await Promise.all([
+    const versionIds = input.items.filter((i) => i.type === 'version').map((i) => i.id)
+    const [folderRows, assetRows, versionRows] = await Promise.all([
         prisma.reviewFolder.findMany({ where: { id: { in: folderIds }, deletedAt: { not: null } } }),
         prisma.reviewAsset.findMany({ where: { id: { in: assetIds }, deletedAt: { not: null } }, include: { folder: { select: { path: true } } } }),
+        // A version is only restorable on its own while its stack is alive; if the asset is also
+        // trashed the caller must restore the ASSET, which brings the whole batch back with it.
+        prisma.reviewVersion.findMany({
+            where: { id: { in: versionIds }, deletedAt: { not: null }, asset: { deletedAt: null } },
+            include: { asset: { select: { id: true, folder: { select: { path: true } } } } },
+        }),
     ])
-    if (folderRows.length !== folderIds.length || assetRows.length !== assetIds.length) {
+    if (folderRows.length !== folderIds.length || assetRows.length !== assetIds.length || versionRows.length !== versionIds.length) {
         throw apiError(404, 'NOT_IN_TRASH', 'Một hoặc nhiều mục không nằm trong thùng rác.')
     }
-    const workspaces = new Set([...folderRows.map((f) => f.workspaceId), ...assetRows.map((a) => a.workspaceId)])
+    const workspaces = new Set([...folderRows.map((f) => f.workspaceId), ...assetRows.map((a) => a.workspaceId), ...versionRows.map((v) => v.workspaceId)])
     if (workspaces.size !== 1) throw apiError(400, 'CROSS_WORKSPACE', 'Các mục không cùng workspace.')
     const workspaceId = [...workspaces][0]
     const access = await requireReviewAccess({ workspaceId })
@@ -1129,18 +1180,61 @@ export async function restoreItems(input: {
         assertFolderPathsMutable(scope, [
             ...folderRows.map((f) => f.path),
             ...assetRows.map((a) => a.folder?.path).filter((p): p is string => !!p),
+            ...versionRows.map((v) => v.asset.folder?.path).filter((p): p is string => !!p),
         ])
     }
+
+    // [audit 2026-07-27 · HIGH] Order + nesting, the two things deleteItems guards and this did not.
+    //
+    // ORDER: the loop below re-homes a folder to the workspace ROOT whenever its parent is still
+    // deleted. `folderRows` came straight from findMany, i.e. in no particular order, so restoring
+    // a parent and a separately-trashed child together was a coin flip: if the child happened to be
+    // processed first its parent was still trashed, so the child was ripped out of its parent, dumped
+    // at the root, and stamped orphanedFromPurge — which (see the `clear` objects below) used to be
+    // permanent. Shallowest-first makes the parent live before its child is considered.
+    const orderedFolderRows = [...folderRows].sort((a, b) => a.depth - b.depth)
+
+    // NESTING: a descendant that shares its ancestor's deleteBatchId is already un-deleted by the
+    // ancestor's batch-wide updateMany. Processing it again re-increments the parent's itemCount,
+    // even though deleteItems only ever decremented ONCE (for the batch root). Skip those — but keep
+    // a descendant trashed in a DIFFERENT batch, whose own count really was decremented separately.
+    const skipFolderIds = new Set(
+        orderedFolderRows
+            .filter((f) =>
+                orderedFolderRows.some(
+                    (g) => g.id !== f.id && f.path.startsWith(g.path) && g.deleteBatchId != null && g.deleteBatchId === f.deleteBatchId,
+                ),
+            )
+            .map((f) => f.id),
+    )
+    const skipAssetIds = new Set(
+        assetRows
+            .filter((a) =>
+                orderedFolderRows.some(
+                    (g) =>
+                        (a.folder?.path ?? '').startsWith(g.path) && g.deleteBatchId != null && g.deleteBatchId === a.deleteBatchId,
+                ),
+            )
+            .map((a) => a.id),
+    )
 
     // Ensure the fallback root exists BEFORE the tx (re-home landing zone).
     const root = await ensureWorkspaceRoot(workspaceId)
 
     return prisma.$transaction(async (tx) => {
-        const restored: { type: ItemType; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[] = []
+        const restored: { type: TrashItemType; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[] = []
 
-        for (const folder of folderRows) {
+        for (const folder of orderedFolderRows) {
+            if (skipFolderIds.has(folder.id)) continue // rides along with its selected ancestor's batch
             const batchId = folder.deleteBatchId
-            const clear = { deletedAt: null, deletedById: null, deleteBatchId: null }
+            // [audit 2026-07-27 · HIGH] orphanedFromPurge MUST be cleared here. It is set when a
+            // restore re-homes an item to the root, and nothing ever unset it — so listTrash's
+            // `restorable: !orphanedFromPurge` stayed false forever and the Trash UI hard-disabled
+            // both the checkbox and the Restore button the NEXT time that item was trashed, with the
+            // tooltip "thư mục gốc đã bị xóa vĩnh viễn" which was no longer true. Meanwhile the purge
+            // never consulted the flag, so the item the UI refused to restore was still destroyed on
+            // schedule. Restoring into a live tree means the item is no longer orphaned; say so.
+            const clear = { deletedAt: null, deletedById: null, deleteBatchId: null, orphanedFromPurge: false }
             // Original parent still alive? If not, re-home to workspace root.
             const parent = folder.parentId
                 ? await tx.reviewFolder.findFirst({ where: { id: folder.parentId, deletedAt: null }, select: { id: true, path: true, depth: true } })
@@ -1187,8 +1281,9 @@ export async function restoreItems(input: {
         }
 
         for (const asset of assetRows) {
+            if (skipAssetIds.has(asset.id)) continue // rides along with its selected ancestor's batch
             const batchId = asset.deleteBatchId
-            const clear = { deletedAt: null, deletedById: null, deleteBatchId: null }
+            const clear = { deletedAt: null, deletedById: null, deleteBatchId: null, orphanedFromPurge: false }
             const folder = await tx.reviewFolder.findFirst({ where: { id: asset.folderId, deletedAt: null }, select: { id: true, path: true } })
             const landing = folder ?? { id: root.id, path: root.path }
             const movedToRoot = !folder
@@ -1206,6 +1301,30 @@ export async function restoreItems(input: {
             await tx.reviewFolder.update({ where: { id: landing.id }, data: { itemCount: { increment: 1 } } })
             await addBytesToAncestors(tx, pathIds(landing.path), bytes)
             restored.push({ type: 'asset', id: asset.id, restoredToFolderId: landing.id, movedToRoot })
+        }
+
+        // [audit 2026-07-27 · HIGH] Restoring a single version back onto a live stack. Mirrors what
+        // deleteVersion's non-last-version branch did: it re-pointed the head away and subtracted the
+        // version's bytes from the folder rollup, so both have to come back.
+        for (const version of versionRows) {
+            const clear = { deletedAt: null, deletedById: null, deleteBatchId: null }
+            if (version.deleteBatchId) {
+                await tx.reviewVersion.updateMany({ where: { deleteBatchId: version.deleteBatchId }, data: clear })
+            } else {
+                // Legacy row from before deleteVersion minted a batch id — restore it by id.
+                await tx.reviewVersion.update({ where: { id: version.id }, data: clear })
+            }
+            // Recompute the head from scratch rather than assuming the restored version wins: it may
+            // be an OLDER version than the current head, in which case the head must not move.
+            const head = await tx.reviewVersion.findFirst({
+                where: { assetId: version.assetId, deletedAt: null },
+                orderBy: { versionNumber: 'desc' },
+                select: { id: true },
+            })
+            if (head) await tx.reviewAsset.update({ where: { id: version.assetId }, data: { currentVersionId: head.id } })
+            const folderPath = version.asset.folder?.path
+            if (folderPath) await addBytesToAncestors(tx, pathIds(folderPath), version.sizeBytes)
+            restored.push({ type: 'version', id: version.id, restoredToFolderId: version.assetId, movedToRoot: false })
         }
 
         return { restored }

@@ -54,7 +54,18 @@ export async function getFolderScope(input: {
               })
             : Promise.resolve([] as { folder: { path: string } | null }[]),
         prisma.reviewFolder.findMany({
-            where: { workspaceId: input.workspaceId, createdById: input.userId },
+            // [audit 2026-07-27 · HIGH] `systemKey: null` is load-bearing. Auto-created folders
+            // (root → client → [brand] → video) are stamped with the id of whoever triggered the
+            // upload that minted them. The ROOT is minted by the FIRST task upload in a workspace,
+            // so if that was an editor, this query returned the root's path `/rootId/` — which as an
+            // allowed prefix is the ENTIRE workspace tree. That one editor silently gained read,
+            // write and delete scope over every other client's deliverables.
+            //
+            // Filtering here (rather than only ceasing to stamp) is what fixes workspaces that
+            // ALREADY have an editor's id on their root — the stamp is in the data, not just in
+            // future writes. "Folders I made" means folders a human deliberately created in the
+            // browser; a folder the upload pipeline conjured is nobody's grant.
+            where: { workspaceId: input.workspaceId, createdById: input.userId, systemKey: null },
             select: { path: true },
         }),
     ])

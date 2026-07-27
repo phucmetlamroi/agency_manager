@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { buildSystemKey, slugifyBrand } from './upload-helpers'
+import { reviveSystemFolderChain } from './folders'
 import type { ParsedTaskVideo } from './parse-task-context'
 
 export interface BreadcrumbItem {
@@ -45,7 +46,16 @@ async function ensureFolder(args: {
     onNameCollision?: 'adopt' | 'suffix'
 }): Promise<FolderRef> {
     const found = await prisma.reviewFolder.findUnique({ where: { systemKey: args.systemKey } })
-    if (found) return { id: found.id, path: found.path, depth: found.depth, name: found.name }
+    if (found) {
+        // [bug 2026-07-27] `systemKey` is @unique, so a TRASHED level squats its key forever —
+        // no replacement row can ever be created and this lookup keeps handing the trashed row
+        // back as the parent for new uploads. The deliverable then lands under a soft-deleted
+        // ancestor and vanishes from Tệp (tree, root listing and getFolder all filter
+        // `deletedAt: null`), while the purge cron refuses to reap the folder because it now
+        // holds live descendants. Re-open the corridor before returning it.
+        if (found.deletedAt) await reviveSystemFolderChain(found.id)
+        return { id: found.id, path: found.path, depth: found.depth, name: found.name }
+    }
 
     const isP2002 = (e: unknown): e is Prisma.PrismaClientKnownRequestError =>
         e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
@@ -79,7 +89,12 @@ async function ensureFolder(args: {
         if (!isP2002(e)) throw e
         // (a) Lost a create race on the unique systemKey → adopt the winner's row.
         const bySystemKey = await prisma.reviewFolder.findUnique({ where: { systemKey: args.systemKey } })
-        if (bySystemKey) return { id: bySystemKey.id, path: bySystemKey.path, depth: bySystemKey.depth, name: bySystemKey.name }
+        if (bySystemKey) {
+            // Same invariant as the fast path above: every return from ensureFolder must be a
+            // folder the UI can actually reach.
+            if (bySystemKey.deletedAt) await reviveSystemFolderChain(bySystemKey.id)
+            return { id: bySystemKey.id, path: bySystemKey.path, depth: bySystemKey.depth, name: bySystemKey.name }
+        }
 
         // (b) Otherwise the P2002 is the (parentId, lower(name)) name collision — resolve per mode.
         if ((args.onNameCollision ?? 'adopt') === 'adopt') {

@@ -35,6 +35,7 @@ import {
 } from './dto'
 import { buildMediaLinks, buildPosterUrl } from './media-links'
 import { buildSystemKey } from './upload-helpers'
+import { reviewLog } from './logger'
 
 const MAX_DEPTH = 20 // API-SPEC §1.1 (block abuse)
 const NAME_MAX = 255
@@ -46,6 +47,9 @@ const MAX_LIMIT = 200
 export interface BreadcrumbItem {
     id: string
     name: string
+    /** true = this ancestor is in the trash. It is NOT navigable (getFolder 404s on it), so the
+     *  UI must render it as plain text rather than a link that dead-ends. */
+    deleted?: boolean
 }
 
 export type SortField = 'name' | 'createdAt' | 'status' | 'duration' | 'sizeBytes' | 'uploader' | 'commentCount'
@@ -136,7 +140,13 @@ interface RootRef {
 /** Read the workspace root (systemKey `ws:{id}`) — null if it doesn't exist yet. */
 async function readRoot(workspaceId: string): Promise<RootRef | null> {
     const row = await prisma.reviewFolder.findUnique({ where: { systemKey: buildSystemKey({ workspaceId }) } })
-    return row ? { id: row.id, path: row.path, depth: row.depth, name: row.name } : null
+    if (!row) return null
+    // Same trap as ensureFolder/ensureRootFolder: the systemKey lookup ignores deletedAt, and this
+    // one feeds the ROOT LISTING (listChildren, folderId == null). A trashed root would keep
+    // serving "Tệp" as if nothing were wrong while every child query filtered against it. Revive
+    // rather than return null — returning null would blank the whole workspace's Files instead.
+    if (row.deletedAt) await reviveSystemFolderChain(row.id)
+    return { id: row.id, path: row.path, depth: row.depth, name: row.name }
 }
 
 /**
@@ -147,7 +157,12 @@ async function readRoot(workspaceId: string): Promise<RootRef | null> {
 async function ensureWorkspaceRoot(workspaceId: string, createdById?: string): Promise<RootRef> {
     const systemKey = buildSystemKey({ workspaceId })
     const existing = await prisma.reviewFolder.findUnique({ where: { systemKey } })
-    if (existing) return existing
+    if (existing) {
+        // A trashed root would hide the ENTIRE workspace's Files while still squatting the
+        // unique systemKey (so no replacement can ever be created). See reviveSystemFolderChain.
+        if (existing.deletedAt) await reviveSystemFolderChain(existing.id)
+        return existing
+    }
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } })
     const id = randomUUID()
     try {
@@ -171,6 +186,86 @@ async function ensureWorkspaceRoot(workspaceId: string, createdById?: string): P
         }
         throw e
     }
+}
+
+/**
+ * Un-trash a SYSTEM folder (systemKey != null) and every soft-deleted ancestor above it.
+ *
+ * WHY THIS EXISTS — the "delivered video is invisible in Tệp" bug (2026-07-27 report):
+ * `ReviewFolder.systemKey` is @unique, and every find-or-create path resolves it with a
+ * plain findUnique that does NOT filter `deletedAt`. So the moment a system folder is
+ * trashed, its key is squatted FOREVER: no replacement row can be created, and every later
+ * task upload silently re-parents fresh content underneath a soft-deleted ancestor. The
+ * content is then unreachable — the tree, the root listing and getFolder all filter
+ * `deletedAt: null` — while the purge cron refuses to reap the trashed folder because it
+ * still holds live descendants. A permanent, self-perpetuating dead zone. Measured on prod:
+ * one trashed client folder was swallowing 5 delivered videos over 20 days.
+ *
+ * The caller is uploading INTO this path right now, so refusing is not an option (the editor
+ * cannot restore a folder they usually cannot even see). Reviving is the only outcome that
+ * matches intent, and it self-heals the moment anyone uploads for that client again.
+ *
+ * Scope is deliberately narrow — ONLY the folder rows on the ancestor chain, never the
+ * original delete batch. Content the admin meant to throw away stays in the trash and stays
+ * restorable; we just re-open the corridor to it.
+ *
+ * Byte rollups need NO adjustment: `addBytesToAncestors` has never filtered `deletedAt`, so
+ * uploads made while the ancestor was trashed already propagated their bytes all the way to
+ * the root. The only bytes missing upstairs belong to the original batch, which stays trashed
+ * — so leaving the totals alone is exactly right. `itemCount` DOES need the +1 that
+ * `deleteItems` took away from the live parent.
+ */
+export async function reviveSystemFolderChain(folderId: string): Promise<void> {
+    const folder = await prisma.reviewFolder.findUnique({
+        where: { id: folderId },
+        select: { id: true, path: true, workspaceId: true, name: true },
+    })
+    if (!folder) return
+
+    // root → … → self. Anything on this chain that is trashed blocks reachability. `folder.id` is
+    // unioned in explicitly: a row whose materialized path never got patched off the '/' placeholder
+    // (create succeeded, patch didn't) would otherwise yield an empty chain and silently skip the
+    // very folder we were asked to revive.
+    const chain = Array.from(new Set([...pathIds(folder.path), folder.id]))
+    const trashed = await prisma.reviewFolder.findMany({
+        where: { id: { in: chain }, deletedAt: { not: null } },
+        select: { id: true, parentId: true, depth: true, name: true },
+    })
+    if (trashed.length === 0) return
+
+    // Shallowest first so a parent is already live when its child's itemCount lands.
+    trashed.sort((a, b) => a.depth - b.depth)
+    const revivedIds = new Set(trashed.map((f) => f.id))
+
+    await prisma.$transaction(async (tx) => {
+        for (const f of trashed) {
+            // updateMany + `deletedAt: { not: null }` rather than update-by-id: two uploads racing
+            // into the same trashed client folder would both observe deletedAt and both bump the
+            // parent's itemCount. Here only the writer that actually flips the row counts it.
+            const flipped = await tx.reviewFolder.updateMany({
+                where: { id: f.id, deletedAt: { not: null } },
+                data: { deletedAt: null, deletedById: null, deleteBatchId: null },
+            })
+            if (flipped.count === 0) continue // someone else revived it first
+            // Give the parent back the child `deleteItems` decremented — but only when the
+            // parent is genuinely live now (either it never was trashed, or we just revived
+            // it in this same loop). Otherwise the count would drift upward.
+            if (f.parentId) {
+                const parentLive =
+                    revivedIds.has(f.parentId) ||
+                    (await tx.reviewFolder.count({ where: { id: f.parentId, deletedAt: null } })) > 0
+                if (parentLive) {
+                    await tx.reviewFolder.update({ where: { id: f.parentId }, data: { itemCount: { increment: 1 } } })
+                }
+            }
+        }
+    })
+
+    reviewLog('warn', 'folders.revived_trashed_system_chain', {
+        folderId: folder.id,
+        workspaceId: folder.workspaceId,
+        revived: trashed.map((f) => f.name),
+    })
 }
 
 /** Batch-load users → UserRef map (display-name rules applied once). */
@@ -375,11 +470,19 @@ export async function getFolder(folderId: string): Promise<{ folder: FolderDto; 
     if (ancestorIds.length > 0) {
         const rows = await prisma.reviewFolder.findMany({
             where: { id: { in: ancestorIds } },
-            select: { id: true, name: true },
+            // deletedAt is load-bearing: this lookup deliberately does NOT filter it (a trashed
+            // ancestor must still be NAMED so the trail reads sensibly), but the UI then rendered
+            // it as a link whose target getFolder refuses with 404 "Không tìm thấy thư mục." —
+            // the mystery the 2026-07-27 bug report hit. Flag it instead of hiding it.
+            select: { id: true, name: true, deletedAt: true },
         })
-        const byId = new Map(rows.map((r) => [r.id, r.name]))
+        const byId = new Map(rows.map((r) => [r.id, r]))
         // element 0 = workspace root, always relabelled "Team" per UI-UX §1.2/§1.4.2.
-        breadcrumb = ancestorIds.map((id, i) => ({ id, name: i === 0 ? 'Team' : (byId.get(id) ?? '—') }))
+        breadcrumb = ancestorIds.map((id, i) => ({
+            id,
+            name: i === 0 ? 'Team' : (byId.get(id)?.name ?? '—'),
+            deleted: byId.get(id)?.deletedAt != null,
+        }))
     }
 
     const createdBy = folder.createdById ? (await loadUserRefs([folder.createdById])).get(folder.createdById) : null

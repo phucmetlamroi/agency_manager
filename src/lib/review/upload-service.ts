@@ -25,6 +25,7 @@ import {
 } from './media-constants'
 import { buildR2Key, buildSystemKey, computePartSize, computePartCount } from './upload-helpers'
 import { ensureTaskFolderPath, type BreadcrumbItem } from './task-folder'
+import { reviveSystemFolderChain } from './folders'
 import { parseVideoTitle } from './parse-task-context'
 import {
     createMultipart,
@@ -93,7 +94,13 @@ function toPrismaKind(kind: MediaKind): ReviewMediaKind {
 async function ensureRootFolder(userId: string, workspaceId: string): Promise<string> {
     const systemKey = buildSystemKey({ workspaceId })
     const existing = await prisma.reviewFolder.findUnique({ where: { systemKey } })
-    if (existing) return existing.id
+    if (existing) {
+        // A trashed root squats the unique systemKey forever, so no replacement can be created
+        // and everything uploaded afterwards lands under a soft-deleted ancestor — invisible in
+        // Tệp. Revive before handing it out (see reviveSystemFolderChain).
+        if (existing.deletedAt) await reviveSystemFolderChain(existing.id)
+        return existing.id
+    }
     try {
         const created = await prisma.reviewFolder.create({
             data: { workspaceId, systemKey, name: 'Team', path: '/', depth: 0, createdById: userId },
@@ -104,7 +111,10 @@ async function ensureRootFolder(userId: string, workspaceId: string): Promise<st
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
             const row = await prisma.reviewFolder.findUnique({ where: { systemKey } })
-            if (row) return row.id
+            if (row) {
+                if (row.deletedAt) await reviveSystemFolderChain(row.id)
+                return row.id
+            }
         }
         throw e
     }

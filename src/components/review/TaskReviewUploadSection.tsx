@@ -448,10 +448,17 @@ function ConfirmStrip({
                 </p>
             )}
 
+            {/* The old copy read "Không nhận diện được Khách/Brand từ tên task — sẽ lưu theo tên
+                hiện tại": it names an internal parsing convention the user was never told about and
+                ends on "tên hiện tại" (whose name?). The owner said on camera: "là sao ta, không
+                hiểu lắm". Say what happened, where the file lands, and that nothing is broken. */}
             {ctx && !ctx.parsedOk && (
                 <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-300/90">
                     <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                    Không nhận diện được Khách/Brand từ tên task — sẽ lưu theo tên hiện tại.
+                    <span>
+                        Tên task không theo mẫu <span className="text-amber-200">“Khách / Brand · Tên video”</span>, nên
+                        thư mục video sẽ lấy nguyên tên task. File vẫn được lưu bình thường vào đường dẫn ở trên.
+                    </span>
                 </p>
             )}
 

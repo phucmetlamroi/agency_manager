@@ -71,6 +71,8 @@ import {
     apiRestoreItems,
     apiSetAssetStatus,
     apiMergeStacks,
+    apiUngroupFolder,
+    apiGroupAssets,
     downloadVersion,
     downloadZip,
     teamFolderUrl,
@@ -100,6 +102,8 @@ import { SelectionBar } from './SelectionBar'
 interface BreadcrumbItem {
     id: string
     name: string
+    /** ancestor sits in the trash → not navigable (getFolder 404s). */
+    deleted?: boolean
 }
 interface ChildrenResult {
     folders: FolderDto[]
@@ -1136,8 +1140,12 @@ export function TeamBrowser({
     }, [])
 
     /* ---- breadcrumb trail ---- */
-    const trail = useMemo<{ id: string | null; name: string }[]>(() => {
-        const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({ id: b.id, name: b.name }))
+    const trail = useMemo<{ id: string | null; name: string; deleted?: boolean }[]>(() => {
+        const crumbs: { id: string | null; name: string; deleted?: boolean }[] = breadcrumb.map((b) => ({
+            id: b.id,
+            name: b.name,
+            deleted: b.deleted,
+        }))
         if (crumbs.length === 0) return [{ id: null, name: REVIEW_MODULE_LABEL }]
         crumbs[0] = { id: null, name: REVIEW_MODULE_LABEL }
         return [...crumbs, { id: folderId, name: currentName }]
@@ -1156,6 +1164,50 @@ export function TeamBrowser({
     const isEmpty = !loading && !error && !hasContent
 
     const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
+
+    /* ---- [foldering 2026-07-27] "Bỏ thư mục" ---- */
+    const doUngroup = useCallback(
+        async (targetFolderId: string) => {
+            const tid = toast.loading('Đang bỏ thư mục…')
+            try {
+                const r = await apiUngroupFolder(targetFolderId)
+                toast.success(
+                    r.movedAssetIds.length === 0
+                        ? 'Đã xóa thư mục rỗng.'
+                        : `Đã đưa ${r.movedAssetIds.length} video ra thư mục cha.`,
+                    { id: tid },
+                )
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+                void refreshTree()
+            } catch (e) {
+                // The server refuses on sub-folders and on share-linked folders; surface its reason
+                // verbatim rather than a generic failure — both are actionable by the user.
+                toast.error(e instanceof Error ? e.message : 'Không bỏ được thư mục.', { id: tid })
+            }
+        },
+        [refreshTree],
+    )
+
+    /* ---- [foldering 2026-07-27] "Gộp thành thư mục" ---- */
+    const doGroup = useCallback(
+        async (assetIds: string[], suggestedName: string) => {
+            const tid = toast.loading('Đang gộp…')
+            try {
+                const r = await apiGroupAssets(assetIds, suggestedName)
+                toast.success(`Đã gộp ${assetIds.length} video vào thư mục mới.`, { id: tid })
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+                void refreshTree()
+                // No name dialog: the folder takes the first video's name and drops straight into
+                // inline rename, so the user types over it instead of filling a modal first.
+                setTimeout(() => startRename(r.folderId), 250)
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không gộp được.', { id: tid })
+            }
+        },
+        [refreshTree, startRename],
+    )
 
     /* ---- context-menu content ---- */
     const renderMenu = useCallback((): ReactNode => {
@@ -1180,6 +1232,10 @@ export function TeamBrowser({
             onRename: () => startRename(target.id),
             onDelete: () => requestDelete(acting),
             canDelete: canDeleteItems(acting),
+            // [foldering 2026-07-27] Only for a single folder — ungroup has no sensible meaning
+            // for a multi-select or for an asset.
+            onUngroup:
+                target.type === 'folder' && acting.length === 1 ? () => void doUngroup(target.id) : undefined,
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
             // P5.5 — share the acting selection (multi-select works via right-click).
             onCreateShare: () =>
@@ -1193,7 +1249,7 @@ export function TeamBrowser({
                 }),
         }
         return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
-    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, workspaceId, folderById, assetById])
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, doUngroup, workspaceId, folderById, assetById])
 
     const selectionActive = selectedIds.size > 0
 
@@ -1462,6 +1518,11 @@ export function TeamBrowser({
                             ? () => openManageVersions(selectedAssets[0].id)
                             : undefined
                     }
+                    onGroup={
+                        selectedFolders.length === 0 && selectedAssets.length >= 2
+                            ? () => void doGroup(selectedAssets.map((a) => a.id), selectedAssets[0].title)
+                            : undefined
+                    }
                 />
             )}
 
@@ -1589,14 +1650,24 @@ function BreadcrumbTrail({
     trail,
     onNavigate,
 }: {
-    trail: { id: string | null; name: string }[]
+    trail: { id: string | null; name: string; deleted?: boolean }[]
     onNavigate: (id: string | null) => void
 }) {
     const COLLAPSE_AFTER = 4
     const Sep = () => <ChevronRight size={13} className="shrink-0 text-muted-foreground" />
-    const Crumb = ({ c, last }: { c: { id: string | null; name: string }; last: boolean }) =>
+    const Crumb = ({ c, last }: { c: { id: string | null; name: string; deleted?: boolean }; last: boolean }) =>
         last ? (
             <span className="truncate font-semibold text-zinc-100" title={c.name}>
+                {c.name}
+            </span>
+        ) : c.deleted ? (
+            // A trashed ancestor is NOT navigable — getFolder refuses it with 404. Rendering it as
+            // a live link is what turned the 2026-07-27 report into a mystery ("bấm vào thì không
+            // tìm thấy thư mục"). Say what is actually wrong instead.
+            <span
+                className="max-w-[180px] cursor-not-allowed truncate text-amber-400/70 line-through"
+                title={`${c.name} — thư mục này đang ở trong thùng rác`}
+            >
                 {c.name}
             </span>
         ) : (
@@ -1646,8 +1717,12 @@ function BreadcrumbTrail({
                         {hidden.map((c, i) => (
                             <DropdownMenu.Item
                                 key={`${c.id ?? 'h'}-${i}`}
-                                onSelect={() => onNavigate(c.id)}
-                                className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[highlighted]:bg-violet-500/15 data-[highlighted]:text-white"
+                                disabled={c.deleted}
+                                onSelect={() => {
+                                    if (c.deleted) return // trashed → getFolder would 404
+                                    onNavigate(c.id)
+                                }}
+                                className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[disabled]:cursor-not-allowed data-[highlighted]:bg-violet-500/15 data-[disabled]:text-amber-400/70 data-[disabled]:line-through data-[highlighted]:text-white"
                                 style={{ paddingLeft: 10 + i * 10 }}
                             >
                                 <FolderIcon size={13} className="shrink-0 text-muted-foreground" />

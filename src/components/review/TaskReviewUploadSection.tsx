@@ -58,7 +58,7 @@ export function TaskReviewUploadSection({
     const uploads = useTaskUploads(taskId)
     const [confirmingComplete, setConfirmingComplete] = useState(false)
     const [data, setData] = useState<TaskAssetsResult | null>(null)
-    const [pendingFile, setPendingFile] = useState<File | null>(null)
+    const [pendingFiles, setPendingFiles] = useState<File[]>([])
     const [dragOver, setDragOver] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     // [status-audit 2026-07-23] F9 from the drawer — see fixConfirm in task-assets.ts.
@@ -119,37 +119,50 @@ export function TaskReviewUploadSection({
         void refetch()
     }, [liveSig, refetch])
 
-    const onPick = (file: File | null) => {
-        if (!file) return
-        const mime = file.type || 'application/octet-stream'
-        const meta = validateFileMeta(file.name, file.size, mime)
-        if (!meta.ok) {
-            toast.error(meta.message)
-            return
+    // [foldering 2026-07-27] Accepts a LIST now. The drop handler used to read
+    // `e.dataTransfer.files?.[0]` and the picker had no `multiple`, so dragging a set of hooks
+    // silently uploaded the first file and discarded the rest — the multi-hook flow the owner
+    // demonstrated could not work at all. Rejected files are reported individually so a single bad
+    // file in a batch never swallows the good ones.
+    const onPick = (files: File[]) => {
+        if (!files.length) return
+        const accepted: File[] = []
+        for (const file of files) {
+            const mime = file.type || 'application/octet-stream'
+            const meta = validateFileMeta(file.name, file.size, mime)
+            if (!meta.ok) {
+                toast.error(`${file.name}: ${meta.message}`)
+                continue
+            }
+            if (meta.kind !== 'VIDEO') {
+                toast.error(`${file.name}: mục bàn giao chỉ nhận video. Ảnh sẽ hỗ trợ ở trình duyệt ${REVIEW_MODULE_LABEL}.`)
+                continue
+            }
+            accepted.push(file)
         }
-        if (meta.kind !== 'VIDEO') {
-            toast.error(`Mục bàn giao chỉ nhận video. Ảnh sẽ hỗ trợ ở trình duyệt ${REVIEW_MODULE_LABEL}.`)
-            return
-        }
-        setPendingFile(file)
+        if (!accepted.length) return
+        setPendingFiles(accepted)
         // refresh the destination preview in case assets/context changed since open
         void refetch()
     }
 
     const startUpload = (markAsFix: boolean) => {
-        if (!pendingFile) return
+        if (!pendingFiles.length) return
         const crumbs = data?.uploadContext.breadcrumb ?? []
         const leaf = crumbs.length ? crumbs[crumbs.length - 1].name : undefined
-        const uploadId = uploadEngine.enqueue(
-            pendingFile,
-            { kind: 'task', taskId },
-            leaf ? { targetLabel: leaf } : undefined,
+        // batchSize is the whole decision: 1 = next version of this task's video (flat, task-named);
+        // >1 = a set of siblings (grouped into the task folder, each named from its own file).
+        const batchSize = pendingFiles.length
+        const ids = pendingFiles.map((file) =>
+            uploadEngine.enqueue(file, { kind: 'task', taskId }, { targetLabel: leaf, batchSize }),
         )
         // [status-audit / owner decision D1 2026-07-23] Arm the confirm, don't fire it. The flip
         // happens when THIS upload's bytes actually land (effect below) — an upload that fails or
         // is cancelled must not leave the manager reading "đã sửa xong" with no new cut to look at.
-        pendingFixUploadIdRef.current = markAsFix ? uploadId : null
-        setPendingFile(null)
+        // For a batch we arm on the LAST file: the round is only really re-delivered once the whole
+        // set has landed, so confirming on the first would tell the manager "done" mid-transfer.
+        pendingFixUploadIdRef.current = markAsFix ? ids[ids.length - 1] ?? null : null
+        setPendingFiles([])
         // reflect the new placeholder card quickly
         setTimeout(() => void refetch(), 400)
     }
@@ -157,8 +170,7 @@ export function TaskReviewUploadSection({
     const onDrop = (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault()
         setDragOver(false)
-        const file = e.dataTransfer.files?.[0]
-        if (file) onPick(file)
+        onPick(Array.from(e.dataTransfer.files ?? []))
     }
 
     const hasCards = liveItems.length > 0 || serverCards.length > 0
@@ -331,9 +343,10 @@ export function TaskReviewUploadSection({
                 ref={fileInputRef}
                 type="file"
                 accept="video/*"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                    onPick(e.target.files?.[0] ?? null)
+                    onPick(Array.from(e.target.files ?? []))
                     e.target.value = '' // allow re-picking the same file
                 }}
             />
@@ -349,13 +362,13 @@ export function TaskReviewUploadSection({
             ))}
 
             {/* confirm strip after a pick (renders even before context loads) */}
-            {pendingFile ? (
+            {pendingFiles.length > 0 ? (
                 <ConfirmStrip
                     // Remount when the picked file changes, so the "đây là bản đã sửa feedback"
                     // tick can never carry over from a file the editor replaced (drag a new one
                     // in while the strip is open) onto a file they never opted in for.
-                    key={`${pendingFile.name}:${pendingFile.size}:${pendingFile.lastModified}`}
-                    file={pendingFile}
+                    key={pendingFiles.map((f) => `${f.name}:${f.size}:${f.lastModified}`).join('|')}
+                    files={pendingFiles}
                     ctx={data?.uploadContext ?? null}
                     // [owner decision D1] Offer the question only on the INTERNAL round, and only
                     // when this viewer may actually confirm.
@@ -372,7 +385,7 @@ export function TaskReviewUploadSection({
                             ? fixConfirm.targetStatus
                             : null
                     }
-                    onCancel={() => setPendingFile(null)}
+                    onCancel={() => setPendingFiles([])}
                     onStart={startUpload}
                 />
             ) : hasCards ? (
@@ -406,36 +419,59 @@ export function TaskReviewUploadSection({
 /* ── confirm strip (§5.3) ─────────────────────────────────────────────────── */
 
 function ConfirmStrip({
-    file,
+    files,
     ctx,
     fixTargetStatus,
     onCancel,
     onStart,
 }: {
-    file: File
+    files: File[]
     ctx: TaskAssetsResult['uploadContext'] | null
     /** Non-null when the task is mid-revision and this viewer may confirm the round. */
     fixTargetStatus: string | null
     onCancel: () => void
     onStart: (markAsFix: boolean) => void
 }) {
-    const path = ctx ? ctx.breadcrumb.map((b) => b.name).join(' / ') : ''
+    // [foldering 2026-07-27] The breadcrumb from the server still ends at the per-task video level.
+    // Only a BATCH actually creates that folder now, so a single file's real destination is the
+    // parent — drop the leaf rather than promising a folder the upload will not make.
+    const crumbs = ctx?.breadcrumb.map((b) => b.name) ?? []
+    const isBatch = files.length > 1
+    const path = isBatch ? crumbs.join(' / ') : crumbs.slice(0, -1).join(' / ')
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
     // [owner decision D1 2026-07-23] Default OFF: editors also upload work-in-progress cuts
     // mid-round, and auto-advancing those would tell the manager "đã sửa xong" about a draft.
     const [markAsFix, setMarkAsFix] = useState(false)
     return (
         <div className="mt-2 rounded-xl border border-violet-500/30 bg-violet-500/[0.06] p-3">
-            <div className="flex items-center gap-2 text-[12px] text-zinc-200">
-                <Film size={14} className="shrink-0 text-violet-300" />
-                <span className="flex-1 truncate" title={file.name}>
-                    {file.name}
-                </span>
-                <span className="shrink-0 text-[10.5px] text-muted-foreground">{formatBytes(file.size)}</span>
-            </div>
+            {files.slice(0, 4).map((f) => (
+                <div key={`${f.name}:${f.lastModified}`} className="flex items-center gap-2 text-[12px] text-zinc-200">
+                    <Film size={14} className="shrink-0 text-violet-300" />
+                    <span className="flex-1 truncate" title={f.name}>
+                        {f.name}
+                    </span>
+                    <span className="shrink-0 text-[10.5px] text-muted-foreground">{formatBytes(f.size)}</span>
+                </div>
+            ))}
+            {files.length > 4 && (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">…và {files.length - 4} video nữa</p>
+            )}
 
             {!ctx ? (
                 <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-zinc-400">
                     <Loader2 size={12} className="animate-spin" /> Đang xác định thư mục đích…
+                </p>
+            ) : isBatch ? (
+                // Say the grouping out loud BEFORE the upload starts. This is the one place the
+                // automatic decision is visible in advance, so it must not be a surprise.
+                <p className="mt-2 text-[11.5px] text-zinc-300">
+                    {files.length} video → gộp vào thư mục{' '}
+                    <span className="font-semibold text-violet-200">“{crumbs[crumbs.length - 1] ?? ''}”</span>{' '}
+                    <span className="text-muted-foreground">({formatBytes(totalBytes)})</span>
+                    <br />
+                    <span className="text-[11px] text-zinc-400">
+                        Lưu vào: {path} · mỗi video là một mục riêng, đặt tên theo tên file.
+                    </span>
                 </p>
             ) : ctx.existingAsset ? (
                 <p className="mt-2 text-[11.5px] text-zinc-300">
@@ -444,14 +480,22 @@ function ConfirmStrip({
                 </p>
             ) : (
                 <p className="mt-2 text-[11.5px] text-zinc-400">
-                    Lưu vào: <span className="text-zinc-200">{path}</span>
+                    Lưu vào: <span className="text-zinc-200">{path}</span>{' '}
+                    <span className="text-muted-foreground">(không tạo thư mục riêng)</span>
                 </p>
             )}
 
+            {/* The old copy read "Không nhận diện được Khách/Brand từ tên task — sẽ lưu theo tên
+                hiện tại": it names an internal parsing convention the user was never told about and
+                ends on "tên hiện tại" (whose name?). The owner said on camera: "là sao ta, không
+                hiểu lắm". Say what happened, where the file lands, and that nothing is broken. */}
             {ctx && !ctx.parsedOk && (
                 <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-300/90">
                     <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                    Không nhận diện được Khách/Brand từ tên task — sẽ lưu theo tên hiện tại.
+                    <span>
+                        Tên task không theo mẫu <span className="text-amber-200">“Khách / Brand · Tên video”</span>, nên
+                        thư mục video sẽ lấy nguyên tên task. File vẫn được lưu bình thường vào đường dẫn ở trên.
+                    </span>
                 </p>
             )}
 

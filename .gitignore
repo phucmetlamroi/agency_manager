@@ -62,3 +62,7 @@ playwright-report/
 test-results/
 
 audit-confirmed.json
+
+# Operational record of the 2026-07-27 folder-flatten migration: real production row ids.
+# Kept on disk as the undo reference, never committed.
+scripts/.flatten-rollback.jsonl

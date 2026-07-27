@@ -12,6 +12,13 @@ export interface ItemRef {
     type: ItemKind
     id: string
 }
+/** Trash can additionally hold a single VERSION deleted out of a live stack — see TrashItemType in
+ *  dto.ts. Move/copy/delete/purge stay folder|asset; only listing and RESTORE are wider. */
+export type TrashItemKind = ItemKind | 'version'
+export interface TrashItemRef {
+    type: TrashItemKind
+    id: string
+}
 export interface MoveRef extends ItemRef {
     rowVersion: number
 }
@@ -66,15 +73,32 @@ export async function apiDeleteItems(items: ItemRef[]): Promise<{ purgeAt: strin
 }
 
 export interface RestoreResult {
-    restored: { type: ItemKind; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[]
+    restored: { type: TrashItemKind; id: string; restoredToFolderId: string | null; movedToRoot: boolean }[]
 }
 
-export async function apiRestoreItems(items: ItemRef[]): Promise<RestoreResult> {
+export async function apiRestoreItems(items: TrashItemRef[]): Promise<RestoreResult> {
     return postJson('/api/review/trash/restore', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 
+/** [foldering 2026-07-27] "Bỏ thư mục" — lift the videos to the parent, drop the wrapper. */
+export async function apiUngroupFolder(folderId: string): Promise<{ movedAssetIds: string[]; parentId: string }> {
+    return postJson('/api/review/folders/ungroup', { folderId })
+}
+
+/** [foldering 2026-07-27] "Gộp thành thư mục" — the manual inverse, for hooks that arrive late. */
+export async function apiGroupAssets(assetIds: string[], name: string): Promise<{ folderId: string }> {
+    return postJson('/api/review/items/group', { assetIds, name })
+}
+
 /** P6.2 "Delete forever" — ADMIN-only permanent purge (Mux + R2 + rows). */
-export async function apiPurgeItems(items: ItemRef[]): Promise<{ versions: number; assets: number; folders: number }> {
+/** `blocked` lists what the purge refused (a folder still holding live rows) or failed to delete.
+ *  Reporting a bare success used to hide both — see the purge.ts note. */
+export async function apiPurgeItems(items: ItemRef[]): Promise<{
+    versions: number
+    assets: number
+    folders: number
+    blocked: { type: 'folder' | 'asset'; id: string; name: string; reason: 'has_live_descendants' | 'delete_failed' | 'not_in_trash' }[]
+}> {
     return postJson('/api/review/trash/purge', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 

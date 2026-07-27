@@ -208,6 +208,8 @@ interface ItemRuntime {
     file: File
     target: UploadTarget
     mimeType: string
+    /** Files in the same drop/pick as this one — see EnqueueOptions.batchSize. */
+    batchSize?: number
     idempotencyKey: string
     contentValidated: boolean
     // set after initiate:
@@ -241,6 +243,10 @@ interface ItemRuntime {
 
 export interface EnqueueOptions {
     targetLabel?: string
+    /** [foldering 2026-07-27] Number of files in the SAME drop/pick this item belongs to. Sent to
+     *  the task-upload initiate so the server can tell "next version of this video" (1) from
+     *  "a set of hooks" (>1). Only meaningful for kind:'task'. */
+    batchSize?: number
 }
 
 export interface UploadEngine {
@@ -332,17 +338,18 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         store.add(base)
         if (!meta.ok) return id
 
-        runtimes.set(id, freshRuntime(file, target, mimeType))
+        runtimes.set(id, freshRuntime(file, target, mimeType, opts.batchSize))
         // Content sniff (async) before we let it consume a slot.
         void sniffContent(id, file, meta.kind)
         return id
     }
 
-    function freshRuntime(file: File, target: UploadTarget, mimeType: string): ItemRuntime {
+    function freshRuntime(file: File, target: UploadTarget, mimeType: string, batchSize?: number): ItemRuntime {
         return {
             file,
             target,
             mimeType,
+            batchSize,
             idempotencyKey: genId(),
             contentValidated: false,
             initiated: false,
@@ -440,7 +447,13 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         if (rt.target.kind === 'task') {
             resp = await postJson<InitiateBody>(
                 TASK_INITIATE_URL,
-                { taskId: rt.target.taskId, fileName: rt.file.name, sizeBytes: String(size), mimeType: rt.mimeType },
+                {
+                    taskId: rt.target.taskId,
+                    fileName: rt.file.name,
+                    sizeBytes: String(size),
+                    mimeType: rt.mimeType,
+                    batchSize: rt.batchSize,
+                },
                 rt.idempotencyKey,
             )
         } else {
@@ -666,7 +679,13 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         if (rt.target.kind === 'task') {
             resp = await postJson<InitiateBody>(
                 TASK_INITIATE_URL,
-                { taskId: rt.target.taskId, fileName: rt.file.name, sizeBytes: String(size), mimeType: rt.mimeType },
+                {
+                    taskId: rt.target.taskId,
+                    fileName: rt.file.name,
+                    sizeBytes: String(size),
+                    mimeType: rt.mimeType,
+                    batchSize: rt.batchSize,
+                },
                 rt.idempotencyKey,
             )
         } else {

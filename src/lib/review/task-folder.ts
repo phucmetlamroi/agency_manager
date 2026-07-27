@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { buildSystemKey, slugifyBrand } from './upload-helpers'
+import { reviveSystemFolderChain } from './folders'
 import type { ParsedTaskVideo } from './parse-task-context'
 
 export interface BreadcrumbItem {
@@ -45,7 +46,16 @@ async function ensureFolder(args: {
     onNameCollision?: 'adopt' | 'suffix'
 }): Promise<FolderRef> {
     const found = await prisma.reviewFolder.findUnique({ where: { systemKey: args.systemKey } })
-    if (found) return { id: found.id, path: found.path, depth: found.depth, name: found.name }
+    if (found) {
+        // [bug 2026-07-27] `systemKey` is @unique, so a TRASHED level squats its key forever —
+        // no replacement row can ever be created and this lookup keeps handing the trashed row
+        // back as the parent for new uploads. The deliverable then lands under a soft-deleted
+        // ancestor and vanishes from Tệp (tree, root listing and getFolder all filter
+        // `deletedAt: null`), while the purge cron refuses to reap the folder because it now
+        // holds live descendants. Re-open the corridor before returning it.
+        if (found.deletedAt) await reviveSystemFolderChain(found.id)
+        return { id: found.id, path: found.path, depth: found.depth, name: found.name }
+    }
 
     const isP2002 = (e: unknown): e is Prisma.PrismaClientKnownRequestError =>
         e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
@@ -79,7 +89,12 @@ async function ensureFolder(args: {
         if (!isP2002(e)) throw e
         // (a) Lost a create race on the unique systemKey → adopt the winner's row.
         const bySystemKey = await prisma.reviewFolder.findUnique({ where: { systemKey: args.systemKey } })
-        if (bySystemKey) return { id: bySystemKey.id, path: bySystemKey.path, depth: bySystemKey.depth, name: bySystemKey.name }
+        if (bySystemKey) {
+            // Same invariant as the fast path above: every return from ensureFolder must be a
+            // folder the UI can actually reach.
+            if (bySystemKey.deletedAt) await reviveSystemFolderChain(bySystemKey.id)
+            return { id: bySystemKey.id, path: bySystemKey.path, depth: bySystemKey.depth, name: bySystemKey.name }
+        }
 
         // (b) Otherwise the P2002 is the (parentId, lower(name)) name collision — resolve per mode.
         if ((args.onNameCollision ?? 'adopt') === 'adopt') {
@@ -115,6 +130,55 @@ async function ensureFolder(args: {
 }
 
 /**
+ * READ-ONLY preview of where a task upload will land — the same systemKey chain the writer
+ * resolves, without creating anything.
+ *
+ * [audit 2026-07-27 · LOW] The "Lưu vào …" strip used to be pure string arithmetic over the task
+ * title: it issued zero queries against ReviewFolder and was therefore structurally incapable of
+ * naming the destination. ensureFolder matches by KEY and returns whatever that row is currently
+ * called, so a folder renamed in Tệp kept receiving uploads while the strip kept promising the old
+ * parsed string forever. Resolving the same keys here makes the promise checkable.
+ *
+ * `exists: false` means the level will be created by this upload — worth showing as "sẽ tạo mới"
+ * rather than as an existing location. A trashed level is reported but not fatal: the upload path
+ * revives a trashed system chain (see reviveSystemFolderChain), so it is no longer a dead end.
+ */
+export async function resolveTaskFolderPreview(args: {
+    workspaceId: string
+    rootName: string
+    taskId: string
+    clientId: string | null
+    parsed: ParsedTaskVideo
+}): Promise<{ name: string; exists: boolean; trashed: boolean }[]> {
+    const { workspaceId, rootName, taskId, clientId, parsed } = args
+    const clientKey = clientId ?? slugifyBrand(parsed.client)
+    const brandKey = parsed.brand ? slugifyBrand(parsed.brand) : null
+
+    const levels: { key: string; fallbackName: string }[] = [
+        { key: buildSystemKey({ workspaceId }), fallbackName: rootName || 'Team' },
+        { key: buildSystemKey({ workspaceId, clientId: clientKey }), fallbackName: parsed.client },
+    ]
+    if (parsed.brand) {
+        levels.push({ key: buildSystemKey({ workspaceId, clientId: clientKey, brandKey }), fallbackName: parsed.brand })
+    }
+    levels.push({
+        key: `${buildSystemKey({ workspaceId, clientId: clientKey, brandKey, taskId })}:video:${slugifyBrand(parsed.video)}`,
+        fallbackName: parsed.video,
+    })
+
+    // deletedAt is SELECTED, never filtered — the point is to see a trashed row, not to miss it.
+    const rows = await prisma.reviewFolder.findMany({
+        where: { systemKey: { in: levels.map((l) => l.key) } },
+        select: { systemKey: true, name: true, deletedAt: true },
+    })
+    const byKey = new Map(rows.map((r) => [r.systemKey!, r]))
+    return levels.map((l) => {
+        const row = byKey.get(l.key)
+        return { name: row?.name ?? l.fallbackName, exists: !!row, trashed: row?.deletedAt != null }
+    })
+}
+
+/**
  * Resolve/create root → client → [brand] → video for a task upload.
  * `clientId` is the review-scalar string form of the task's client (or null).
  * Returns the leaf (video) folder + the breadcrumb for the UI "saved to …" toast.
@@ -126,6 +190,20 @@ export async function ensureTaskFolderPath(args: {
     clientId: string | null
     parsed: ParsedTaskVideo
     createdById: string
+    /** [foldering 2026-07-27] Create the per-task VIDEO folder, or drop the deliverable straight
+     *  into the client/brand folder?
+     *
+     *  The module used to ALWAYS wrap: root → client → [brand] → video → the one asset. That was a
+     *  deliberate bet on multi-hook sets, but for the overwhelmingly common single-deliverable task
+     *  it cost every viewer an extra click into a folder holding exactly one item, and the owner's
+     *  team and clients pushed back on it.
+     *
+     *  Now the wrapper is earned, not assumed: false (default) = flat, true = group. The caller
+     *  decides from the ONE unambiguous signal available — how many files were dropped in a single
+     *  action. Dropping several files onto one task means "these are siblings"; uploading one file
+     *  again later means "this is the next version", which must NOT become a folder or the whole
+     *  feedback→revise loop would fork into separate videos. */
+    groupInFolder?: boolean
 }): Promise<{ videoFolder: FolderRef; breadcrumb: BreadcrumbItem[] }> {
     const { workspaceId, rootName, taskId, clientId, parsed, createdById } = args
     // Stable client identity: the real clientId when present, else a slug of the parsed name.
@@ -166,6 +244,10 @@ export async function ensureTaskFolderPath(args: {
         breadcrumb.push({ id: brand.id, name: brand.name })
         parent = brand
     }
+
+    // [foldering 2026-07-27] Flat by default — the deliverable lands in the client/brand folder and
+    // the breadcrumb stops here. No empty-ish wrapper holding a single video.
+    if (!args.groupInFolder) return { videoFolder: parent, breadcrumb }
 
     // The video level is per (task, video-name): the task's own deliverable folder.
     const videoSystemKey = `${buildSystemKey({ workspaceId, clientId: clientKey, brandKey, taskId })}:video:${slugifyBrand(parsed.video)}`

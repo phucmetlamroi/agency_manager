@@ -24,6 +24,7 @@ import {
     UploadCloud,
     FolderUp,
     FolderPlus,
+    FolderOpen,
 } from 'lucide-react'
 
 export type MenuTargetKind = 'folder' | 'asset'
@@ -88,6 +89,8 @@ export interface ItemMenuHandlers {
     onDuplicate: () => void
     onRename: () => void
     onDelete: () => void
+    /** [foldering 2026-07-27] Folder menu only: lift the videos out and drop the wrapper. */
+    onUngroup?: () => void
     canDelete: boolean
     /** P3.4 — asset menu only; present (enabled) when a single asset is the target. */
     onManageVersions?: () => void
@@ -109,6 +112,14 @@ export function FolderMenuContent(h: ItemMenuHandlers) {
             <Item icon={<FolderInput size={15} />} label="Di chuyển tới…" onSelect={h.onMoveTo} />
             <Item icon={<Files size={15} />} label="Nhân bản" onSelect={h.onDuplicate} />
             <Item icon={<Pencil size={15} />} label="Đổi tên" onSelect={h.onRename} />
+            {h.onUngroup && (
+                <Item
+                    icon={<FolderOpen size={15} />}
+                    label="Bỏ thư mục"
+                    onSelect={h.onUngroup}
+                    hint="Đưa video bên trong ra thư mục cha rồi xóa thư mục này"
+                />
+            )}
             <Sep />
             <Item
                 icon={<Trash2 size={15} />}

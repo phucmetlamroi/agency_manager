@@ -17,6 +17,10 @@ const TaskInitiateSchema = z.object({
     fileName: z.string().min(1).max(255),
     sizeBytes: z.string().regex(/^\d+$/, 'sizeBytes phải là chuỗi số nguyên (BigInt string).'),
     mimeType: z.string().min(1).max(255),
+    // [foldering 2026-07-27] How many files this single drop/pick contained. 1 (or absent) = a
+    // cut/revision → flat + task-named + auto-versioned. >1 = a multi-hook set → grouped folder +
+    // per-file asset names. Capped so a hostile client can't claim an absurd batch.
+    batchSize: z.number().int().min(1).max(50).optional(),
 })
 
 export const POST = withReviewRoute(async (req: NextRequest) => {
@@ -27,6 +31,7 @@ export const POST = withReviewRoute(async (req: NextRequest) => {
         fileName: parsed.data.fileName,
         sizeBytes: BigInt(parsed.data.sizeBytes),
         mimeType: parsed.data.mimeType,
+        batchSize: parsed.data.batchSize,
         idempotencyKey: req.headers.get('idempotency-key'),
     })
     return apiJson(result.body, { status: result.status })

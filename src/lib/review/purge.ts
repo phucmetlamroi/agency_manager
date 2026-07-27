@@ -302,6 +302,25 @@ export interface PurgeItemRef {
 }
 
 /**
+ * [audit 2026-07-27 · MED] Why the manual purge now reports per-item outcomes.
+ *
+ * Every failure mode used to be silent. The live-descendant guard was a bare `continue`, the row
+ * delete swallowed every error (including the onDelete:Restrict FK violation) with `.catch(() => {})`,
+ * and `total.folders` was only incremented on success — yet the TRASH_PURGED activity was recorded
+ * unconditionally and the route returned 200. So the admin saw a green
+ * "Đã xóa vĩnh viễn 0 asset · 0 thư mục", the row was still there after the refresh, and the audit
+ * log claimed the folder had been permanently deleted. The guard itself is right — it is what stops
+ * a live child being destroyed. The reporting was what lied.
+ */
+export type PurgeBlockReason = 'has_live_descendants' | 'delete_failed' | 'not_in_trash'
+export interface PurgeBlockedItem {
+    type: 'folder' | 'asset'
+    id: string
+    name: string
+    reason: PurgeBlockReason
+}
+
+/**
  * ADMIN-only immediate purge of the given trash items (each = a batch root in the
  * Recently Deleted UI). Runs the SAME teardown as the cron; for a folder root it
  * purges the whole subtree (assets deepest-first, then folders). Bypasses the
@@ -311,16 +330,21 @@ export interface PurgeItemRef {
 export async function manualPurgeItems(
     input: { items: PurgeItemRef[] },
     ctx: { workspaceId: string; userId: string; isAdmin: boolean },
-): Promise<PurgeStats> {
+): Promise<{ stats: PurgeStats; blocked: PurgeBlockedItem[] }> {
     const total = emptyStats()
+    const blocked: PurgeBlockedItem[] = []
 
     for (const item of input.items) {
         if (item.type === 'asset') {
             const asset = await prisma.reviewAsset.findFirst({
                 where: { id: item.id, workspaceId: ctx.workspaceId, deletedAt: { not: null } },
-                select: { id: true },
+                select: { id: true, name: true },
             })
-            if (asset) addStats(total, await purgeAssetById(asset.id, 'manual', ctx.userId))
+            if (!asset) {
+                blocked.push({ type: 'asset', id: item.id, name: '', reason: 'not_in_trash' })
+                continue
+            }
+            addStats(total, await purgeAssetById(asset.id, 'manual', ctx.userId))
             continue
         }
         // Folder root → purge its whole deleted subtree: assets first, then folders deepest-first.
@@ -328,7 +352,10 @@ export async function manualPurgeItems(
             where: { id: item.id, workspaceId: ctx.workspaceId, deletedAt: { not: null } },
             select: { id: true, path: true, name: true, workspaceId: true },
         })
-        if (!folder) continue
+        if (!folder) {
+            blocked.push({ type: 'folder', id: item.id, name: '', reason: 'not_in_trash' })
+            continue
+        }
         const subAssets = await prisma.reviewAsset.findMany({
             where: { folder: { path: { startsWith: folder.path } }, deletedAt: { not: null } },
             select: { id: true },
@@ -339,28 +366,50 @@ export async function manualPurgeItems(
             select: { id: true, path: true, name: true, workspaceId: true },
             orderBy: { path: 'desc' },
         })
+        let rootDeleted = false
         for (const f of subFolders) {
-            if (await folderHasDescendantRow(f)) continue // a LIVE (restored) child keeps it
-            await prisma.reviewFolder.delete({ where: { id: f.id } }).catch(() => {})
+            if (await folderHasDescendantRow(f)) {
+                // A LIVE (restored, or squatted-into) child keeps it. Report it for the root; a
+                // deeper one is implied by its ancestor surviving.
+                if (f.id === folder.id) blocked.push({ type: 'folder', id: f.id, name: f.name, reason: 'has_live_descendants' })
+                continue
+            }
+            const ok = await prisma.reviewFolder
+                .delete({ where: { id: f.id } })
+                .then(() => true)
+                .catch((e) => {
+                    reviewLog('error', 'purge.manual_folder_delete_failed', { folderId: f.id, error: String(e) })
+                    return false
+                })
+            if (!ok) {
+                if (f.id === folder.id) blocked.push({ type: 'folder', id: f.id, name: f.name, reason: 'delete_failed' })
+                continue
+            }
             total.folders++
+            if (f.id === folder.id) rootDeleted = true
         }
-        await recordActivity(prisma, {
-            type: REVIEW_ACTIVITY.TRASH_PURGED,
-            workspaceId: folder.workspaceId,
-            folderId: folder.id,
-            actorUserId: ctx.userId,
-            meta: { kind: 'manual', itemName: folder.name, itemType: 'folder' },
-        })
+        // Only claim a purge that actually happened — the audit trail used to record TRASH_PURGED
+        // for folders still sitting in the trash.
+        if (rootDeleted) {
+            await recordActivity(prisma, {
+                type: REVIEW_ACTIVITY.TRASH_PURGED,
+                workspaceId: folder.workspaceId,
+                folderId: folder.id,
+                actorUserId: ctx.userId,
+                meta: { kind: 'manual', itemName: folder.name, itemType: 'folder' },
+            })
+        }
     }
     reviewLog('info', 'purge.manual', {
         userId: ctx.userId,
         items: input.items.length,
         assets: total.assets,
         folders: total.folders,
+        blocked: blocked.length,
         muxDeleted: total.muxDeleted,
         r2Deleted: total.r2Deleted,
     })
-    return total
+    return { stats: total, blocked }
 }
 
 /**
@@ -374,6 +423,8 @@ export async function purgeItemsAuthorized(input: { items: PurgeItemRef[] }): Pr
     assets: number
     folders: number
     bytesFreed: string
+    /** Items the purge refused or failed to destroy — the UI must not report these as deleted. */
+    blocked: PurgeBlockedItem[]
 }> {
     if (!input.items.length || input.items.length > 200) {
         throw apiError(400, 'VALIDATION_ERROR', 'Số mục phải từ 1–200.')
@@ -390,6 +441,12 @@ export async function purgeItemsAuthorized(input: { items: PurgeItemRef[] }): Pr
     if (!access.isAdmin) {
         throw apiError(403, 'FORBIDDEN', 'Chỉ admin mới xóa vĩnh viễn được.')
     }
-    const stats = await manualPurgeItems(input, { workspaceId, userId: access.userId, isAdmin: true })
-    return { versions: stats.versions, assets: stats.assets, folders: stats.folders, bytesFreed: stats.bytesFreed.toString() }
+    const { stats, blocked } = await manualPurgeItems(input, { workspaceId, userId: access.userId, isAdmin: true })
+    return {
+        versions: stats.versions,
+        assets: stats.assets,
+        folders: stats.folders,
+        bytesFreed: stats.bytesFreed.toString(),
+        blocked,
+    }
 }

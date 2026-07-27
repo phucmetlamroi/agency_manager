@@ -10,7 +10,9 @@ import { restoreItems } from '@/lib/review/folders'
 
 const RestoreSchema = z.object({
     items: z
-        .array(z.object({ type: z.enum(['folder', 'asset']), id: z.string().min(1) }))
+        // 'version' — a single version deleted out of a live stack is its own trash root, and the
+        // confirm dialog promises it is restorable for 30 days. See TrashItemType in dto.ts.
+        .array(z.object({ type: z.enum(['folder', 'asset', 'version']), id: z.string().min(1) }))
         .min(1)
         .max(200),
 })

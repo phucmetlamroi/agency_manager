@@ -67,27 +67,49 @@ async function applyMuxReady(
 ): Promise<'applied' | 'noop' | 'unexpected' | 'gone'> {
     const version = await prisma.reviewVersion.findFirst({
         where: { id: versionId },
-        include: { asset: { select: { taskId: true } } },
+        include: { asset: { select: { taskId: true, deletedAt: true } } },
     })
     if (!version) return 'gone'
     const meta = extractReadyMeta(asset)
+    const readyData = {
+        pipelineStatus: ReviewPipelineStatus.READY,
+        reviewState: ReviewState.AWAITING_REVIEW,
+        readyAt: new Date(),
+        muxAssetId: asset.id ?? version.muxAssetId,
+        muxPlaybackId: meta.muxPlaybackId,
+        durationMs: meta.durationMs,
+        fpsNumerator: meta.fpsNumerator,
+        fpsDenominator: meta.fpsDenominator,
+        width: meta.width,
+        height: meta.height,
+        videoCodec: meta.videoCodec,
+        audioCodec: meta.audioCodec,
+    }
+
+    // [audit 2026-07-27 · HIGH] Mux transcoding takes minutes, and a version (or its whole stack)
+    // can be trashed inside that window. This function used to plough on regardless: it re-pointed
+    // the asset's head at the DELETED version, cleared a guest approval, flipped the task to
+    // "Đã nộp video (nội bộ)", emailed the manager about a cut nobody can open, and — via
+    // revokeClientExposureOnNewVersion downstream — revoked the client's live review link over a
+    // delivery that had been thrown away. Record the media metadata (so restoring the version later
+    // yields something playable) and stop: no head re-point, no task transition, no notifications.
+    // 'noop' consumes the event — the version is not coming back to PROCESSING, so retrying is futile.
+    if (version.deletedAt != null || version.asset.deletedAt != null) {
+        await prisma.reviewVersion.updateMany({
+            where: { id: versionId, pipelineStatus: ReviewPipelineStatus.PROCESSING },
+            data: readyData,
+        })
+        reviewLog('warn', 'mux.ready_on_trashed_version', {
+            versionId,
+            assetTrashed: version.asset.deletedAt != null,
+        })
+        return 'noop'
+    }
+
     const applied = await prisma.$transaction(async (tx) => {
         const flip = await tx.reviewVersion.updateMany({
-            where: { id: versionId, pipelineStatus: ReviewPipelineStatus.PROCESSING },
-            data: {
-                pipelineStatus: ReviewPipelineStatus.READY,
-                reviewState: ReviewState.AWAITING_REVIEW,
-                readyAt: new Date(),
-                muxAssetId: asset.id ?? version.muxAssetId,
-                muxPlaybackId: meta.muxPlaybackId,
-                durationMs: meta.durationMs,
-                fpsNumerator: meta.fpsNumerator,
-                fpsDenominator: meta.fpsDenominator,
-                width: meta.width,
-                height: meta.height,
-                videoCodec: meta.videoCodec,
-                audioCodec: meta.audioCodec,
-            },
+            where: { id: versionId, pipelineStatus: ReviewPipelineStatus.PROCESSING, deletedAt: null },
+            data: readyData,
         })
         if (flip.count === 0) return false
         // The newest ready version becomes the stack head. When it does, CLEAR a stale

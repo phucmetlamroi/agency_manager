@@ -23,6 +23,7 @@ import {
     assertAssetInScope,
 } from './folder-scope'
 import { apiError } from './errors'
+import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import {
     serializeFolder,
     serializeAsset,
@@ -1628,6 +1629,21 @@ export async function renameAsset(
         })
     }
     await prisma.reviewAsset.update({ where: { id: assetId }, data: { name, rowVersion: { increment: 1 } } })
+    // [foldering 2026-07-27] Record the rename. Besides closing an audit gap (this was the one
+    // mutation in the module that left no trace), the row is the marker initiateTaskUpload reads to
+    // know this name was chosen by a PERSON — after which the auto "keep the deliverable's name in
+    // sync with its task title" behaviour must leave it alone.
+    if (name !== existing.name) {
+        await recordActivity(prisma, {
+            type: REVIEW_ACTIVITY.ASSET_RENAMED,
+            workspaceId: existing.workspaceId,
+            taskId: existing.taskId,
+            folderId: existing.folderId,
+            assetId,
+            actorUserId: access.userId,
+            meta: { old: existing.name, new: name },
+        })
+    }
     return loadAssetDto(assetId)
 }
 

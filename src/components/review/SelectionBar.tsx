@@ -6,7 +6,7 @@
 // Delete. "Manage Versions" shows only when exactly one asset is selected (P3.4).
 // Esc / the clear button dismiss the selection.
 
-import { Download, FolderInput, CopyPlus, Trash2, X, Layers } from 'lucide-react'
+import { Download, FolderInput, FolderPlus, CopyPlus, Trash2, X, Layers } from 'lucide-react'
 import type { FolderDto, AssetDto } from '@/lib/review/dto'
 import { bytesLabel } from './TeamCards'
 
@@ -40,6 +40,7 @@ export function SelectionBar({
     onDelete,
     onClear,
     onManageVersions,
+    onGroup,
 }: {
     folders: FolderDto[]
     assets: AssetDto[]
@@ -53,6 +54,10 @@ export function SelectionBar({
     onClear: () => void
     /** P3.4 — open Manage Versions for the sole selected asset. */
     onManageVersions?: () => void
+    /** [foldering 2026-07-27] Put the selected videos into a new folder beside them. Offered only
+     *  for an asset-only selection of 2+ — the manual path for hooks that arrive separately, which
+     *  the upload flow deliberately will not guess at. */
+    onGroup?: () => void
 }) {
     const nFolders = folders.length
     const nAssets = assets.length
@@ -98,6 +103,9 @@ export function SelectionBar({
                 <div className="flex items-center gap-1">
                     <BarBtn icon={<Download size={14} />} label="Tải xuống" onClick={onDownload} />
                     <BarBtn icon={<FolderInput size={14} />} label="Di chuyển" onClick={onMove} />
+                    {nFolders === 0 && nAssets >= 2 && onGroup && (
+                        <BarBtn icon={<FolderPlus size={14} />} label="Gộp thành thư mục" onClick={onGroup} />
+                    )}
                     <BarBtn icon={<CopyPlus size={14} />} label="Sao chép" onClick={onCopy} />
                     {soleAsset && onManageVersions && (
                         <BarBtn

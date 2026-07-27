@@ -910,6 +910,145 @@ export async function moveItems(input: {
     })
 }
 
+// ─────────────────────── group / ungroup (foldering 2026-07-27) ───────────────────────
+
+/** Free name in `folderId`, appending " (2)", " (3)"… until the partial unique index is satisfied:
+ *  UNIQUE ("folderId", lower("name")) WHERE "deletedAt" IS NULL. */
+async function freeAssetName(tx: Prisma.TransactionClient, folderId: string, desired: string): Promise<string> {
+    const siblings = await tx.reviewAsset.findMany({
+        where: { folderId, deletedAt: null },
+        select: { name: true },
+    })
+    const taken = new Set(siblings.map((s) => s.name.toLowerCase()))
+    if (!taken.has(desired.toLowerCase())) return desired
+    for (let n = 2; n < 1000; n++) {
+        const candidate = `${desired} (${n})`
+        if (!taken.has(candidate.toLowerCase())) return candidate
+    }
+    return `${desired} (${randomUUID().slice(0, 8)})`
+}
+
+/**
+ * "Bỏ thư mục" — lift a folder's videos up to its parent and remove the now-empty wrapper.
+ *
+ * The manual counterpart to the automatic decision at upload time: uploads only create the
+ * per-task folder for a dropped SET, but a set can later shrink to one, or the grouping can
+ * simply be unwanted. Rather than guessing on the user's behalf we give them the inverse.
+ *
+ * Refuses rather than cascades when the folder has sub-folders (nothing here decides where a
+ * whole subtree should land) or is referenced by a share link (ShareLinkItem → folder is
+ * onDelete: Cascade, so removing it would silently break a link already sent to a client).
+ */
+export async function ungroupFolder(input: { folderId: string }): Promise<{ movedAssetIds: string[]; parentId: string }> {
+    const folder = await prisma.reviewFolder.findFirst({
+        where: { id: input.folderId, deletedAt: null },
+        select: { id: true, name: true, parentId: true, path: true, workspaceId: true, createdById: true },
+    })
+    if (!folder) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
+    if (!folder.parentId) throw apiError(409, 'STATE_INVALID', 'Không bỏ được thư mục gốc.')
+
+    const access = await requireReviewAccess({ workspaceId: folder.workspaceId })
+    // Same gate as deleteItems: a non-admin may only restructure folders they created, inside
+    // their assigned subtree.
+    if (!access.isAdmin) {
+        if (folder.createdById !== access.userId) {
+            throw apiError(403, 'FORBIDDEN', 'Chỉ người tạo hoặc quản trị được bỏ thư mục này.')
+        }
+        const scope = await getFolderScope({ userId: access.userId, workspaceId: folder.workspaceId, isAdmin: false })
+        assertFolderPathsMutable(scope, [folder.path])
+    }
+
+    const [childFolders, shareItems] = await Promise.all([
+        prisma.reviewFolder.count({ where: { parentId: folder.id, deletedAt: null } }),
+        prisma.shareLinkItem.count({ where: { folderId: folder.id } }),
+    ])
+    if (childFolders > 0) {
+        throw apiError(409, 'STATE_INVALID', 'Thư mục còn thư mục con — di chuyển chúng ra trước.')
+    }
+    if (shareItems > 0) {
+        throw apiError(409, 'STATE_INVALID', 'Thư mục đang được chia sẻ qua link — gỡ link chia sẻ trước.')
+    }
+
+    const parentId = folder.parentId
+    return prisma.$transaction(async (tx) => {
+        const assets = await tx.reviewAsset.findMany({
+            where: { folderId: folder.id, deletedAt: null },
+            select: { id: true, name: true },
+        })
+        for (const a of assets) {
+            const name = await freeAssetName(tx, parentId, a.name)
+            await tx.reviewAsset.update({ where: { id: a.id }, data: { folderId: parentId, name } })
+        }
+        // Trashed assets still point at this folder (ReviewAsset.folder is onDelete: Restrict), so
+        // they have to come along or the delete below throws — and a restore must not resurrect an
+        // item into a folder that no longer exists.
+        await tx.reviewAsset.updateMany({
+            where: { folderId: folder.id, deletedAt: { not: null } },
+            data: { folderId: parentId },
+        })
+        await tx.reviewFolder.delete({ where: { id: folder.id } })
+        // Parent loses one folder, gains the assets. Ancestor byte totals are unchanged: these
+        // bytes were already counted through this folder on the way up.
+        await tx.reviewFolder.update({
+            where: { id: parentId },
+            data: { itemCount: { increment: assets.length - 1 } },
+        })
+        reviewLog('info', 'folders.ungrouped', { folderId: folder.id, name: folder.name, assets: assets.length })
+        return { movedAssetIds: assets.map((a) => a.id), parentId }
+    })
+}
+
+/**
+ * "Gộp thành thư mục" — the inverse: put selected videos into a new folder beside them.
+ *
+ * Covers the case the upload path deliberately refuses to guess: hook 2 arrives days after
+ * hook 1, as a separate single upload. That gesture already means "next version", so it can
+ * never auto-group; the user says so here instead.
+ */
+export async function groupAssetsIntoFolder(input: {
+    assetIds: string[]
+    name: string
+}): Promise<{ folderId: string }> {
+    if (input.assetIds.length < 2 || input.assetIds.length > BULK_CAP) {
+        throw apiError(400, 'VALIDATION_ERROR', `Chọn từ 2–${BULK_CAP} video để gộp.`)
+    }
+    const name = validateName(input.name)
+    const assets = await prisma.reviewAsset.findMany({
+        where: { id: { in: input.assetIds }, deletedAt: null },
+        select: { id: true, name: true, folderId: true, workspaceId: true, folder: { select: { path: true } } },
+    })
+    if (assets.length !== input.assetIds.length) {
+        throw apiError(404, 'NOT_FOUND', 'Một hoặc nhiều video không tồn tại.')
+    }
+    const parents = new Set(assets.map((a) => a.folderId))
+    if (parents.size !== 1) {
+        throw apiError(400, 'VALIDATION_ERROR', 'Chỉ gộp được các video đang nằm chung một thư mục.')
+    }
+    const workspaces = new Set(assets.map((a) => a.workspaceId))
+    if (workspaces.size !== 1) throw apiError(400, 'CROSS_WORKSPACE', 'Các video không cùng workspace.')
+    const parentId = [...parents][0]
+    const workspaceId = [...workspaces][0]
+
+    const access = await requireReviewAccess({ workspaceId })
+    if (!access.isAdmin) {
+        const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: false })
+        assertFolderPathsMutable(scope, [assets[0].folder?.path ?? ''])
+    }
+
+    // createFolder runs its own access check + name de-dup + counter bookkeeping.
+    const folder = await createFolder({ workspaceId, parentId, name })
+    await prisma.$transaction(async (tx) => {
+        for (const a of assets) {
+            const free = await freeAssetName(tx, folder.id, a.name)
+            await tx.reviewAsset.update({ where: { id: a.id }, data: { folderId: folder.id, name: free } })
+        }
+        await tx.reviewFolder.update({ where: { id: parentId }, data: { itemCount: { decrement: assets.length } } })
+        await tx.reviewFolder.update({ where: { id: folder.id }, data: { itemCount: { increment: assets.length } } })
+    })
+    reviewLog('info', 'folders.grouped', { folderId: folder.id, name, assets: assets.length })
+    return { folderId: folder.id }
+}
+
 // ─────────────────────── delete (soft) ───────────────────────
 
 export async function deleteItems(input: {

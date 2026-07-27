@@ -80,6 +80,16 @@ export async function apiRestoreItems(items: TrashItemRef[]): Promise<RestoreRes
     return postJson('/api/review/trash/restore', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 
+/** [foldering 2026-07-27] "Bỏ thư mục" — lift the videos to the parent, drop the wrapper. */
+export async function apiUngroupFolder(folderId: string): Promise<{ movedAssetIds: string[]; parentId: string }> {
+    return postJson('/api/review/folders/ungroup', { folderId })
+}
+
+/** [foldering 2026-07-27] "Gộp thành thư mục" — the manual inverse, for hooks that arrive late. */
+export async function apiGroupAssets(assetIds: string[], name: string): Promise<{ folderId: string }> {
+    return postJson('/api/review/items/group', { assetIds, name })
+}
+
 /** P6.2 "Delete forever" — ADMIN-only permanent purge (Mux + R2 + rows). */
 export async function apiPurgeItems(items: ItemRef[]): Promise<{ versions: number; assets: number; folders: number }> {
     return postJson('/api/review/trash/purge', { items: items.map((i) => ({ type: i.type, id: i.id })) })

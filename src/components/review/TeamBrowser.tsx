@@ -71,6 +71,8 @@ import {
     apiRestoreItems,
     apiSetAssetStatus,
     apiMergeStacks,
+    apiUngroupFolder,
+    apiGroupAssets,
     downloadVersion,
     downloadZip,
     teamFolderUrl,
@@ -1163,6 +1165,50 @@ export function TeamBrowser({
 
     const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
 
+    /* ---- [foldering 2026-07-27] "Bỏ thư mục" ---- */
+    const doUngroup = useCallback(
+        async (targetFolderId: string) => {
+            const tid = toast.loading('Đang bỏ thư mục…')
+            try {
+                const r = await apiUngroupFolder(targetFolderId)
+                toast.success(
+                    r.movedAssetIds.length === 0
+                        ? 'Đã xóa thư mục rỗng.'
+                        : `Đã đưa ${r.movedAssetIds.length} video ra thư mục cha.`,
+                    { id: tid },
+                )
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+                void refreshTree()
+            } catch (e) {
+                // The server refuses on sub-folders and on share-linked folders; surface its reason
+                // verbatim rather than a generic failure — both are actionable by the user.
+                toast.error(e instanceof Error ? e.message : 'Không bỏ được thư mục.', { id: tid })
+            }
+        },
+        [refreshTree],
+    )
+
+    /* ---- [foldering 2026-07-27] "Gộp thành thư mục" ---- */
+    const doGroup = useCallback(
+        async (assetIds: string[], suggestedName: string) => {
+            const tid = toast.loading('Đang gộp…')
+            try {
+                const r = await apiGroupAssets(assetIds, suggestedName)
+                toast.success(`Đã gộp ${assetIds.length} video vào thư mục mới.`, { id: tid })
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+                void refreshTree()
+                // No name dialog: the folder takes the first video's name and drops straight into
+                // inline rename, so the user types over it instead of filling a modal first.
+                setTimeout(() => startRename(r.folderId), 250)
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không gộp được.', { id: tid })
+            }
+        },
+        [refreshTree, startRename],
+    )
+
     /* ---- context-menu content ---- */
     const renderMenu = useCallback((): ReactNode => {
         if (!menuTarget) {
@@ -1186,6 +1232,10 @@ export function TeamBrowser({
             onRename: () => startRename(target.id),
             onDelete: () => requestDelete(acting),
             canDelete: canDeleteItems(acting),
+            // [foldering 2026-07-27] Only for a single folder — ungroup has no sensible meaning
+            // for a multi-select or for an asset.
+            onUngroup:
+                target.type === 'folder' && acting.length === 1 ? () => void doUngroup(target.id) : undefined,
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
             // P5.5 — share the acting selection (multi-select works via right-click).
             onCreateShare: () =>
@@ -1199,7 +1249,7 @@ export function TeamBrowser({
                 }),
         }
         return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
-    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, workspaceId, folderById, assetById])
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, doUngroup, workspaceId, folderById, assetById])
 
     const selectionActive = selectedIds.size > 0
 
@@ -1466,6 +1516,11 @@ export function TeamBrowser({
                     onManageVersions={
                         selectedFolders.length === 0 && selectedAssets.length === 1
                             ? () => openManageVersions(selectedAssets[0].id)
+                            : undefined
+                    }
+                    onGroup={
+                        selectedFolders.length === 0 && selectedAssets.length >= 2
+                            ? () => void doGroup(selectedAssets.map((a) => a.id), selectedAssets[0].title)
                             : undefined
                     }
                 />

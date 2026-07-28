@@ -462,8 +462,27 @@ export async function createComment(versionId: string, input: CreateCommentInput
                     where: { profileId: task.profileId, userId: { in: mentionIds }, role: { in: ['OWNER', 'ADMIN', 'USER'] } },
                     select: { userId: true },
                 })
+                let recipientIds = staff.map((s) => s.userId)
+                // [kiểm toán 2026-07 · phản biện] Chú thích ngay trên kia ("khách không bao giờ
+                // thấy bình luận nội bộ nên nhắc tên ở đó là an toàn") đúng với khách-qua-LINK,
+                // nhưng SAI với khách của workspace: họ là tài khoản thật, thường mang
+                // ProfileAccess = USER, nên lọt đúng bộ lọc trên. Và `body` được gửi NGUYÊN VĂN
+                // 140 ký tự qua chuông, realtime và web-push — tức nội dung nội bộ đi thẳng tới
+                // khách bằng một đường vòng, dù listComments đã chặn. Cờ !access.isGuest phía
+                // trên chỉ kiểm NGƯỜI GỬI, không kiểm người nhận.
+                if (isInternal && recipientIds.length) {
+                    const guestRows = await prisma.workspaceMember.findMany({
+                        where: { workspaceId: asset.workspaceId, userId: { in: recipientIds }, role: 'GUEST' },
+                        select: { userId: true },
+                    })
+                    if (guestRows.length) {
+                        const guestIds = new Set(guestRows.map((g) => g.userId))
+                        recipientIds = recipientIds.filter((id) => !guestIds.has(id))
+                    }
+                }
+                if (!recipientIds.length) return
                 await notifyReview({
-                    recipientIds: staff.map((s) => s.userId),
+                    recipientIds,
                     excludeUserId: access.userId,
                     type: 'VIDEO_COMMENT_NEW',
                     title: 'Bạn được nhắc trong một bình luận review',

@@ -38,7 +38,7 @@ Railway tự build (`next build --webpack`) rồi chạy `next start`.
 > Tạo schema bằng tay, trỏ đúng vào Postgres của Railway:
 >
 > ```
-> ALLOW_DB_PUSH=1 DATABASE_URL="<DATABASE_URL của Railway>" npx prisma db push
+> ALLOW_DB_PUSH=1 DATABASE_URL="<DATABASE_URL của Railway>" node scripts/maybe-db-push.mjs
 > ```
 >
 > Truyền `DATABASE_URL` nội tuyến là bắt buộc: Prisma CLI đọc `.env` (production) chứ không đọc

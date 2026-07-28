@@ -26,7 +26,7 @@
  *
  * Vì vậy quy trình mới, BẮT BUỘC làm tay và có chủ đích:
  *
- *   ALLOW_DB_PUSH=1 DATABASE_URL="<chuỗi kết nối>" npx prisma db push
+ *   ALLOW_DB_PUSH=1 DATABASE_URL="<chuỗi kết nối>" node scripts/maybe-db-push.mjs
  *
  * Truyền DATABASE_URL nội tuyến là bắt buộc, không phải cho đẹp — Prisma CLI đọc
  * `.env` chứ không đọc `.env.local`, nên lệnh trần sẽ trúng production ngay cả trên
@@ -40,18 +40,23 @@ import { spawnSync } from 'node:child_process'
 const PROD_MARKER = 'ep-autumn-flower'
 
 const url = process.env.DATABASE_URL || ''
-const host = (url.match(/@([^/?]+)/) || [])[1] || '(không đọc được)'
+// [kiểm toán 2026-07 · phản biện] So khớp phải KHÔNG PHÂN BIỆT HOA THƯỜNG. Tên miền DNS
+// vốn không phân biệt hoa thường, nên `...@EP-AUTUMN-FLOWER-123.neon.tech/db` vẫn tới đúng
+// production, trong khi `host.includes('ep-autumn-flower')` trả false và cổng cho qua.
+// Đã chạy thử đúng chuỗi đó: trước sửa ra blocked=false.
+const rawHost = (url.match(/@([^/?]+)/) || [])[1] || ''
+const host = rawHost ? rawHost.toLowerCase() : '(không đọc được)'
 
 if (process.env.ALLOW_DB_PUSH !== '1') {
     console.log('  [maybe-db-push] BỎ QUA `prisma db push` (mặc định).')
     console.log('  [maybe-db-push] Đổi prisma/schema.prisma? Phải tự đẩy, có chủ đích:')
-    console.log('  [maybe-db-push]   ALLOW_DB_PUSH=1 DATABASE_URL="<chuỗi>" npx prisma db push')
+    console.log('  [maybe-db-push]   ALLOW_DB_PUSH=1 DATABASE_URL="<chuỗi>" node scripts/maybe-db-push.mjs')
     process.exit(0)
 }
 
 // [kiểm toán 2026-07 · phản biện] Cổng này TỪNG FAIL-OPEN, và fail-open đúng vào
 // trường hợp thường gặp nhất. Nó soi `process.env.DATABASE_URL`, nhưng tiến trình con
-// `npx prisma db push` KHÔNG đọc biến đó — Prisma CLI tự nạp `.env` (= production).
+// (`prisma db push`) KHÔNG đọc biến đó — Prisma CLI tự nạp `.env` (= production).
 // Khi DATABASE_URL vắng mặt trong môi trường (trạng thái bình thường của `npm install`),
 // `host` thành '(không đọc được)', chuỗi đó không chứa PROD_MARKER, cổng cho qua — rồi
 // tiến trình con vẫn đẩy schema vào PRODUCTION. Cổng gác một biến, còn con dao cầm biến khác.
@@ -62,7 +67,7 @@ if (!url) {
     console.error('\n  [maybe-db-push] DỪNG — ALLOW_DB_PUSH=1 nhưng KHÔNG có DATABASE_URL.')
     console.error('  [maybe-db-push] Không đặt biến này thì Prisma CLI sẽ tự đọc `.env` = PRODUCTION.')
     console.error('  [maybe-db-push] Nói rõ đích đến:')
-    console.error('  [maybe-db-push]   ALLOW_DB_PUSH=1 DATABASE_URL="<chuỗi>" npx prisma db push\n')
+    console.error('  [maybe-db-push]   ALLOW_DB_PUSH=1 DATABASE_URL="<chuỗi>" node scripts/maybe-db-push.mjs\n')
     process.exit(1)
 }
 

@@ -7,6 +7,7 @@ import { BulkEditTaskModal } from './tasks/BulkEditTaskModal'
 import { deleteTask } from '@/actions/task-management-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { failureMessage } from '@/lib/ui/action-feedback'
 import { useRouter } from 'next/navigation'
 import { Search, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pen, Trash2, GripVertical, Timer, Undo2, CalendarDays, ChevronDown, MessageSquare } from 'lucide-react'
 import { AssigneeCell } from './tasks/cells/AssigneeCell'
@@ -320,8 +321,8 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     router.refresh()
                 }
             }
-        } catch {
-            toast.error('Cập nhật trạng thái thất bại')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Cập nhật trạng thái thất bại'))
         }
     }, [tasks, workspaceId, router])
 

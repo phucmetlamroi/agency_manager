@@ -19,7 +19,8 @@
     "test:auto-transition": "tsx scripts/test-auto-transition.ts",
     "test:folder-scope": "tsx scripts/test-folder-scope.ts",
     "test:folder-scope-db": "tsx scripts/test-folder-scope-db.ts",
-    "test:portal-notify": "tsx scripts/test-portal-notify.ts"
+    "test:portal-notify": "tsx scripts/test-portal-notify.ts",
+    "test:offline-message": "npx tsx scripts/test-offline-message.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

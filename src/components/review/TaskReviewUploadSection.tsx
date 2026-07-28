@@ -362,10 +362,23 @@ export function TaskReviewUploadSection({
                 <UploadingCard key={it.id} item={it} />
             ))}
 
-            {/* persisted deliverable cards */}
-            {serverCards.map((a) => (
-                <DeliverableCard key={a.assetId} asset={a} workspaceId={data?.workspaceId ?? ''} />
-            ))}
+            {/* [owner request 2026-07-28] persisted deliverables. ONE video keeps its thumbnail —
+                that is the whole point of the card. A SET collapses to a single tile that opens the
+                task's folder in Tệp: a task of 10 hooks rendered 10 stacked cards and blew the
+                drawer apart, and the thumbnails all look alike anyway, so the grid in Tệp is the
+                better place to tell them apart. Falls back to the card list when the videos are not
+                all in one folder — no single folder means no honest destination to link to. */}
+            {data?.deliverableFolder && serverCards.length >= 2 ? (
+                <DeliverableFolderTile
+                    folder={data.deliverableFolder}
+                    workspaceId={data.workspaceId}
+                    unresolved={serverCards.reduce((n, a) => n + a.unresolvedCommentCount, 0)}
+                />
+            ) : (
+                serverCards.map((a) => (
+                    <DeliverableCard key={a.assetId} asset={a} workspaceId={data?.workspaceId ?? ''} />
+                ))
+            )}
 
             {/* confirm strip after a pick (renders even before context loads) */}
             {pendingFiles.length > 0 ? (
@@ -710,6 +723,47 @@ function UploadingCard({ item }: { item: UploadItem }) {
                 </div>
             </div>
         </div>
+    )
+}
+
+/* ── collapsed tile for a task whose deliverables are a SET (2+ in one folder) ─── */
+
+function DeliverableFolderTile({
+    folder,
+    workspaceId,
+    unresolved,
+}: {
+    folder: { id: string; name: string; videoCount: number }
+    workspaceId: string
+    unresolved: number
+}) {
+    const open = () => {
+        if (workspaceId) window.location.assign(`/${workspaceId}/team/folder/${folder.id}`)
+    }
+    return (
+        <button
+            type="button"
+            onClick={open}
+            className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-violet-400/40 hover:bg-white/[0.06]"
+            title={`Mở thư mục “${folder.name}” trong ${REVIEW_MODULE_LABEL}`}
+        >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-300">
+                <Clapperboard size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-zinc-100">{folder.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                    <span>{folder.videoCount} video</span>
+                    {unresolved > 0 && (
+                        <>
+                            <span className="text-zinc-700">·</span>
+                            <span className="text-amber-300/90">{unresolved} góp ý chưa xử lý</span>
+                        </>
+                    )}
+                </div>
+            </div>
+            <span className="shrink-0 text-[11.5px] font-medium text-violet-300">Mở thư mục →</span>
+        </button>
     )
 }
 

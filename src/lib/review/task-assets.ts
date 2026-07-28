@@ -72,6 +72,12 @@ export interface TaskAssetsResult {
     workspaceId: string
     assets: TaskDeliverableDto[]
     uploadContext: TaskUploadContextDto
+    /** [owner request 2026-07-28] Set only when the task has 2+ deliverables that all live in ONE
+     *  folder. The drawer then collapses them into a single tile that opens that folder in Tệp,
+     *  instead of stacking one thumbnail card per video — a set of 10 hooks blew the panel apart.
+     *  Null when there is 1 video (show its thumbnail) or when the videos are spread across
+     *  folders (no single honest destination, so keep the list rather than link somewhere wrong). */
+    deliverableFolder: { id: string; name: string; videoCount: number } | null
     /** Null unless the viewer can confirm a finished feedback round — see TaskFixConfirmDto.
      *  Doubles as the "task is mid-revision AND you may act on it" signal the confirm-strip uses
      *  to offer "đây là bản đã sửa feedback?", so no separate status field is needed here. */
@@ -293,9 +299,21 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             ? { assetId: fixAsset.id, targetStatus: fixTarget, onBehalf: !isAssignee }
             : null
 
+    // Collapse target: every visible deliverable in the same folder, 2 or more of them.
+    const distinctFolderIds = Array.from(new Set(assetRows.map((a) => a.folderId).filter((x): x is string => !!x)))
+    let deliverableFolder: TaskAssetsResult['deliverableFolder'] = null
+    if (assetRows.length >= 2 && distinctFolderIds.length === 1) {
+        const f = await prisma.reviewFolder.findFirst({
+            where: { id: distinctFolderIds[0], deletedAt: null },
+            select: { id: true, name: true },
+        })
+        if (f) deliverableFolder = { id: f.id, name: f.name, videoCount: assetRows.length }
+    }
+
     return {
         workspaceId,
         assets,
+        deliverableFolder,
         uploadContext: { breadcrumb, parsedOk: parsed.matched, existingAsset, taskAssets },
         fixConfirm,
     }

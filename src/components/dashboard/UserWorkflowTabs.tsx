@@ -67,7 +67,7 @@ const TABS: TabConfig[] = [
     // introduce — would otherwise fall out of every tab and DISAPPEAR from the editor's home. This
     // tab surfaces those so a task can never silently vanish. Rendered only when it has tasks (see
     // visibleTabs), so it stays invisible in normal 14-status operation.
-    { id: "other",    label: "Khác",         statuses: [],                                                          color: "#71717A" },
+    { id: "other",    label: "Khác",         statuses: [],                                                          color: "#878790" },
 ]
 
 // Statuses claimed by a real tab — the "other" catch-all shows everything NOT in here.
@@ -92,7 +92,7 @@ const NP = {
     accentGlow: "rgba(139,92,246,0.35)",
     textPrimary: "#FFFFFF",
     textSecondary: "#A1A1AA",
-    textMuted: "#71717A",
+    textMuted: "#878790",
     lilac: "#D8B4FE",
     pageActive: "rgba(139,92,246,0.20)",
     pageActiveBorder: "rgba(139,92,246,0.30)",

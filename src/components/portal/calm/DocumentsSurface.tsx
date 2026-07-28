@@ -178,7 +178,7 @@ function FolderTile({ folder, selected, onSelect, onToggle, onOpen }: {
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: '#F4F4F5', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{folder.name}</div>
-                <div style={{ marginTop: 4, color: '#71717A', fontSize: 11, fontWeight: 600 }}>{folder.itemCount} items - {bytesLabel(folder.totalBytes)}</div>
+                <div style={{ marginTop: 4, color: '#878790', fontSize: 11, fontWeight: 600 }}>{folder.itemCount} items - {bytesLabel(folder.totalBytes)}</div>
             </div>
             <button
                 type="button"
@@ -233,7 +233,7 @@ function AssetTile({ asset, selected, layout, onSelect, onToggle, onOpen }: {
                     </span>
                     <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{asset.title}</div>
-                        <div style={{ fontSize: 11, color: '#71717A', marginTop: 2 }}>{asset.workspaceName || 'Project'} - v{asset.currentVersion.versionNumber}</div>
+                        <div style={{ fontSize: 11, color: '#878790', marginTop: 2 }}>{asset.workspaceName || 'Project'} - v{asset.currentVersion.versionNumber}</div>
                     </div>
                 </div>
                 <span style={{ fontSize: 12, color: '#A1A1AA', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{asset.clientName || '-'}</span>
@@ -288,7 +288,7 @@ function AssetTile({ asset, selected, layout, onSelect, onToggle, onOpen }: {
             </div>
             <div style={{ minHeight: 76, padding: 12 }}>
                 <div style={{ color: '#F4F4F5', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{asset.title}</div>
-                <div style={{ marginTop: 4, color: '#71717A', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ marginTop: 4, color: '#878790', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {asset.clientName || asset.workspaceName || 'Document'} - {shortDate(asset.currentVersion.createdAt)}
                 </div>
                 <div style={{ marginTop: 9, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -320,7 +320,7 @@ function TreeNode({ folder, folderByParent, currentId, expanded, onToggle, onOpe
         <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 + depth * 12 }}>
                 {children.length ? (
-                    <button type="button" onClick={() => onToggle(folder.id)} aria-label={open ? 'Collapse' : 'Expand'} style={{ width: 22, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, background: 'transparent', color: '#71717A', cursor: 'pointer' }}>
+                    <button type="button" onClick={() => onToggle(folder.id)} aria-label={open ? 'Collapse' : 'Expand'} style={{ width: 22, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, background: 'transparent', color: '#878790', cursor: 'pointer' }}>
                         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                 ) : <span style={{ width: 22 }} />}
@@ -600,7 +600,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                 <div style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--line)' }}>
                     <div className="grid grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]" style={{ height: '100%', minHeight: 520 }}>
                         <aside className="hidden md:block" style={{ borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0B0B10', padding: 14, overflow: 'auto' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 12px', color: '#71717A', fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 12px', color: '#878790', fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em' }}>
                                 <Layers size={13} style={{ color: '#A78BFA' }} /> Assets
                             </div>
                             <button
@@ -655,7 +655,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                                     ))}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                    <label style={{ width: 220, height: 34, display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, background: '#15151B', border: '1px solid rgba(255,255,255,0.10)', color: '#71717A', padding: '0 10px' }}>
+                                    <label style={{ width: 220, height: 34, display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, background: '#15151B', border: '1px solid rgba(255,255,255,0.10)', color: '#878790', padding: '0 10px' }}>
                                         <Search size={14} />
                                         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" style={{ minWidth: 0, flex: 1, border: 0, outline: 0, background: 'transparent', color: '#E4E4E7', fontSize: 12.5 }} />
                                     </label>
@@ -684,7 +684,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                                         <div>
                                             <FolderOpen size={34} style={{ color: '#A78BFA', margin: '0 auto 12px' }} />
                                             <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#E4E4E7' }}>No documents yet</p>
-                                            <p style={{ margin: '4px auto 0', maxWidth: 360, fontSize: 12.5, color: '#71717A' }}>Files appear here after the team sends a review-ready version for your project.</p>
+                                            <p style={{ margin: '4px auto 0', maxWidth: 360, fontSize: 12.5, color: '#878790' }}>Files appear here after the team sends a review-ready version for your project.</p>
                                         </div>
                                     </div>
                                 ) : (
@@ -734,7 +734,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                                             </div>
                                         )}
                                         {currentFolders.length === 0 && currentAssets.length === 0 && (
-                                            <div style={{ display: 'grid', placeItems: 'center', minHeight: 260, color: '#71717A', textAlign: 'center' }}>
+                                            <div style={{ display: 'grid', placeItems: 'center', minHeight: 260, color: '#878790', textAlign: 'center' }}>
                                                 <div>
                                                     <FolderOpen size={30} style={{ color: '#A78BFA', margin: '0 auto 10px' }} />
                                                     <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#D4D4D8' }}>This folder is empty in the current filter.</p>

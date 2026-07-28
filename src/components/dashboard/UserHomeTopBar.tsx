@@ -273,7 +273,7 @@ export default function UserHomeTopBar({
                                     <p
                                         className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest"
                                         style={{
-                                            color: "#71717A",
+                                            color: "#878790",
                                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         }}
                                     >
@@ -341,7 +341,7 @@ export default function UserHomeTopBar({
                                                             </span>
                                                             <span
                                                                 className="truncate text-[11px]"
-                                                                style={{ color: "#71717A" }}
+                                                                style={{ color: "#878790" }}
                                                             >
                                                                 {isActive ? "Đang hoạt động" : "Chuyển sang tổ chức này"}
                                                             </span>

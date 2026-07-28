@@ -26,7 +26,7 @@ export default async function ClientTrashPage({ params }: { params: Promise<{ wo
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem' }}>
                 <h2 className="title-gradient" style={{ marginBottom: 4 }}>Thùng rác Khách hàng</h2>
-                <p style={{ color: '#71717A', fontSize: 13 }}>
+                <p style={{ color: '#878790', fontSize: 13 }}>
                     Khách hàng đã xoá — có thể khôi phục bất cứ lúc nào. Xoá vĩnh viễn là thủ công, không thể hoàn tác.
                 </p>
             </div>

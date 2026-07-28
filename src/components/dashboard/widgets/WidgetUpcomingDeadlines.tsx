@@ -29,7 +29,7 @@ const NP = {
     accent: "#8B5CF6",
     textPrimary: "#FFFFFF",
     textSecondary: "#A1A1AA",
-    textMuted: "#71717A",
+    textMuted: "#878790",
 }
 
 /** Màu + nhãn theo trạng thái từng task (khớp logic dấu chấm lịch). */

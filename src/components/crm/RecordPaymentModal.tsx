@@ -105,7 +105,7 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
                 <div style={{ display: 'flex', gap: 10, padding: '14px 20px 4px' }}>
                     {[['Cần thu', usd(owed), '#fff'], ['Đã thu', usd(paid), '#34d399'], ['Còn lại', usd(remaining), remaining > 0 ? '#fbbf24' : '#34d399']].map(([l, v, c]) => (
                         <div key={l} style={{ flex: 1, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <div style={{ fontSize: 10, color: '#71717a', fontWeight: 700, textTransform: 'uppercase' }}>{l}</div>
+                            <div style={{ fontSize: 10, color: '#878790', fontWeight: 700, textTransform: 'uppercase' }}>{l}</div>
                             <div style={{ fontSize: 16, fontWeight: 800, color: c as string, fontFamily: 'ui-monospace, monospace' }}>{v}</div>
                         </div>
                     ))}
@@ -138,12 +138,12 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
 
                 {/* History */}
                 <div style={{ padding: '4px 20px 20px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#878790', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                         <span>Lịch sử thu ({history.length})</span>
                         {history.length > 0 && <span style={{ color: '#34d399' }}>Tổng: {usd(histTotal)}</span>}
                     </div>
                     {loadingHist ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#71717a', fontSize: 12, padding: '8px 0' }}><Loader2 size={13} className="animate-spin" /> Đang tải…</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#878790', fontSize: 12, padding: '8px 0' }}><Loader2 size={13} className="animate-spin" /> Đang tải…</div>
                     ) : history.length === 0 ? (
                         <div style={{ fontSize: 12, color: '#52525b', fontStyle: 'italic', padding: '8px 0' }}>Chưa có lần thu nào.</div>
                     ) : (
@@ -154,7 +154,7 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <span style={{ fontSize: 14, fontWeight: 700, color: '#34d399', fontFamily: 'ui-monospace, monospace' }}>{usd(h.amount)}</span>
                                             <span style={{ fontSize: 11, color: '#a1a1aa' }}>{fmtDate(h.paidAt)}</span>
-                                            {h.method && <span style={{ fontSize: 10.5, color: '#71717a' }}>· {h.method}</span>}
+                                            {h.method && <span style={{ fontSize: 10.5, color: '#878790' }}>· {h.method}</span>}
                                         </div>
                                         {h.note && <div style={{ fontSize: 11.5, color: '#a1a1aa', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.note}</div>}
                                         {h.recordedBy && <div style={{ fontSize: 10, color: '#52525b', marginTop: 1 }}>bởi {h.recordedBy}</div>}

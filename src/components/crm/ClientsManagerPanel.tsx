@@ -222,7 +222,7 @@ export default function ClientsManagerPanel({
                         </button>
                     )}
                     {view === 'invoice' && (
-                        <span className="text-[11px] font-mono tracking-[0.06em]" style={{ color: '#71717a' }}>TRÌNH TẠO HÓA ĐƠN</span>
+                        <span className="text-[11px] font-mono tracking-[0.06em]" style={{ color: '#878790' }}>TRÌNH TẠO HÓA ĐƠN</span>
                     )}
                 </div>
             </div>

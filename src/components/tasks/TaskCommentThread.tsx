@@ -113,7 +113,7 @@ export default function TaskCommentThread({
     }, [mentionQuery, onSearchMembers])
 
     const c = useMemo(() => dark ? {
-        text: '#E4E4E7', muted: '#A1A1AA', faint: '#71717A', line: 'rgba(255,255,255,0.08)',
+        text: '#E4E4E7', muted: '#A1A1AA', faint: '#878790', line: 'rgba(255,255,255,0.08)',
         bubble: 'rgba(255,255,255,0.03)', bubbleLine: 'rgba(255,255,255,0.07)',
         internalBg: 'rgba(234,179,8,0.08)', internalLine: 'rgba(234,179,8,0.25)', internalText: '#FDE68A',
         accent: '#8B5CF6', accentSoft: 'rgba(139,92,246,0.14)', accentLine: 'rgba(139,92,246,0.4)',

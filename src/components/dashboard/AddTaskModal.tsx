@@ -289,7 +289,7 @@ function AutoSaveIndicator({ savedAt }: { savedAt: number | null }) {
 
     if (!savedAt) {
         return (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] text-[10px] text-[#71717A]">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] text-[10px] text-[#878790]">
                 <CloudOff size={11} strokeWidth={2} />
                 <span>Chưa lưu</span>
             </div>

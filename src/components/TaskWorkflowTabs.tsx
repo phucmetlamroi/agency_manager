@@ -104,7 +104,7 @@ const NP = {
     accentGlow: 'rgba(139,92,246,0.35)',
     textPrimary: '#FFFFFF',
     textSecondary: '#A1A1AA',
-    textMuted: '#71717A',
+    textMuted: '#878790',
     lilac: '#D8B4FE',
     pageActive: 'rgba(139,92,246,0.20)',
     pageActiveBorder: 'rgba(139,92,246,0.30)',
@@ -321,7 +321,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
     }, [tasks, workspaceId, router])
 
     // ─── Helpers ────────────────────────────────────────
-    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
+    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#878790' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
         return taskTypeLabel(type) || 'Task'

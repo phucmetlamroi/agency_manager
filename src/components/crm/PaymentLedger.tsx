@@ -67,7 +67,7 @@ export default function PaymentLedger({ clients, byClient, onRecord }: {
 
     const Summary = ({ label, value, color }: { label: string; value: string; color: string }) => (
         <div style={{ flex: 1, minWidth: 130, padding: '12px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#878790', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
             <div style={{ fontSize: 22, fontWeight: 800, color, marginTop: 4, fontFamily: 'ui-monospace, monospace' }}>{value}</div>
         </div>
     )

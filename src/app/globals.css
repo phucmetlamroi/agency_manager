@@ -526,7 +526,16 @@ h2.section-title {
   --m-glass-2:rgba(255,255,255,0.05); --m-glass-zinc:rgba(24,24,27,0.60); --m-glass-zinc-strong:rgba(24,24,27,0.80);
   --m-border-1:rgba(255,255,255,0.05); --m-border-2:rgba(255,255,255,0.08); --m-border-3:rgba(255,255,255,0.10);
   /* text */
-  --m-fg-0:#FFFFFF; --m-fg-1:#F4F4F5; --m-fg-2:#D4D4D8; --m-fg-3:#A1A1AA; --m-fg-4:#71717A; --m-fg-5:#52525B;
+  /* --m-fg-4 is #878790, NOT zinc-500 #71717A as the owner's prototype had it, and NOT a typo.
+     Audit 2026-07 F-12 measured the muted tier failing WCAG AA everywhere: zinc-500 is 4.10:1 on
+     --m-bg-1 and only 3.93:1 on the real .m-card surface (--m-glass-zinc composited over --m-bg-0),
+     where mobile text runs 10.5-13px and gets no large-text relief. zinc-400 #A1A1AA is NOT the fix
+     -- that is already --m-fg-3, so reusing it collapses two tiers into one. #878790 is the value
+     between them: >=4.66:1 on every surface either palette actually paints (worst is rowHover
+     #211B31), while holding dL* ~10 from --m-fg-3 so the ladder still reads as three steps.
+     There is no Tailwind zinc step here; the ramp jumps straight from 4.10:1 to 7.72:1.
+     Same value is used for the desktop `textMuted` constants. Do not "tidy" it back to a zinc token. */
+  --m-fg-0:#FFFFFF; --m-fg-1:#F4F4F5; --m-fg-2:#D4D4D8; --m-fg-3:#A1A1AA; --m-fg-4:#878790; --m-fg-5:#52525B;
   /* accents (INDIGO primary, violet neon) */
   --m-primary:#6366F1; --m-primary-hover:#818CF8; --m-primary-fg:#C7D2FE; --m-primary-glow:rgba(99,102,241,0.40);
   --m-neon:#8B5CF6; --m-neon-hot:#A855F7;

@@ -205,7 +205,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                 size="icon"
                                 onClick={handleRevert}
                                 disabled={isPending}
-                                className="h-9 w-9 rounded-xl text-[#71717A] hover:text-[#F87171] hover:bg-[rgba(239,68,68,0.1)]"
+                                className="h-9 w-9 rounded-xl text-[#878790] hover:text-[#F87171] hover:bg-[rgba(239,68,68,0.1)]"
                                 title="Hoàn tác thanh toán"
                             >
                                 <RotateCcw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
@@ -228,19 +228,19 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                 <div className="flex items-center gap-2 px-5 py-2.5">
                     <button
                         onClick={() => setShowPending(false)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${!showPending ? 'bg-[rgba(139,92,246,0.15)] text-primary-accent border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${!showPending ? 'bg-[rgba(139,92,246,0.15)] text-primary-accent border-[rgba(139,92,246,0.3)]' : 'text-[#878790] hover:text-[#A1A1AA] border-transparent'}`}
                     >
                         Hoàn tất ({completedTasks.length})
                     </button>
                     <button
                         onClick={() => setShowPending(true)}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${showPending ? 'bg-[rgba(139,92,246,0.15)] text-primary-accent border-[rgba(139,92,246,0.3)]' : 'text-[#71717A] hover:text-[#A1A1AA] border-transparent'}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 border ${showPending ? 'bg-[rgba(139,92,246,0.15)] text-primary-accent border-[rgba(139,92,246,0.3)]' : 'text-[#878790] hover:text-[#A1A1AA] border-transparent'}`}
                     >
                         Dự kiến ({pendingTasks.length})
                     </button>
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className="ml-auto p-1.5 rounded-lg text-[#71717A] hover:text-primary-accent hover:bg-[rgba(139,92,246,0.08)] transition-colors"
+                        className="ml-auto p-1.5 rounded-lg text-[#878790] hover:text-primary-accent hover:bg-[rgba(139,92,246,0.08)] transition-colors"
                         title={isExpanded ? 'Thu gọn' : 'Xem chi tiết'}
                     >
                         <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />

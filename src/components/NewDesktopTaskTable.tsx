@@ -222,7 +222,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     }
 
     // ─── Helpers ────────────────────────────────────────
-    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
+    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#878790' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
         return taskTypeShort(type) || 'TASK'
@@ -269,7 +269,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 borderRadius: 999,
                                 background: isActive ? `color-mix(in srgb, ${tab.color} 9.41%, transparent)` : 'transparent',
                                 border: isActive ? `1px solid color-mix(in srgb, ${tab.color} 20.78%, transparent)` : '1px solid rgba(255,255,255,0.08)',
-                                color: isActive ? tab.color : '#71717A',
+                                color: isActive ? tab.color : '#878790',
                                 fontSize: 12,
                                 fontWeight: 600,
                                 cursor: 'pointer',
@@ -655,7 +655,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 {task.assignedBy && (
                                     <div
                                         title={`Người quản lý: ${(task.assignedBy as any).nickname || task.assignedBy.username}`}
-                                        style={{ fontSize: 10, color: '#71717A', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                        style={{ fontSize: 10, color: '#878790', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                                     >
                                         QL: {(task.assignedBy as any).nickname || task.assignedBy.username}
                                     </div>

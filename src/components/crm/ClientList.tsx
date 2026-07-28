@@ -307,7 +307,7 @@ function StatusPill({ status, clarify = false }: { status: 'ACTIVE' | 'PENDING' 
         PENDING: clarify
             ? { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.25)', color: '#a5b4fc', dot: '#6366f1' }
             : { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)', color: '#fbbf24', dot: '#fbbf24' },
-        INACTIVE: { bg: 'rgba(113,113,122,0.10)', border: 'rgba(113,113,122,0.25)', color: '#71717a', dot: '#71717a' },
+        INACTIVE: { bg: 'rgba(113,113,122,0.10)', border: 'rgba(113,113,122,0.25)', color: '#878790', dot: '#878790' },
     }
     const c = config[status]
     const labels: Record<'ACTIVE' | 'PENDING' | 'INACTIVE', string> = {
@@ -521,7 +521,7 @@ function ClientItem({
                             cursor: 'pointer',
                             flexShrink: 0,
                             transition: 'background 0.15s',
-                            color: '#71717a',
+                            color: '#878790',
                             padding: 0,
                         }}
                     >

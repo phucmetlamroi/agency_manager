@@ -26,6 +26,19 @@ export interface FolderScope {
     allowedPrefixes: string[]
 }
 
+/**
+ * [kiểm toán 2026-07 · T-04] Người này chưa được giao GÌ CẢ trong workspace.
+ *
+ * Đây là tín hiệu AN TOÀN để gửi ra giao diện, và điều đó không hiển nhiên: nó chỉ suy từ
+ * quyền của CHÍNH người gọi, không phụ thuộc thư mục họ đang mở. Các cờ "anh em" như
+ * isPathVisible/isPathMutable thì phụ thuộc container — đưa chúng ra client sẽ biến mọi id
+ * thư mục nhặt được thành một phép thử "cái này có tồn tại không", thứ hôm nay KHÔNG có
+ * (thư mục ngoài phạm vi và thư mục rỗng thật đều trả về 200 + rỗng, không phân biệt nổi).
+ */
+export function isScopeEmpty(scope: FolderScope): boolean {
+    return !scope.unrestricted && scope.allowedPrefixes.length === 0
+}
+
 /** Compute an editor's folder scope in a workspace. Admin/owner → unrestricted. */
 export async function getFolderScope(input: {
     userId: string
@@ -99,7 +112,10 @@ export function isPathMutable(scope: FolderScope, path: string): boolean {
 }
 
 function outOfScope() {
-    return apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
+    // [kiểm toán 2026-07 · §11] Câu cũ — "…trên mục ngoài phạm vi được giao" — vừa từ chối
+    // vừa XÁC NHẬN rằng mục đó CÓ THẬT và chỉ nằm ngoài phần của bạn. Với một id đoán được,
+    // đó là phép thử tồn tại. Câu trung tính không nói gì về sự tồn tại của mục.
+    return apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem nội dung này.')
 }
 
 /** Throw 403 unless the folder path is mutable for this scope. */

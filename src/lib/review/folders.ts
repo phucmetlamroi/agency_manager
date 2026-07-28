@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto'
 import { requireReviewAccess } from './access'
 import {
     getFolderScope,
+    isScopeEmpty,
     isPathVisible,
     isPathMutable,
     assertFolderPathMutable,
@@ -63,6 +64,19 @@ export interface ListChildrenResult {
     assets: AssetDto[]
     summary: { folderCount: number; assetCount: number; totalBytes: string }
     nextCursor: string | null
+    /**
+     * [kiểm toán 2026-07 · T-04] true = người gọi CHƯA được giao gì trong workspace này, nên
+     * lưới rỗng vì phạm vi rỗng chứ không phải vì chưa có dữ liệu. Chỉ để chọn CÂU CHỮ.
+     *
+     * TUỲ CHỌN có lý do: nhánh "workspace chưa có thư mục gốc" thoát TRƯỚC khi phạm vi được
+     * tính, nên ở đó cờ này vắng mặt — và vắng mặt là đúng nghĩa (workspace rỗng thật, không
+     * phải vấn đề phân quyền). Đừng "sửa" bằng cách tính thêm: sẽ tốn 4 truy vấn cho một
+     * nhánh không cần.
+     *
+     * An toàn: xem isScopeEmpty trong folder-scope.ts — nó chỉ suy từ quyền của chính người
+     * gọi, không phụ thuộc thư mục đang mở.
+     */
+    scopeEmpty?: boolean
 }
 
 export interface TrashItemDto {
@@ -575,7 +589,7 @@ export async function listChildren(input: {
     // -không-mutable) → chỉ hiện folder-con-on-path, KHÔNG hiện asset (asset chỉ ở folder được giao).
     const scope = await getFolderScope({ userId: access.userId, workspaceId: container.workspaceId, isAdmin: access.isAdmin })
     if (!isPathVisible(scope, container.path)) {
-        return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null }
+        return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null, scopeEmpty: isScopeEmpty(scope) }
     }
     const showAssets = isPathMutable(scope, container.path)
 
@@ -762,6 +776,7 @@ export async function listChildren(input: {
                   : '0',
         },
         nextCursor,
+        scopeEmpty: isScopeEmpty(scope),
     }
 }
 
@@ -1799,8 +1814,8 @@ export async function copyItems(input: {
     // [FR-03] editor chỉ copy TỪ mục xem được (nguồn) VÀO đích trong phạm vi được giao.
     const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
     if (!scope.unrestricted) {
-        for (const f of srcFolders) if (!isPathVisible(scope, f.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
-        for (const a of srcAssets) if (!isPathVisible(scope, a.folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
+        for (const f of srcFolders) if (!isPathVisible(scope, f.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem nội dung này.')
+        for (const a of srcAssets) if (!isPathVisible(scope, a.folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem nội dung này.')
         assertFolderPathMutable(scope, target.path)
     }
 

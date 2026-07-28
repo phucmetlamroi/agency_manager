@@ -111,6 +111,13 @@ interface ChildrenResult {
     assets: AssetDto[]
     summary: { folderCount: number; assetCount: number; totalBytes: string }
     nextCursor: string | null
+    /**
+     * [kiểm toán 2026-07 · T-04] true = tài khoản này chưa được giao task nào, nên lưới rỗng
+     * vì PHẠM VI rỗng chứ không phải vì chưa có dữ liệu. Chỉ dùng để chọn câu chữ.
+     * Bản sao của trường cùng tên ở ListChildrenResult (src/lib/review/folders.ts) — thiếu ở
+     * đây thì data?.scopeEmpty luôn undefined và nhánh mới không bao giờ chạy.
+     */
+    scopeEmpty?: boolean
 }
 interface TreeNode {
     id: string
@@ -1416,6 +1423,7 @@ export function TeamBrowser({
                             ) : isEmpty ? (
                                 <EmptyState
                                     atRoot={folderId === null}
+                                    scopeEmpty={data?.scopeEmpty}
                                     onUpload={() => filesInputRef.current?.click()}
                                     onNewFolder={startNewFolder}
                                 />
@@ -1796,8 +1804,12 @@ function TreeSidebar({
     const roots = childrenOf.get(null) ?? []
     if (roots.length === 0) {
         return (
+            // [kiểm toán 2026-07 · T-04] Câu cũ "Chưa có thư mục nào." khẳng định về CẢ
+            // workspace, mà cột này chỉ thấy phần trong phạm vi của người xem — với editor
+            // chưa có task, nó nói dối trong khi lưới bên phải đã nói đúng. Câu mới chỉ
+            // nói về những gì hiển thị được, nên đúng ở cả hai trường hợp.
             <p className="px-3 py-6 text-center text-[11.5px] leading-relaxed text-muted-foreground">
-                Chưa có thư mục nào.
+                Không có thư mục nào để hiển thị.
                 <br />
                 Bản dựng tải lên từ task sẽ hiện ở đây.
             </p>
@@ -1953,23 +1965,44 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
     )
 }
 
-function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUpload: () => void; onNewFolder: () => void }) {
+function EmptyState({ atRoot, scopeEmpty, onUpload, onNewFolder }: { atRoot: boolean; scopeEmpty?: boolean; onUpload: () => void; onNewFolder: () => void }) {
     return (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
                 <Clapperboard size={26} />
             </div>
             <div>
+                {/*
+                  [kiểm toán 2026-07 · T-04] Nhánh thứ ba: phân quyền hoạt động ĐÚNG (chỉ thấy
+                  tài nguyên của task được giao) nhưng cách BÁO thì sai — editor chưa có task nào
+                  nhận đúng câu "chưa có asset nào trong workspace", nghe như hệ thống rỗng hoặc
+                  hỏng, chứ không phải "phần của bạn chưa có gì".
+                */}
                 <p className="text-[14px] font-medium text-zinc-200">
-                    {atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
+                    {scopeEmpty ? 'Bạn chưa được giao task nào' : atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
                 </p>
                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
-                    {atRoot
+                    {scopeEmpty
+                        ? 'Video sẽ hiện ở đây khi bạn nhận task. Câu này không nói gì về việc workspace có dữ liệu hay không — chỉ nói phần được giao cho bạn đang trống.'
+                        : atRoot
                         ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng, hoặc kéo thả file vào đây.'
                         : 'Kéo thả file vào đây, hoặc dùng nút “+ Mới” để tải lên.'}
                 </p>
             </div>
             <div className="mt-1 flex items-center gap-2">
+                {/*
+                  ⚠️ CHỈ ẨN NÚT TẢI LÊN, KHÔNG ẨN "THƯ MỤC MỚI" — hai nút này có hậu quả TRÁI
+                  NGƯỢC nhau và kế hoạch ban đầu gộp chung là sai:
+
+                  · Tải lên ở gốc → asset rơi thẳng vào thư mục gốc, mà gốc mang systemKey nên
+                    bị chính bộ lọc phạm vi loại ra. Upload THÀNH CÔNG, tốn dung lượng R2 + phí
+                    Mux, rồi lưới vẫn báo rỗng y như cũ. Đó là một cái hố đen im lặng.
+                  · Thư mục mới ở gốc → thư mục được tạo mang createdById = chính họ và KHÔNG có
+                    systemKey, tức đúng hình dạng mà bộ tính phạm vi công nhận. Phạm vi hết rỗng,
+                    màn hình này tự tắt. Đây là LỐI THOÁT TỰ CHỮA DUY NHẤT của editor — ẩn nó đi
+                    là nhốt họ vĩnh viễn trong màn rỗng, phải chờ admin giao task mới ra được.
+                */}
+                {!scopeEmpty && (
                 <button
                     type="button"
                     onClick={onUpload}
@@ -1977,6 +2010,7 @@ function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUplo
                 >
                     <UploadCloud size={14} /> Tải asset lên
                 </button>
+                )}
                 <button
                     type="button"
                     onClick={onNewFolder}

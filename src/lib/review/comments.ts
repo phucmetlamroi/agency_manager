@@ -297,11 +297,28 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
         select: { id: true, versionNumber: true, commentCount: true },
         orderBy: { versionNumber: 'desc' },
     })
+    // [kiểm toán 2026-07 · phản biện] ReviewVersion.commentCount là bộ đếm phi chuẩn hoá,
+    // và nó tăng cho MỌI bình luận (dòng ~416, không rẽ nhánh isInternal). Với khách, con số
+    // đó là một kênh rò riêng: khách không đọc được nội dung nội bộ nữa, nhưng huy hiệu vẫn
+    // nói cho họ biết version kia đang có bao nhiêu trao đổi. Đếm lại theo đúng tập khách thấy.
+    let visibleCounts: Map<string, number> | null = null
+    if (access.isGuest && others.length > 0) {
+        const grouped = await prisma.reviewComment.groupBy({
+            by: ['versionId'],
+            where: { versionId: { in: others.map((o) => o.id) }, deletedAt: null, isInternal: false },
+            _count: { _all: true },
+        })
+        visibleCounts = new Map(grouped.map((g) => [g.versionId, g._count._all]))
+    }
 
     return {
         items,
         ...(deletedIds ? { deletedIds } : {}),
-        otherVersions: others.map((o) => ({ versionId: o.id, versionNumber: o.versionNumber, commentCount: o.commentCount })),
+        otherVersions: others.map((o) => ({
+            versionId: o.id,
+            versionNumber: o.versionNumber,
+            commentCount: visibleCounts ? (visibleCounts.get(o.id) ?? 0) : o.commentCount,
+        })),
         nextCursor: null,
         total,
     }

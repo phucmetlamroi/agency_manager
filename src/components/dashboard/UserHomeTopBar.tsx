@@ -91,6 +91,16 @@ export default function UserHomeTopBar({
         return () => clearTimeout(handler)
     }, [searchValue])
 
+    // [kiểm toán 2026-07 · S2-6] Chiều ngược lại: nút "Xóa bộ lọc" ở trạng thái rỗng của
+    // bảng task nằm trong MỘT component khác, mà ô nhập lại sống ở đây. Không có đường về
+    // này thì bấm xóa sẽ lọc lại bảng nhưng chữ vẫn nằm nguyên trong ô tìm kiếm — người
+    // dùng thấy hai thứ nói ngược nhau.
+    useEffect(() => {
+        function clear() { setSearchValue("") }
+        window.addEventListener("user-home-search-clear", clear)
+        return () => window.removeEventListener("user-home-search-clear", clear)
+    }, [])
+
     const handleProfileSwitch = async (newProfileId: string) => {
         if (newProfileId === currentProfileId || switching) return
         setSwitching(true)

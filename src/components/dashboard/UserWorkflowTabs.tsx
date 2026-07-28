@@ -392,8 +392,18 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                 </div>
 
                 {/* Rows */}
+                {/*
+                  [kiểm toán 2026-07 · S2-6] BA lý do rỗng, ba câu khác nhau.
+                  Trước đây cả ba đều nhận đúng một câu "Chưa có task nào ở đây." — nên lọc
+                  không ra và chưa có gì trông y hệt nhau, và người dùng không biết mình nên
+                  chờ hay nên xóa bộ lọc.
+                  role="status" + aria-live: câu này đổi theo từng ký tự gõ vào ô tìm kiếm mà
+                  không có gì nhận focus, nên trình đọc màn hình sẽ im lặng nếu thiếu (WCAG 4.1.3).
+                */}
                 {paged.length === 0 && (
                     <div
+                        role="status"
+                        aria-live="polite"
                         style={{
                             padding: "40px 20px",
                             textAlign: "center",
@@ -402,7 +412,33 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                         }}
                     >
-                        Chưa có task nào ở đây.
+                        {tasks.length === 0 ? (
+                            "Chưa có task nào. Task sẽ hiện ở đây khi được tạo."
+                        ) : search.trim() ? (
+                            <>
+                                <div>Không tìm thấy task nào khớp «{search.trim()}»</div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearch("")
+                                        setPage(1)
+                                        // Ô nhập nằm ở UserHomeTopBar — báo cho nó tự xóa,
+                                        // nếu không chữ cũ vẫn nằm đó sau khi bảng đã bỏ lọc.
+                                        window.dispatchEvent(new Event("user-home-search-clear"))
+                                    }}
+                                    className="mt-3 inline-flex items-center justify-center rounded-full px-4 py-2 text-[13px] font-semibold transition-colors"
+                                    style={{
+                                        color: "#FFFFFF",
+                                        background: NP.pageActive,
+                                        border: `1px solid ${NP.pageActiveBorder}`,
+                                    }}
+                                >
+                                    Xóa bộ lọc
+                                </button>
+                            </>
+                        ) : (
+                            "Không có task nào ở trạng thái này."
+                        )}
                     </div>
                 )}
 

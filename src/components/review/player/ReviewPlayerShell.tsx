@@ -875,7 +875,12 @@ function ReviewPlayerShellInner({
         />
 
         <div className="flex shrink-0 items-center gap-1">
-          <div className="hidden items-center overflow-hidden rounded-md border border-white/[0.12] bg-white/[0.035] md:flex">
+          {/* [kiểm toán 2026-07 · phản biện] Cụm điều hướng này nằm NGOÀI khối >= 2 ở trên,
+              nên video một phiên bản vẫn bày ra "1 / 1" cùng hai mũi tên chết — đúng thứ §5.3
+              muốn giấu. Cùng điều kiện với thanh chọn phiên bản, không phải điều kiện riêng. */}
+          <div
+            className={`${data.versions.length >= 2 ? "hidden md:flex" : "hidden"} items-center overflow-hidden rounded-md border border-white/[0.12] bg-white/[0.035]`}
+          >
             <button
               type="button"
               onClick={() =>

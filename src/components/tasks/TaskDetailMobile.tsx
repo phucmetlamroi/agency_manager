@@ -11,7 +11,7 @@ import React, { useEffect, useState } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
-import { failureMessage } from "@/lib/ui/action-feedback"
+import { failureMessage, isNetworkFailure } from "@/lib/ui/action-feedback"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
@@ -217,7 +217,14 @@ export function TaskDetailMobile({
                 } else {
                     toast.error(res?.error || 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
                 }
-            } catch (e) { toast.error(failureMessage(e, 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')) }
+            } catch (e) {
+                // Xem chú thích cùng lỗi ở TaskDetailModal: link đã nằm trong DB, đừng nói "chưa lưu".
+                toast.error(
+                    isNetworkFailure(e)
+                        ? 'Link đã lưu. Mất kết nối nên chưa chuyển status — thử lại khi có mạng.'
+                        : 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.',
+                )
+            }
         }
         setSavingCard(false)
     }

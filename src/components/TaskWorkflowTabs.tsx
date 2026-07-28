@@ -543,7 +543,10 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                         gap: 8,
                         padding: '12px 20px',
                         borderRadius: 26,
-                        background: NP.accent,
+                        // [kiểm toán 2026-07 · phản biện] Đây là chỗ thứ hai có chữ trắng trên nền
+                        // violet, và đợt F-12 đã bỏ sót nó: accentSolid sinh ra chính vì cặp
+                        // #FFFFFF/#8B5CF6 chỉ đạt 4,23:1, nhưng chỉ được cắm vào viên tab đang chọn.
+                        background: NP.accentSolid,
                         border: 'none',
                         color: '#FFFFFF',
                         fontSize: 14,

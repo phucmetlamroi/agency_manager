@@ -375,7 +375,9 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
             )}
 
             {/* ─── SEARCH ROW ────────────────────────────── */}
-            <div className="flex items-center" style={{ gap: 8 }}>
+            {/* items-stretch: see the twin row in UserWorkflowTabs — keeps the pill and the button
+                the same height once the input carries its WCAG 2.5.8 minHeight. */}
+            <div className="flex items-stretch" style={{ gap: 8 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{
@@ -398,6 +400,10 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             outline: 'none',
                             color: '#F4F4F5',
                             fontSize: 12,
+                            // Same borderless-input defect as the other two search fields, and the
+                            // shortest of the three at fontSize 12 — furthest under the WCAG 2.2
+                            // SC 2.5.8 24px floor.
+                            minHeight: 24,
                         }}
                     />
                 </div>

@@ -498,7 +498,9 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
             )}
 
             {/* ─── SEARCH BAR ───────────────────────────── */}
-            <div className="flex items-center" style={{ gap: 10 }}>
+            {/* items-stretch: see the twin row in UserWorkflowTabs — keeps the pill and the button
+                the same height once the input carries its WCAG 2.5.8 minHeight. */}
+            <div className="flex items-stretch" style={{ gap: 10 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{
@@ -522,6 +524,10 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             color: NP.textPrimary,
                             fontSize: 14,
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            // Byte-for-byte twin of the dashboard search field — same borderless
+                            // input, same pill. It takes its height from the font alone, which puts
+                            // the real pointer target under the WCAG 2.2 SC 2.5.8 24px floor.
+                            minHeight: 24,
                         }}
                     />
                 </div>

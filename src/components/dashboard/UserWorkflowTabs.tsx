@@ -294,7 +294,10 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
             </div>
 
             {/* ─── Search + View ─── */}
-            <div className="flex items-center" style={{ gap: 10 }}>
+            {/* items-stretch, not items-center: the search input carries a minHeight (WCAG 2.5.8)
+                that makes its pill ~3px taller than the button beside it. Stretching keeps the pair
+                the same height by construction instead of by matching padding arithmetic. */}
+            <div className="flex items-stretch" style={{ gap: 10 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{

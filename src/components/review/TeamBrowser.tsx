@@ -1256,6 +1256,11 @@ export function TeamBrowser({
             onResetName:
                 target.type === 'asset' && acting.length === 1 ? () => void doResetName(target.id) : undefined,
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
+            // [kiểm toán 2026-07 · §5.3] Video 1 phiên bản (hoặc 0) thì KHÔNG có gì để quản lý.
+            // Tách khỏi `onManageVersions` có lý do: callback đó undefined còn vì "đang chọn
+            // nhiều mục", và mục menu lúc ấy hiện mờ kèm gợi ý "Chọn đúng một asset" — gợi ý
+            // đúng. Gộp hai lý do vào một cờ sẽ hiện gợi ý SAI cho video 1 phiên bản.
+            canManageVersions: (assetById.get(target.id)?.versionCount ?? 0) >= 2,
             // P5.5 — share the acting selection (multi-select works via right-click).
             onCreateShare: () =>
                 setShareTarget({
@@ -1448,7 +1453,8 @@ export function TeamBrowser({
                                             asset={selectedAsset}
                                             onClose={clearSelection}
                                             onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
-                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                            // [kiểm toán 2026-07 · §5.3] Không truyền callback = InfoPanel tự bỏ nút.
+                                            onManageVersions={selectedAsset.versionCount >= 2 ? () => openManageVersions(selectedAsset.id) : undefined}
                                         />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
@@ -1509,7 +1515,8 @@ export function TeamBrowser({
                                             asset={selectedAsset}
                                             onClose={clearSelection}
                                             onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
-                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                            // [kiểm toán 2026-07 · §5.3] Không truyền callback = InfoPanel tự bỏ nút.
+                                            onManageVersions={selectedAsset.versionCount >= 2 ? () => openManageVersions(selectedAsset.id) : undefined}
                                         />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
@@ -1533,7 +1540,7 @@ export function TeamBrowser({
                     onDelete={() => requestDelete(toItemRefs([...selectedIds]))}
                     onClear={clearSelection}
                     onManageVersions={
-                        selectedFolders.length === 0 && selectedAssets.length === 1
+                        selectedFolders.length === 0 && selectedAssets.length === 1 && selectedAssets[0].versionCount >= 2
                             ? () => openManageVersions(selectedAssets[0].id)
                             : undefined
                     }

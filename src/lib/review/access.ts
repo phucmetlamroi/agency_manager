@@ -81,9 +81,17 @@ export async function requireReviewAccess(opts?: {
                 auth.workspaceRole === 'ADMIN' ||
                 auth.profileRole === 'OWNER' ||
                 auth.profileRole === 'ADMIN'
-            // GUEST không bao giờ là OWNER/ADMIN nên isAdmin tự khắc false; getFolderScope
-            // vì thế giới hạn khách theo task được giao — đúng vế thứ hai của Q3.
-            return { userId: auth.userId, role, isAdmin: isWorkspaceAdmin, isGuest: auth.workspaceRole === 'GUEST' }
+            // [kiểm toán 2026-07 · phản biện] ĐÍNH CHÍNH bản trước của chú thích này, vốn viết
+            // "GUEST không bao giờ là OWNER/ADMIN nên isAdmin tự khắc false" — SAI. isWorkspaceAdmin
+            // còn OR theo profileRole, nên một người vừa là ADMIN của profile vừa có hàng
+            // WorkspaceMember role='GUEST' sẽ ra isGuest=true VÀ isAdmin=true, và getFolderScope
+            // khi đó trả unrestricted. Tổ hợp đó hôm nay không dựng được bằng giao diện (không
+            // nơi nào trong src ghi role:'GUEST'), và biểu thức isWorkspaceAdmin đã có từ trước
+            // đợt kiểm toán — nên đây KHÔNG phải lỗ hổng do Q3 mở ra. Nhưng vế thứ hai của Q3
+            // ("khách chỉ thấy tài nguyên gắn task được giao") phải đúng theo định nghĩa, không
+            // phải đúng nhờ may mắn: đã là khách thì không được coi là admin trong module này.
+            const isGuest = auth.workspaceRole === 'GUEST'
+            return { userId: auth.userId, role, isAdmin: isWorkspaceAdmin && !isGuest, isGuest }
         } catch (e) {
             if (e instanceof ReviewAccessError) throw e
             throw new ReviewAccessError(403, 'Không có quyền trên workspace này.')

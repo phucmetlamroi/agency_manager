@@ -99,7 +99,7 @@ export const reactionSchema = z
 interface VersionCtx {
     version: ReviewVersion
     asset: ReviewAsset
-    access: { userId: string; isAdmin: boolean }
+    access: { userId: string; isAdmin: boolean; isGuest: boolean }
     isImage: boolean
 }
 
@@ -234,6 +234,11 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
     if (opts.filter === 'unresolved') filterWhere.resolvedAt = null
     if (opts.filter === 'internal') filterWhere.isInternal = true
     if (opts.filter === 'public') filterWhere.isInternal = false
+    // [kiểm toán 2026-07 · phản biện] Khách CHỈ thấy bình luận công khai. Ràng buộc này đặt
+    // SAU các bộ lọc phía trên nên `?filter=internal` không lách qua được: nó ghi đè, không
+    // cộng thêm. Đây là bất biến chú thích đầu file đã tuyên bố ("guests only ever see false")
+    // và đường khách-qua-link share-comments.ts:177 đã thực thi — đường khách-nội-bộ thì chưa.
+    if (access.isGuest) filterWhere.isInternal = false
     if (opts.filter === 'mine') filterWhere.authorId = access.userId
     if (opts.authorId) filterWhere.authorId = opts.authorId
     if (opts.q) filterWhere.body = { contains: opts.q, mode: 'insensitive' }
@@ -249,7 +254,9 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
         filterWhere.deletedAt = null
         // …plus ids deleted after the mark, so the client can drop them from cache.
         const gone = await prisma.reviewComment.findMany({
-            where: { versionId, deletedAt: { gt: since } },
+            // Cùng ràng buộc khách như trên: đừng để danh sách "đã xoá" tiết lộ id của
+            // những bình luận nội bộ mà khách chưa từng được thấy.
+            where: { versionId, deletedAt: { gt: since }, ...(access.isGuest ? { isInternal: false } : {}) },
             select: { id: true },
         })
         deletedIds = gone.map((g) => g.id)
@@ -266,7 +273,11 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
     const items = await serializeComments(rows, version, access.userId)
 
     // Count of live comments on THIS version (excludes deleted; independent of filters).
-    const total = await prisma.reviewComment.count({ where: { versionId, deletedAt: null } })
+    // Với khách, đếm theo đúng tập khách được thấy — nếu không, con số cao hơn số dòng
+    // hiển thị sẽ tự nó tố cáo rằng có trao đổi nội bộ đang bị giấu.
+    const total = await prisma.reviewComment.count({
+        where: { versionId, deletedAt: null, ...(access.isGuest ? { isInternal: false } : {}) },
+    })
 
     const others = await prisma.reviewVersion.findMany({
         where: { assetId: asset.id, deletedAt: null, id: { not: versionId } },
@@ -306,8 +317,18 @@ export async function createComment(versionId: string, input: CreateCommentInput
         if (!parent || parent.versionId !== versionId || parent.parentId) {
             throw apiError(400, 'VALIDATION_ERROR', 'Bình luận gốc không hợp lệ.', { field: 'parentId' })
         }
+        // [kiểm toán 2026-07 · phản biện] Khách không được trả lời vào luồng nội bộ — nếu
+        // thừa kế, bình luận của khách sẽ chui vào đúng cuộc trao đổi họ không được thấy.
+        // Trả 404 chứ không phải 403: khách vốn không được biết bình luận đó tồn tại (§11).
+        if (access.isGuest && parent.isInternal) {
+            throw apiError(404, 'NOT_FOUND', 'Bình luận gốc không hợp lệ.', { field: 'parentId' })
+        }
         isInternal = parent.isInternal // server FORCES inheritance (ignores client value)
     }
+    // Mặc định của trường này là NỘI BỘ, nên nếu không ép thì mọi bình luận khách viết ra
+    // đều rơi vào diện nội bộ — vừa sai ý "khách bình luận để nhân viên đọc", vừa khiến
+    // chính khách không đọc lại được bình luận của mình sau khi bộ lọc trên có hiệu lực.
+    if (access.isGuest) isInternal = false
 
     // Timecode / range → ms. Only for video (images have no frames).
     let timecodeMs: number | null = null
@@ -398,7 +419,10 @@ export async function createComment(versionId: string, input: CreateCommentInput
     // depth — never notify an arbitrary uuid), exclude the author, and works for
     // INTERNAL comments too (a guest never sees internal comments, so mentioning an
     // internal teammate there is safe — AC2). Fire-and-forget.
-    if (input.mentions?.length && asset.taskId) {
+    // [kiểm toán 2026-07 · phản biện] Khách KHÔNG được cầm cần fan-out này. Nó nhận thẳng
+    // userId do client gửi và bắn thông báo tới nhân viên; mở cho khách là mở một đường
+    // nhắn tin tới nhân viên tuỳ ý, nằm ngoài mức "chỉ xem + bình luận" đã chốt.
+    if (input.mentions?.length && asset.taskId && !access.isGuest) {
         const mentionIds = [...new Set(input.mentions)].filter((id) => id !== access.userId)
         if (mentionIds.length) {
             void (async () => {

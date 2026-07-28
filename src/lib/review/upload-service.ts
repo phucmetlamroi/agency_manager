@@ -371,7 +371,13 @@ async function replaySession(sessionId: string): Promise<InitiateResult> {
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     const v = session.version
-    await requireReviewAccess({ workspaceId: v.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: v.workspaceId })
+    // [audit 2026-07 S1-4] initiateUpload gọi hàm này ngay khi trúng idempotencyKey và trả về
+    // TRƯỚC các assertion phạm vi phía dưới — kèm URL presign R2 mới. Không có chốt này, ai
+    // biết khoá của người khác sẽ nhận được quyền ghi vào file của họ.
+    if (!access.isAdmin && v.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     const done = session.completedAt != null || session.abortedAt != null
     const parts = done ? [] : await partUrlsFor(session.r2Key, session.r2UploadId, session.partsTotal, v.mimeType)
@@ -500,7 +506,21 @@ export async function completeUpload(
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     const version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Một phiên tải lên thuộc về NGƯỜI khởi tạo nó, không phải
+    // "bất kỳ thành viên workspace nào" — requireReviewAccess ở trên chỉ hỏi được câu thứ hai.
+    // Ranh giới là version.uploaderId: gán lúc initiate từ phiên đăng nhập, BẤT BIẾN (chỉ có
+    // 2 chỗ ghi trong toàn repo, cả hai đều lúc tạo), đã nằm sẵn trong `include` nên KHÔNG
+    // tốn thêm truy vấn.
+    //
+    // CỐ Ý KHÔNG dùng folder-scope ở đây, dù đó là lớp phân quyền chuẩn của module. Asset của
+    // một lần kéo-thả vào GỐC Tệp không có taskId, và thư mục gốc mang systemKey nên bị loại
+    // khỏi cả ba nguồn của getFolderScope -> assertVersionInScope('write') sẽ 403 CHÍNH CHỦ,
+    // và 403 đó rơi SAU khi cả file đã đẩy xong lên R2. uploaderId hẹp hơn, đúng ngữ nghĩa hơn,
+    // và không có âm tính giả nào.
+    if (!access.isAdmin && version.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     if (session.abortedAt) fail(409, 'STATE_INVALID', 'Phiên tải lên đã bị hủy.')
 
@@ -587,7 +607,11 @@ export async function abortUpload(uploadSessionId: string): Promise<{ aborted: t
     // Returning the same shape for "gone" and "not yours" also denies an enumeration oracle.
     if (!session) return { aborted: true }
     const version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Chỉ người khởi tạo (hoặc admin workspace) mới hủy được. Trả về ĐÚNG
+    // shape của nhánh "không tìm thấy" ở trên — giữ trọn lời hứa chống dò id đã ghi trong
+    // comment của hàm, thay vì để 403 lộ ra "phiên này có thật".
+    if (!access.isAdmin && version.uploaderId !== access.userId) return { aborted: true }
 
     if (session.abortedAt) return { aborted: true }
     // Only an in-flight upload (version still UPLOADING) may be discarded. Once a complete has
@@ -634,7 +658,13 @@ export async function getUploadStatus(uploadSessionId: string): Promise<UploadSt
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     let version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Ràng theo người khởi tạo như complete/abort. Đây KHÔNG phải phép đọc
+    // vô hại: hàm mint token phát Mux đã ký, trả nguyên VersionDto (tên file, dung lượng, danh
+    // tính người upload), và tự gọi driveCompletion — tức có cả tác dụng phụ ghi.
+    if (!access.isAdmin && version.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     // Self-heal the crash window: if a complete finalized R2 (completedAt set) but died before
     // driving the transition, the version is stuck UPLOADED. The client's 3s poller only stops on

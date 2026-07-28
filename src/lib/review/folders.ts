@@ -440,6 +440,17 @@ export async function createFolderTree(input: {
         select: { id: true, path: true, depth: true },
     })
     if (!base) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục đích.')
+    // [audit 2026-07 S1-4] Thiếu hẳn chốt phạm vi ở đây, trong khi createFolder (hàm anh em,
+    // cùng file) ĐÃ có `assertFolderPathMutable(scope, parent.path)`. Đây không phải chủ đích
+    // mà là bỏ sót, và nó nặng hơn "ghi ngoài phạm vi": mỗi thư mục tạo ra được đóng dấu
+    // createdById = người gọi và systemKey = null — đúng hình dạng mà getFolderScope nguồn 3
+    // biến thành allowedPrefix. Tức đây là công cụ TỰ CẤP THÊM phạm vi, không chỉ ghi bậy.
+    // Chỉ chặn khi người gọi tự chỉ định parentId; nhánh parentId = null rơi về gốc workspace,
+    // đúng luồng kéo-thả hợp lệ mà chính S1-4 phải giữ cho chạy được.
+    if (input.parentId != null) {
+        const scope = await getFolderScope({ userId: access.userId, workspaceId: input.workspaceId, isAdmin: access.isAdmin })
+        assertFolderPathMutable(scope, base.path)
+    }
 
     // Fail fast on the ABSOLUTE resulting depth (base.depth + deepest relative path).
     // getOrCreateChild also enforces MAX_DEPTH per folder, but its per-folder tx commits

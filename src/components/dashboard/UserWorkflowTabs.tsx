@@ -321,6 +321,11 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             color: NP.textPrimary,
                             fontSize: 14,
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            // A bare borderless input takes its height from the font alone (~21px
+                            // measured), so the pointer target was under the WCAG 2.2 SC 2.5.8 24px
+                            // floor even though the pill AROUND it looks generous — clicking that
+                            // padding does not focus the field. minHeight raises the real target.
+                            minHeight: 24,
                         }}
                     />
                 </div>

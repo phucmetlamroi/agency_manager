@@ -169,6 +169,10 @@ export default function UserHomeTopBar({
                                     color: "#FFFFFF",
                                     fontSize: 13,
                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    // See UserWorkflowTabs' twin field: a borderless input is only as
+                                    // tall as its font, which put the real pointer target under the
+                                    // WCAG 2.2 SC 2.5.8 24px floor despite the roomy pill around it.
+                                    minHeight: 24,
                                 }}
                             />
                         </div>

@@ -1815,13 +1815,16 @@ function TreeSidebar({
                         <button
                             type="button"
                             onClick={() => onToggle(node.id)}
-                            className="flex h-6 w-5 items-center justify-center text-muted-foreground hover:text-zinc-200"
+                            // w-6 not w-5: 20px wide fails WCAG 2.2 SC 2.5.8 (24x24 min) and the
+                            // spacing exception does not save it — the navigate button sits gap-1 away.
+                            className="flex h-6 w-6 items-center justify-center text-muted-foreground hover:text-zinc-200"
                             aria-label={isOpen ? 'Thu gọn' : 'Mở rộng'}
                         >
                             {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                         </button>
                     ) : (
-                        <span className="h-6 w-5" />
+                        // Spacer must track the button's width or childless rows lose their indent.
+                        <span className="h-6 w-6" />
                     )}
                     <button
                         type="button"

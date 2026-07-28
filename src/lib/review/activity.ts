@@ -44,6 +44,10 @@ export const REVIEW_ACTIVITY = {
     // The presence of this row is what tells the two apart — ReviewAsset.rowVersion cannot, since
     // moves, status changes and the Mux webhook all bump it too.
     ASSET_RENAMED: 'asset.renamed',
+    /** "Reset về tên Task" — hands the name back to automatic sync (meta {old, new}). The gate is
+     *  RECENCY, not presence: the name is auto-managed when the newest reset is newer than the
+     *  newest manual rename. That way a reset restores sync without deleting history. */
+    ASSET_NAME_RESET: 'asset.name_reset',
 } as const
 
 export type ReviewActivityType = (typeof REVIEW_ACTIVITY)[keyof typeof REVIEW_ACTIVITY]

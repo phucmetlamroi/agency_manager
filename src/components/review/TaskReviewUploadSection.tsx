@@ -146,7 +146,7 @@ export function TaskReviewUploadSection({
         void refetch()
     }
 
-    const startUpload = (markAsFix: boolean) => {
+    const startUpload = (markAsFix: boolean, targetAssetId?: string) => {
         if (!pendingFiles.length) return
         const crumbs = data?.uploadContext.breadcrumb ?? []
         const leaf = crumbs.length ? crumbs[crumbs.length - 1].name : undefined
@@ -154,7 +154,13 @@ export function TaskReviewUploadSection({
         // >1 = a set of siblings (grouped into the task folder, each named from its own file).
         const batchSize = pendingFiles.length
         const ids = pendingFiles.map((file) =>
-            uploadEngine.enqueue(file, { kind: 'task', taskId }, { targetLabel: leaf, batchSize }),
+            // targetAssetId only applies to a single file — a batch is N distinct hooks, so forcing
+            // them all onto one stack would collapse the set into versions of one video again.
+            uploadEngine.enqueue(file, { kind: 'task', taskId }, {
+                targetLabel: leaf,
+                batchSize,
+                targetAssetId: batchSize === 1 ? targetAssetId : undefined,
+            }),
         )
         // [status-audit / owner decision D1 2026-07-23] Arm the confirm, don't fire it. The flip
         // happens when THIS upload's bytes actually land (effect below) — an upload that fails or
@@ -356,10 +362,23 @@ export function TaskReviewUploadSection({
                 <UploadingCard key={it.id} item={it} />
             ))}
 
-            {/* persisted deliverable cards */}
-            {serverCards.map((a) => (
-                <DeliverableCard key={a.assetId} asset={a} workspaceId={data?.workspaceId ?? ''} />
-            ))}
+            {/* [owner request 2026-07-28] persisted deliverables. ONE video keeps its thumbnail —
+                that is the whole point of the card. A SET collapses to a single tile that opens the
+                task's folder in Tệp: a task of 10 hooks rendered 10 stacked cards and blew the
+                drawer apart, and the thumbnails all look alike anyway, so the grid in Tệp is the
+                better place to tell them apart. Falls back to the card list when the videos are not
+                all in one folder — no single folder means no honest destination to link to. */}
+            {data?.deliverableFolder && serverCards.length >= 2 ? (
+                <DeliverableFolderTile
+                    folder={data.deliverableFolder}
+                    workspaceId={data.workspaceId}
+                    unresolved={serverCards.reduce((n, a) => n + a.unresolvedCommentCount, 0)}
+                />
+            ) : (
+                serverCards.map((a) => (
+                    <DeliverableCard key={a.assetId} asset={a} workspaceId={data?.workspaceId ?? ''} />
+                ))
+            )}
 
             {/* confirm strip after a pick (renders even before context loads) */}
             {pendingFiles.length > 0 ? (
@@ -430,7 +449,7 @@ function ConfirmStrip({
     /** Non-null when the task is mid-revision and this viewer may confirm the round. */
     fixTargetStatus: string | null
     onCancel: () => void
-    onStart: (markAsFix: boolean) => void
+    onStart: (markAsFix: boolean, targetAssetId?: string) => void
 }) {
     // [foldering 2026-07-27] The breadcrumb from the server still ends at the per-task video level.
     // Only a BATCH actually creates that folder now, so a single file's real destination is the
@@ -442,6 +461,11 @@ function ConfirmStrip({
     // [owner decision D1 2026-07-23] Default OFF: editors also upload work-in-progress cuts
     // mid-round, and auto-advancing those would tell the manager "đã sửa xong" about a draft.
     const [markAsFix, setMarkAsFix] = useState(false)
+    // [owner request 2026-07-27] On a multi-hook task, name matching is a guess: a filename that is
+    // one character off silently mints a NEW video instead of adding v2, and the editor only finds
+    // out afterwards. Let them pick the target. Empty string = keep the automatic behaviour.
+    const [pickedAssetId, setPickedAssetId] = useState('')
+    const canPickTarget = !isBatch && (ctx?.taskAssets.length ?? 0) > 1
     return (
         <div className="mt-2 rounded-xl border border-violet-500/30 bg-violet-500/[0.06] p-3">
             {files.slice(0, 4).map((f) => (
@@ -508,6 +532,50 @@ function ConfirmStrip({
                 hiện tại": it names an internal parsing convention the user was never told about and
                 ends on "tên hiện tại" (whose name?). The owner said on camera: "là sao ta, không
                 hiểu lắm". Say what happened, where the file lands, and that nothing is broken. */}
+            {canPickTarget && (
+                <div className="mt-2.5 rounded-lg border border-white/10 bg-black/20 p-2.5">
+                    <p className="text-[11px] font-medium text-zinc-300">Task này có nhiều video — file mới thuộc video nào?</p>
+                    <label className="mt-1.5 flex cursor-pointer items-start gap-2 text-[11.5px] text-zinc-300">
+                        <input
+                            type="radio"
+                            name="upload-target"
+                            className="mt-[3px] accent-violet-500"
+                            checked={pickedAssetId === ''}
+                            onChange={() => setPickedAssetId('')}
+                        />
+                        <span>
+                            Tự động khớp theo tên
+                            <span className="block text-[10.5px] text-muted-foreground">
+                                Khớp tên file với tên video. Lệch một ký tự là tạo video mới.
+                            </span>
+                        </span>
+                    </label>
+                    <label className="mt-1.5 flex cursor-pointer items-start gap-2 text-[11.5px] text-zinc-300">
+                        <input
+                            type="radio"
+                            name="upload-target"
+                            className="mt-[3px] accent-violet-500"
+                            checked={pickedAssetId !== ''}
+                            onChange={() => setPickedAssetId(ctx?.taskAssets[0]?.id ?? '')}
+                        />
+                        <span>Chọn video cụ thể để đè phiên bản mới</span>
+                    </label>
+                    {pickedAssetId !== '' && (
+                        <select
+                            value={pickedAssetId}
+                            onChange={(e) => setPickedAssetId(e.target.value)}
+                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-zinc-900/70 px-2.5 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-violet-400/60"
+                        >
+                            {ctx?.taskAssets.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                    {a.name} → v{a.nextVersionNumber}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            )}
+
             {ctx && !ctx.parsedOk && (
                 <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-300/90">
                     <AlertTriangle size={12} className="mt-0.5 shrink-0" />
@@ -545,7 +613,7 @@ function ConfirmStrip({
                 </button>
                 <button
                     type="button"
-                    onClick={() => onStart(markAsFix)}
+                    onClick={() => onStart(markAsFix, pickedAssetId || undefined)}
                     className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-primary-accent"
                 >
                     <UploadCloud size={13} /> Bắt đầu tải lên
@@ -655,6 +723,47 @@ function UploadingCard({ item }: { item: UploadItem }) {
                 </div>
             </div>
         </div>
+    )
+}
+
+/* ── collapsed tile for a task whose deliverables are a SET (2+ in one folder) ─── */
+
+function DeliverableFolderTile({
+    folder,
+    workspaceId,
+    unresolved,
+}: {
+    folder: { id: string; name: string; videoCount: number }
+    workspaceId: string
+    unresolved: number
+}) {
+    const open = () => {
+        if (workspaceId) window.location.assign(`/${workspaceId}/team/folder/${folder.id}`)
+    }
+    return (
+        <button
+            type="button"
+            onClick={open}
+            className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-violet-400/40 hover:bg-white/[0.06]"
+            title={`Mở thư mục “${folder.name}” trong ${REVIEW_MODULE_LABEL}`}
+        >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-300">
+                <Clapperboard size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-zinc-100">{folder.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                    <span>{folder.videoCount} video</span>
+                    {unresolved > 0 && (
+                        <>
+                            <span className="text-zinc-700">·</span>
+                            <span className="text-amber-300/90">{unresolved} góp ý chưa xử lý</span>
+                        </>
+                    )}
+                </div>
+            </div>
+            <span className="shrink-0 text-[11.5px] font-medium text-violet-300">Mở thư mục →</span>
+        </button>
     )
 }
 

@@ -25,7 +25,7 @@ import {
     type MediaKind,
 } from './media-constants'
 import { buildR2Key, buildSystemKey, computePartSize, computePartCount } from './upload-helpers'
-import { ensureTaskFolderPath, type BreadcrumbItem } from './task-folder'
+import { ensureTaskFolderPath, assetNameIsAutoManaged, type BreadcrumbItem } from './task-folder'
 import { reviveSystemFolderChain, pathIds } from './folders'
 import { parseVideoTitle } from './parse-task-context'
 import {
@@ -695,6 +695,13 @@ export async function initiateTaskUpload(input: {
      *  versions: every file resolved to the same name and hit the auto-version match. Removing the
      *  wrapper folder alone would NOT have fixed that — the folder was never the blocker. */
     batchSize?: number
+    /** [owner request 2026-07-27] Force this upload onto a SPECIFIC existing deliverable.
+     *
+     *  Name matching is a good default but it is a guess, and on a multi-hook task a one-character
+     *  difference in a filename silently mints a new video instead of adding v2 — the editor only
+     *  finds out afterwards. When the uploader has picked the target in the confirm strip, that
+     *  choice is authoritative and no guessing happens at all. */
+    targetAssetId?: string
 }): Promise<TaskInitiateResult> {
     const kind = mediaKindFromMime(input.mimeType, input.fileName)
     if (kind !== 'VIDEO') fail(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ nhận file video ở mục bàn giao.')
@@ -762,6 +769,31 @@ export async function initiateTaskUpload(input: {
     // when the cheap pre-check below saw an existing asset that vanished before the lock was taken.
     class NeedFolderChain extends Error {}
 
+    // An explicitly chosen target short-circuits every guess below. Validated against THIS task so a
+    // caller cannot stack a version onto someone else's deliverable by passing an arbitrary id.
+    if (input.targetAssetId) {
+        const target = await prisma.reviewAsset.findFirst({
+            where: { id: input.targetAssetId, taskId: task.id, workspaceId, deletedAt: null },
+            select: { id: true },
+        })
+        if (!target) fail(404, 'NOT_FOUND', 'Video được chọn không thuộc task này hoặc đã bị xóa.')
+        const init = await initiateUpload({
+            fileName: input.fileName,
+            sizeBytes: input.sizeBytes,
+            mimeType: input.mimeType,
+            target: { kind: 'asset', assetId: target.id },
+            idempotencyKey: input.idempotencyKey,
+        })
+        return {
+            status: init.status,
+            body: {
+                ...init.body,
+                createdNewAsset: false,
+                folderPath: (await breadcrumbForAsset(target.id)) ?? [],
+            },
+        }
+    }
+
     let resolved: { assetId: string; createdNewAsset: boolean } | null = null
     for (let attempt = 0; attempt < MAX_VERSION_RETRIES; attempt++) {
         const assetName = attempt === 0 ? baseAssetName : `${baseAssetName} (${attempt + 1})`
@@ -802,12 +834,10 @@ export async function initiateTaskUpload(input: {
                     if (solo.length === 1) {
                         const asset = solo[0]
                         // Keep the name in sync with the task — but never overwrite one a PERSON
-                        // chose. renameAsset logs asset.renamed; its presence means hands off.
+                        // chose. The gate is recency, not presence, so "Reset về tên Task" can hand
+                        // the name back to automatic sync without erasing the rename from history.
                         if (asset.name !== assetName) {
-                            const renamedByHand = await tx.reviewActivity.count({
-                                where: { assetId: asset.id, type: REVIEW_ACTIVITY.ASSET_RENAMED },
-                            })
-                            if (renamedByHand === 0) {
+                            if (await assetNameIsAutoManaged(tx, asset.id)) {
                                 // A P2002 here (a sibling in the shared client folder already owns
                                 // this name) aborts the tx and the outer loop retries with " (2)".
                                 await tx.reviewAsset.update({

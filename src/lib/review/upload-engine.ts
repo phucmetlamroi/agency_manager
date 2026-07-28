@@ -210,6 +210,8 @@ interface ItemRuntime {
     mimeType: string
     /** Files in the same drop/pick as this one — see EnqueueOptions.batchSize. */
     batchSize?: number
+    /** Uploader-chosen deliverable to version — see EnqueueOptions.targetAssetId. */
+    targetAssetId?: string
     idempotencyKey: string
     contentValidated: boolean
     // set after initiate:
@@ -247,6 +249,10 @@ export interface EnqueueOptions {
      *  the task-upload initiate so the server can tell "next version of this video" (1) from
      *  "a set of hooks" (>1). Only meaningful for kind:'task'. */
     batchSize?: number
+    /** [owner request 2026-07-27] Skip the name matcher entirely and stack onto THIS deliverable.
+     *  Set when the uploader picked the target in the confirm strip; a near-miss filename would
+     *  otherwise mint a new video on a multi-hook task. */
+    targetAssetId?: string
 }
 
 export interface UploadEngine {
@@ -338,18 +344,19 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         store.add(base)
         if (!meta.ok) return id
 
-        runtimes.set(id, freshRuntime(file, target, mimeType, opts.batchSize))
+        runtimes.set(id, freshRuntime(file, target, mimeType, opts.batchSize, opts.targetAssetId))
         // Content sniff (async) before we let it consume a slot.
         void sniffContent(id, file, meta.kind)
         return id
     }
 
-    function freshRuntime(file: File, target: UploadTarget, mimeType: string, batchSize?: number): ItemRuntime {
+    function freshRuntime(file: File, target: UploadTarget, mimeType: string, batchSize?: number, targetAssetId?: string): ItemRuntime {
         return {
             file,
             target,
             mimeType,
             batchSize,
+            targetAssetId,
             idempotencyKey: genId(),
             contentValidated: false,
             initiated: false,
@@ -453,6 +460,7 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
                     sizeBytes: String(size),
                     mimeType: rt.mimeType,
                     batchSize: rt.batchSize,
+                    targetAssetId: rt.targetAssetId,
                 },
                 rt.idempotencyKey,
             )
@@ -685,6 +693,7 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
                     sizeBytes: String(size),
                     mimeType: rt.mimeType,
                     batchSize: rt.batchSize,
+                    targetAssetId: rt.targetAssetId,
                 },
                 rt.idempotencyKey,
             )

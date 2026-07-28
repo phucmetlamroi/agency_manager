@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { buildSystemKey, slugifyBrand } from './upload-helpers'
+import { REVIEW_ACTIVITY } from './activity'
 import { reviveSystemFolderChain } from './folders'
 import type { ParsedTaskVideo } from './parse-task-context'
 
@@ -127,6 +128,28 @@ async function ensureFolder(args: {
         }
         throw e
     }
+}
+
+/**
+ * Is this deliverable's name still managed automatically (kept in sync with its task title)?
+ *
+ * Gate is RECENCY, not presence. A manual rename takes the name over; "Reset về tên Task" hands it
+ * back. Comparing the newest of each keeps both reversible and leaves the audit trail intact —
+ * deleting the rename rows would have worked too, but then the history would lie.
+ *
+ * Accepts a tx client so the upload path can ask inside its own transaction.
+ */
+export async function assetNameIsAutoManaged(
+    db: Pick<Prisma.TransactionClient, 'reviewActivity'>,
+    assetId: string,
+): Promise<boolean> {
+    const latest = await db.reviewActivity.findFirst({
+        where: { assetId, type: { in: [REVIEW_ACTIVITY.ASSET_RENAMED, REVIEW_ACTIVITY.ASSET_NAME_RESET] } },
+        orderBy: { createdAt: 'desc' },
+        select: { type: true },
+    })
+    // Never touched by hand → still automatic. Otherwise only a reset re-enables it.
+    return latest == null || latest.type === REVIEW_ACTIVITY.ASSET_NAME_RESET
 }
 
 /**

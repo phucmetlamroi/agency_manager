@@ -41,6 +41,10 @@ export interface TaskUploadContextDto {
      *  `willRenameTo` is set when that card's name no longer matches the task title and the upload
      *  will bring it back in sync — announced up front so an automatic rename is never a surprise. */
     existingAsset: { id: string; name: string; nextVersionNumber: number; willRenameTo: string | null } | null
+    /** [owner request 2026-07-27] Every live deliverable on this task, so a multi-hook upload can
+     *  PICK the one to version instead of relying on the filename matching. Automatic matching is a
+     *  guess; on a set of hooks a one-character difference silently mints a new video. */
+    taskAssets: { id: string; name: string; nextVersionNumber: number }[]
 }
 
 /**
@@ -244,6 +248,23 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
         existingAsset = { id: match.id, name: match.name, nextVersionNumber: (agg._max.versionNumber ?? 0) + 1, willRenameTo }
     }
 
+    // Picker options. Scoped rows only (assetRows), so an editor never sees a deliverable outside
+    // their assigned subtree. MAX(versionNumber) per stack, same rule as above — the head pointer
+    // lags while a version is still PROCESSING, so head+1 would mispredict.
+    const pickerCounts = assetRows.length
+        ? await prisma.reviewVersion.groupBy({
+              by: ['assetId'],
+              where: { assetId: { in: assetRows.map((a) => a.id) } },
+              _max: { versionNumber: true },
+          })
+        : []
+    const maxByAsset = new Map(pickerCounts.map((r) => [r.assetId, r._max.versionNumber ?? 0]))
+    const taskAssets = assetRows.map((a) => ({
+        id: a.id,
+        name: a.name,
+        nextVersionNumber: (maxByAsset.get(a.id) ?? 0) + 1,
+    }))
+
     // [status-audit 2026-07-23] Mirror `confirmFixDone`'s guard exactly: pick whichever of A4/A7
     // is reachable from the CURRENT status, and require assignee-or-admin. `assetRows` is already
     // folder-scoped, so an editor who cannot see any of this task's deliverables gets null and no
@@ -275,7 +296,7 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
     return {
         workspaceId,
         assets,
-        uploadContext: { breadcrumb, parsedOk: parsed.matched, existingAsset },
+        uploadContext: { breadcrumb, parsedOk: parsed.matched, existingAsset, taskAssets },
         fixConfirm,
     }
 }

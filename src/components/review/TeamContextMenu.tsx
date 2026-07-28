@@ -25,6 +25,7 @@ import {
     FolderUp,
     FolderPlus,
     FolderOpen,
+    RotateCcw,
 } from 'lucide-react'
 
 export type MenuTargetKind = 'folder' | 'asset'
@@ -91,6 +92,8 @@ export interface ItemMenuHandlers {
     onDelete: () => void
     /** [foldering 2026-07-27] Folder menu only: lift the videos out and drop the wrapper. */
     onUngroup?: () => void
+    /** Asset menu only: put the name back to the task title and re-enable automatic sync. */
+    onResetName?: () => void
     canDelete: boolean
     /** P3.4 — asset menu only; present (enabled) when a single asset is the target. */
     onManageVersions?: () => void
@@ -154,6 +157,14 @@ export function AssetMenuContent(h: ItemMenuHandlers) {
             <Item icon={<FolderInput size={15} />} label="Di chuyển tới…" onSelect={h.onMoveTo} />
             <Item icon={<Files size={15} />} label="Nhân bản" onSelect={h.onDuplicate} />
             <Item icon={<Pencil size={15} />} label="Đổi tên" onSelect={h.onRename} />
+            {h.onResetName && (
+                <Item
+                    icon={<RotateCcw size={15} />}
+                    label="Reset về tên Task"
+                    onSelect={h.onResetName}
+                    hint="Lấy lại tên từ task, và bật lại tự đồng bộ khi task đổi tên về sau"
+                />
+            )}
             <Sep />
             <Item
                 icon={<Trash2 size={15} />}

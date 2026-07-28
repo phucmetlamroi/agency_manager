@@ -102,6 +102,16 @@ export async function apiPurgeItems(items: ItemRef[]): Promise<{
     return postJson('/api/review/trash/purge', { items: items.map((i) => ({ type: i.type, id: i.id })) })
 }
 
+/** "Reset về tên Task" — server recomputes the name from the task title and re-enables auto sync. */
+export async function apiResetAssetName(id: string): Promise<AssetDto> {
+    const res = await fetch(`/api/review/assets/${encodeURIComponent(id)}/reset-name`, {
+        method: 'POST',
+        credentials: 'same-origin',
+    })
+    if (!res.ok) throw new Error(await errMessage(res))
+    return ((await res.json()) as { asset: AssetDto }).asset
+}
+
 export async function apiRenameFolder(id: string, name: string, rowVersion: number): Promise<FolderDto> {
     const res = await fetch(`/api/review/folders/${encodeURIComponent(id)}`, {
         method: 'PATCH',

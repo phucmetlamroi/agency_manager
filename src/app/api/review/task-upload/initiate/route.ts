@@ -21,6 +21,8 @@ const TaskInitiateSchema = z.object({
     // cut/revision → flat + task-named + auto-versioned. >1 = a multi-hook set → grouped folder +
     // per-file asset names. Capped so a hostile client can't claim an absurd batch.
     batchSize: z.number().int().min(1).max(50).optional(),
+    /** Uploader picked the deliverable to version, instead of letting the name matcher guess. */
+    targetAssetId: z.string().min(1).optional(),
 })
 
 export const POST = withReviewRoute(async (req: NextRequest) => {

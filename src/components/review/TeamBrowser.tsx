@@ -72,6 +72,7 @@ import {
     apiSetAssetStatus,
     apiMergeStacks,
     apiUngroupFolder,
+    apiResetAssetName,
     apiGroupAssets,
     downloadVersion,
     downloadZip,
@@ -1166,6 +1167,22 @@ export function TeamBrowser({
     const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
 
     /* ---- [foldering 2026-07-27] "Bỏ thư mục" ---- */
+    const doResetName = useCallback(
+        async (assetId: string) => {
+            const tid = toast.loading('Đang lấy lại tên từ task…')
+            try {
+                const a = await apiResetAssetName(assetId)
+                toast.success(`Đã đổi tên thành “${a.title}” và bật lại tự đồng bộ theo task.`, { id: tid })
+                setRefreshKey((k) => k + 1)
+            } catch (e) {
+                // 409 when the video is not attached to a task, or the task is gone — both are
+                // actionable, so show what the server said instead of a generic failure.
+                toast.error(e instanceof Error ? e.message : 'Không lấy lại được tên từ task.', { id: tid })
+            }
+        },
+        [],
+    )
+
     const doUngroup = useCallback(
         async (targetFolderId: string) => {
             const tid = toast.loading('Đang bỏ thư mục…')
@@ -1236,6 +1253,8 @@ export function TeamBrowser({
             // for a multi-select or for an asset.
             onUngroup:
                 target.type === 'folder' && acting.length === 1 ? () => void doUngroup(target.id) : undefined,
+            onResetName:
+                target.type === 'asset' && acting.length === 1 ? () => void doResetName(target.id) : undefined,
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
             // P5.5 — share the acting selection (multi-select works via right-click).
             onCreateShare: () =>
@@ -1249,7 +1268,7 @@ export function TeamBrowser({
                 }),
         }
         return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
-    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, doUngroup, workspaceId, folderById, assetById])
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, doUngroup, doResetName, workspaceId, folderById, assetById])
 
     const selectionActive = selectedIds.size > 0
 

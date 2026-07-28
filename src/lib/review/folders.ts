@@ -24,6 +24,7 @@ import {
 } from './folder-scope'
 import { apiError } from './errors'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
+import { parseVideoTitle } from './parse-task-context'
 import {
     serializeFolder,
     serializeAsset,
@@ -1644,6 +1645,52 @@ export async function renameAsset(
             meta: { old: existing.name, new: name },
         })
     }
+    return loadAssetDto(assetId)
+}
+
+/**
+ * "Reset về tên Task" — put a deliverable's name back to whatever its task title parses to, and
+ * hand it back to automatic sync.
+ *
+ * A manual rename opts the asset out of that sync (see assetNameIsAutoManaged). Without a way back,
+ * one accidental rename froze that deliverable's name forever. Recording a NEWER asset.name_reset
+ * re-enables sync while leaving the rename in the audit trail — nothing is rewritten, the newest
+ * intent simply wins.
+ */
+export async function resetAssetNameToTask(assetId: string): Promise<AssetDto> {
+    const asset = await prisma.reviewAsset.findFirst({
+        where: { id: assetId, deletedAt: null },
+        select: { id: true, name: true, workspaceId: true, folderId: true, taskId: true },
+    })
+    if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
+    if (!asset.taskId) throw apiError(409, 'STATE_INVALID', 'Video này không gắn với task nào nên không có tên task để lấy.')
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    await assertAssetInScope(
+        await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }),
+        assetId,
+        'write',
+    )
+    const task = await prisma.task.findUnique({
+        where: { id: asset.taskId },
+        select: { title: true, client: { select: { name: true } } },
+    })
+    if (!task) throw apiError(409, 'STATE_INVALID', 'Task gắn với video này không còn tồn tại.')
+
+    const desired = validateAssetName(parseVideoTitle(task.title, task.client?.name ?? '').video)
+    // Same partial unique index as everywhere else: a sibling in this folder may already own the
+    // name (flat mode shares one client folder across tasks), so take the next free suffix.
+    const finalName = await prisma.$transaction((tx) => freeAssetName(tx, asset.folderId, desired))
+
+    await prisma.reviewAsset.update({ where: { id: assetId }, data: { name: finalName, rowVersion: { increment: 1 } } })
+    await recordActivity(prisma, {
+        type: REVIEW_ACTIVITY.ASSET_NAME_RESET,
+        workspaceId: asset.workspaceId,
+        taskId: asset.taskId,
+        folderId: asset.folderId,
+        assetId,
+        actorUserId: access.userId,
+        meta: { old: asset.name, new: finalName },
+    })
     return loadAssetDto(assetId)
 }
 

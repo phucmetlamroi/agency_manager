@@ -146,7 +146,7 @@ export function TaskReviewUploadSection({
         void refetch()
     }
 
-    const startUpload = (markAsFix: boolean) => {
+    const startUpload = (markAsFix: boolean, targetAssetId?: string) => {
         if (!pendingFiles.length) return
         const crumbs = data?.uploadContext.breadcrumb ?? []
         const leaf = crumbs.length ? crumbs[crumbs.length - 1].name : undefined
@@ -154,7 +154,13 @@ export function TaskReviewUploadSection({
         // >1 = a set of siblings (grouped into the task folder, each named from its own file).
         const batchSize = pendingFiles.length
         const ids = pendingFiles.map((file) =>
-            uploadEngine.enqueue(file, { kind: 'task', taskId }, { targetLabel: leaf, batchSize }),
+            // targetAssetId only applies to a single file — a batch is N distinct hooks, so forcing
+            // them all onto one stack would collapse the set into versions of one video again.
+            uploadEngine.enqueue(file, { kind: 'task', taskId }, {
+                targetLabel: leaf,
+                batchSize,
+                targetAssetId: batchSize === 1 ? targetAssetId : undefined,
+            }),
         )
         // [status-audit / owner decision D1 2026-07-23] Arm the confirm, don't fire it. The flip
         // happens when THIS upload's bytes actually land (effect below) — an upload that fails or
@@ -430,7 +436,7 @@ function ConfirmStrip({
     /** Non-null when the task is mid-revision and this viewer may confirm the round. */
     fixTargetStatus: string | null
     onCancel: () => void
-    onStart: (markAsFix: boolean) => void
+    onStart: (markAsFix: boolean, targetAssetId?: string) => void
 }) {
     // [foldering 2026-07-27] The breadcrumb from the server still ends at the per-task video level.
     // Only a BATCH actually creates that folder now, so a single file's real destination is the
@@ -442,6 +448,11 @@ function ConfirmStrip({
     // [owner decision D1 2026-07-23] Default OFF: editors also upload work-in-progress cuts
     // mid-round, and auto-advancing those would tell the manager "đã sửa xong" about a draft.
     const [markAsFix, setMarkAsFix] = useState(false)
+    // [owner request 2026-07-27] On a multi-hook task, name matching is a guess: a filename that is
+    // one character off silently mints a NEW video instead of adding v2, and the editor only finds
+    // out afterwards. Let them pick the target. Empty string = keep the automatic behaviour.
+    const [pickedAssetId, setPickedAssetId] = useState('')
+    const canPickTarget = !isBatch && (ctx?.taskAssets.length ?? 0) > 1
     return (
         <div className="mt-2 rounded-xl border border-violet-500/30 bg-violet-500/[0.06] p-3">
             {files.slice(0, 4).map((f) => (
@@ -508,6 +519,50 @@ function ConfirmStrip({
                 hiện tại": it names an internal parsing convention the user was never told about and
                 ends on "tên hiện tại" (whose name?). The owner said on camera: "là sao ta, không
                 hiểu lắm". Say what happened, where the file lands, and that nothing is broken. */}
+            {canPickTarget && (
+                <div className="mt-2.5 rounded-lg border border-white/10 bg-black/20 p-2.5">
+                    <p className="text-[11px] font-medium text-zinc-300">Task này có nhiều video — file mới thuộc video nào?</p>
+                    <label className="mt-1.5 flex cursor-pointer items-start gap-2 text-[11.5px] text-zinc-300">
+                        <input
+                            type="radio"
+                            name="upload-target"
+                            className="mt-[3px] accent-violet-500"
+                            checked={pickedAssetId === ''}
+                            onChange={() => setPickedAssetId('')}
+                        />
+                        <span>
+                            Tự động khớp theo tên
+                            <span className="block text-[10.5px] text-muted-foreground">
+                                Khớp tên file với tên video. Lệch một ký tự là tạo video mới.
+                            </span>
+                        </span>
+                    </label>
+                    <label className="mt-1.5 flex cursor-pointer items-start gap-2 text-[11.5px] text-zinc-300">
+                        <input
+                            type="radio"
+                            name="upload-target"
+                            className="mt-[3px] accent-violet-500"
+                            checked={pickedAssetId !== ''}
+                            onChange={() => setPickedAssetId(ctx?.taskAssets[0]?.id ?? '')}
+                        />
+                        <span>Chọn video cụ thể để đè phiên bản mới</span>
+                    </label>
+                    {pickedAssetId !== '' && (
+                        <select
+                            value={pickedAssetId}
+                            onChange={(e) => setPickedAssetId(e.target.value)}
+                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-zinc-900/70 px-2.5 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-violet-400/60"
+                        >
+                            {ctx?.taskAssets.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                    {a.name} → v{a.nextVersionNumber}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            )}
+
             {ctx && !ctx.parsedOk && (
                 <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-300/90">
                     <AlertTriangle size={12} className="mt-0.5 shrink-0" />
@@ -545,7 +600,7 @@ function ConfirmStrip({
                 </button>
                 <button
                     type="button"
-                    onClick={() => onStart(markAsFix)}
+                    onClick={() => onStart(markAsFix, pickedAssetId || undefined)}
                     className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-primary-accent"
                 >
                     <UploadCloud size={13} /> Bắt đầu tải lên

@@ -85,7 +85,7 @@ export default function PaymentLedger({ clients, byClient, onRecord }: {
             {/* Filters */}
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-                    <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: '#52525b' }} />
+                    <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: '#878790' }} />
                     <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm khách hàng..."
                         style={{ width: '100%', padding: '9px 12px 9px 34px', borderRadius: 10, background: 'rgba(39,39,42,0.6)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 13, outline: 'none' }} />
                 </div>
@@ -103,22 +103,22 @@ export default function PaymentLedger({ clients, byClient, onRecord }: {
             {/* Header */}
             <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 {['Khách hàng', 'Cần thu', 'Đã thu', 'Còn lại', 'Trạng thái', ''].map((h, i) => (
-                    <span key={i} style={{ fontSize: 10, fontWeight: 700, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: i >= 1 && i <= 3 ? 'right' : 'left' }}>{h}</span>
+                    <span key={i} style={{ fontSize: 10, fontWeight: 700, color: '#878790', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: i >= 1 && i <= 3 ? 'right' : 'left' }}>{h}</span>
                 ))}
             </div>
 
             {/* Rows */}
             {filtered.length === 0 ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#52525b', fontSize: 13 }}>Không có khách hàng nào.</div>
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#878790', fontSize: 13 }}>Không có khách hàng nào.</div>
             ) : filtered.map((r) => (
                 <div key={r.c.id} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 12, alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.c.name}</div>
-                        {r.lastPaidAt && <div style={{ fontSize: 10.5, color: '#52525b', marginTop: 1 }}>Thu gần nhất: {fmtDate(r.lastPaidAt)}</div>}
+                        {r.lastPaidAt && <div style={{ fontSize: 10.5, color: '#878790', marginTop: 1 }}>Thu gần nhất: {fmtDate(r.lastPaidAt)}</div>}
                     </div>
                     <div style={{ textAlign: 'right', fontSize: 13, color: '#d4d4d8', fontFamily: 'ui-monospace, monospace' }}>{usd(r.owed)}</div>
-                    <div style={{ textAlign: 'right', fontSize: 13, color: r.paid > 0 ? '#34d399' : '#52525b', fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}>{usd(r.paid)}</div>
-                    <div style={{ textAlign: 'right', fontSize: 13, color: r.remaining > 0 ? '#fbbf24' : '#52525b', fontFamily: 'ui-monospace, monospace' }}>{usd(r.remaining)}</div>
+                    <div style={{ textAlign: 'right', fontSize: 13, color: r.paid > 0 ? '#34d399' : '#878790', fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}>{usd(r.paid)}</div>
+                    <div style={{ textAlign: 'right', fontSize: 13, color: r.remaining > 0 ? '#fbbf24' : '#878790', fontFamily: 'ui-monospace, monospace' }}>{usd(r.remaining)}</div>
                     <div><StatusBadge s={r.status} /></div>
                     <div style={{ textAlign: 'right' }}>
                         <button onClick={() => onRecord(r.c.id, r.owed, r.paid)}
@@ -132,7 +132,7 @@ export default function PaymentLedger({ clients, byClient, onRecord }: {
                 </div>
             ))}
 
-            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#52525b' }}>
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#878790' }}>
                 <Wallet style={{ width: 13, height: 13 }} /> "Cần thu" = tổng giá trị task của khách trong tháng này. Một khách có thể ghi nhận nhiều lần (trả góp/một phần).
             </div>
         </div>

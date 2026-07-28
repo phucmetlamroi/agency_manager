@@ -143,7 +143,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                     </div>
                     <div className="min-w-0">
                         <h3 className="text-[15px] font-bold text-white leading-tight truncate">{displayName}</h3>
-                        <span className="text-[11px] font-mono" style={{ color: '#52525B' }}>ID: {user.id.slice(0, 8)}…</span>
+                        <span className="text-[11px] font-mono" style={{ color: '#878790' }}>ID: {user.id.slice(0, 8)}…</span>
                     </div>
                 </div>
 
@@ -176,7 +176,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                         <div className="flex items-center gap-1.5 text-[11px] mb-1 md:justify-end" style={{ color: '#A1A1AA' }}>
                             <Hourglass className="w-3 h-3" /> Dự kiến
                         </div>
-                        <div className="text-lg font-bold tabular-nums" style={{ color: pendingIncome > 0 ? '#D8B4FE' : '#52525B' }}>
+                        <div className="text-lg font-bold tabular-nums" style={{ color: pendingIncome > 0 ? '#D8B4FE' : '#878790' }}>
                             {pendingIncome.toLocaleString()} đ
                         </div>
                     </div>
@@ -275,7 +275,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-[11px] mt-0.5" style={{ color: '#52525B' }}>
+                                                <div className="text-[11px] mt-0.5" style={{ color: '#878790' }}>
                                                     {new Date(task.updatedAt).toLocaleDateString('vi-VN')}
                                                 </div>
                                             </div>
@@ -286,7 +286,7 @@ export default function PayrollCard({ user, currentMonth, currentYear, workspace
                                     ))}
 
                                     {detailTasks.length === 0 && (
-                                        <div className="text-center py-6 text-sm" style={{ color: '#52525B' }}>
+                                        <div className="text-center py-6 text-sm" style={{ color: '#878790' }}>
                                             Không có task nào.
                                         </div>
                                     )}

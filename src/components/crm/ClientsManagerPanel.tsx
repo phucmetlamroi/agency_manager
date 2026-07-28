@@ -163,7 +163,7 @@ export default function ClientsManagerPanel({
                             </button>
                             {view !== 'list' && selectedName && (
                                 <>
-                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#52525b' }} />
+                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#878790' }} />
                                     <button
                                         onClick={() => setView('detail')}
                                         className="text-[16px] font-extrabold truncate"
@@ -175,13 +175,13 @@ export default function ClientsManagerPanel({
                             )}
                             {view === 'invoice' && (
                                 <>
-                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#52525b' }} />
+                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#878790' }} />
                                     <span className="text-[16px] font-extrabold text-white">Tạo hóa đơn</span>
                                 </>
                             )}
                             {view === 'payments' && (
                                 <>
-                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#52525b' }} />
+                                    <ChevronRight className="w-[15px] h-[15px] flex-shrink-0" style={{ color: '#878790' }} />
                                     <span className="text-[16px] font-extrabold text-white">Sổ thu tiền</span>
                                 </>
                             )}

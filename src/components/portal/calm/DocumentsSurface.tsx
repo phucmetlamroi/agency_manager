@@ -273,7 +273,7 @@ function AssetTile({ asset, selected, layout, onSelect, onToggle, onOpen }: {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={asset.currentVersion.posterUrl} alt={asset.title} loading="lazy" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 ) : (
-                    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#52525B' }}>
+                    <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#878790' }}>
                         <Icon size={30} />
                     </div>
                 )}
@@ -649,7 +649,7 @@ export default function DocumentsSurface({ actions, wsScope, scope }: {
                                     <button type="button" onClick={() => { setCurrentFolderId(null); setSelected(new Set()) }} style={{ border: 0, background: 'transparent', color: activeFolderId ? '#A78BFA' : '#F4F4F5', cursor: activeFolderId ? 'pointer' : 'default', fontWeight: 800 }}>Document</button>
                                     {breadcrumb.map((folder) => (
                                         <span key={folder.id} style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                                            <ChevronRight size={13} style={{ color: '#52525B' }} />
+                                            <ChevronRight size={13} style={{ color: '#878790' }} />
                                             <button type="button" onClick={() => setCurrentFolderId(folder.id)} style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', border: 0, background: 'transparent', color: folder.id === activeFolderId ? '#F4F4F5' : '#A78BFA', cursor: 'pointer', fontWeight: 800 }}>{folder.name}</button>
                                         </span>
                                     ))}

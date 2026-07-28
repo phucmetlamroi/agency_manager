@@ -145,7 +145,7 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
                     {loadingHist ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#878790', fontSize: 12, padding: '8px 0' }}><Loader2 size={13} className="animate-spin" /> Đang tải…</div>
                     ) : history.length === 0 ? (
-                        <div style={{ fontSize: 12, color: '#52525b', fontStyle: 'italic', padding: '8px 0' }}>Chưa có lần thu nào.</div>
+                        <div style={{ fontSize: 12, color: '#878790', fontStyle: 'italic', padding: '8px 0' }}>Chưa có lần thu nào.</div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {history.map((h) => (
@@ -157,7 +157,7 @@ export default function RecordPaymentModal({ clientId, clientName, owed, paid, w
                                             {h.method && <span style={{ fontSize: 10.5, color: '#878790' }}>· {h.method}</span>}
                                         </div>
                                         {h.note && <div style={{ fontSize: 11.5, color: '#a1a1aa', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.note}</div>}
-                                        {h.recordedBy && <div style={{ fontSize: 10, color: '#52525b', marginTop: 1 }}>bởi {h.recordedBy}</div>}
+                                        {h.recordedBy && <div style={{ fontSize: 10, color: '#878790', marginTop: 1 }}>bởi {h.recordedBy}</div>}
                                     </div>
                                     <button onClick={() => remove(h.id)} title="Xoá" style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                         <Trash2 size={12} />

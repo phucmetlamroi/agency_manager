@@ -101,6 +101,11 @@ const NP = {
     borderSubtle: 'rgba(139,92,246,0.10)',
     borderCell: 'rgba(139,92,246,0.12)',
     accent: '#8B5CF6',
+    // [audit 2026-07 §12] Violet one step darker, used ONLY where white text sits on it.
+    // #FFFFFF on accent #8B5CF6 measured 4.23:1, under the 4.5:1 AA floor; #7C3AED is 5.70:1
+    // and reads as the same brand colour. `accent` above still paints glows, borders and
+    // dots, where no text sits and the contrast rule does not apply.
+    accentSolid: '#7C3AED',
     accentGlow: 'rgba(139,92,246,0.35)',
     textPrimary: '#FFFFFF',
     textSecondary: '#A1A1AA',
@@ -372,7 +377,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 gap: 8,
                                 padding: '10px 20px',
                                 borderRadius: 26,
-                                background: isActive ? NP.accent : NP.surface,
+                                background: isActive ? NP.accentSolid : NP.surface,
                                 border: `1px solid ${isActive ? NP.accent : NP.border}`,
                                 color: isActive ? '#FFFFFF' : NP.textSecondary,
                                 fontSize: 14,

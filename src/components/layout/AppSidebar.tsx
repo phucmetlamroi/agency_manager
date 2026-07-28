@@ -112,6 +112,14 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
 /* ── Neon Purple Dark palette constants ── */
 const SIDEBAR_BG = "#0A0A0A"
 const ACTIVE_BG = "#8B5CF6"
+/**
+ * [audit 2026-07 §12] The SAME violet, one step darker, for the places white text sits ON it.
+ * Measured: #FFFFFF on #8B5CF6 = 4.23:1, just under the 4.5:1 AA floor — so the active nav
+ * label and the unread badge were failing. violet-600 #7C3AED = 5.70:1 and reads as the same
+ * brand colour. Deliberately NOT a global swap: ACTIVE_BG above still paints the decorative
+ * dot and the glow, where no text sits and the contrast rule does not apply.
+ */
+const ACTIVE_FILL = "#7C3AED"
 const ACTIVE_GLOW = "0 4px 20px rgba(139,92,246,0.35)"
 const INACTIVE_TEXT = "#A1A1AA"
 const INACTIVE_HOVER_BG = "#211B31"
@@ -252,7 +260,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                         const isActive = !item.external && pathname === item.href
                         const dangerActiveBg = "#EF4444"
                         const dangerGlow = "0 4px 20px rgba(239,68,68,0.35)"
-                        const activeBg = item.danger ? dangerActiveBg : ACTIVE_BG
+                        const activeBg = item.danger ? dangerActiveBg : ACTIVE_FILL
                         const activeGlow = item.danger ? dangerGlow : ACTIVE_GLOW
                         const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
                         // External links (mailto:, https://…) bypass next/link to avoid runtime warnings.
@@ -332,8 +340,8 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 {item.href === requestsHref && reqCount > 0 && (
                                     <span style={{
                                         minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999,
-                                        background: isActive ? '#FFFFFF' : ACTIVE_BG,
-                                        color: isActive ? ACTIVE_BG : '#FFFFFF',
+                                        background: isActive ? '#FFFFFF' : ACTIVE_FILL,
+                                        color: isActive ? ACTIVE_FILL : '#FFFFFF',
                                         fontSize: 11, fontWeight: 800, display: 'inline-flex',
                                         alignItems: 'center', justifyContent: 'center',
                                         boxShadow: isActive ? 'none' : '0 0 10px rgba(139,92,246,0.5)',

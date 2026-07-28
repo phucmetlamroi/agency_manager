@@ -122,10 +122,22 @@ async function scan(page: Page, screen: string, shell: string) {
             const need = large ? 3 : 4.5
             const r = ratio(fg, effBg(el))
             if (r < need) {
+                // Kèm đường dẫn tổ tiên: một lần đo trước chỉ ra "chữ trắng trên #8B5CF6" mà
+                // không cách nào lần ra nguồn bằng grep, vì màu đến từ tổ tiên chứ không phải
+                // từ chính phần tử. Không có dòng này thì phát hiện không hành động được.
+                const chain: string[] = []
+                let n: Element | null = el
+                for (let i = 0; n && i < 4; i++, n = n.parentElement) {
+                    const cls = typeof n.className === 'string' && n.className.trim()
+                        ? '.' + n.className.trim().split(/\s+/).slice(0, 2).join('.')
+                        : ''
+                    chain.push(n.tagName.toLowerCase() + cls)
+                }
                 textFails.push({
                     screen, shell, text: own.replace(/\s+/g, ' ').slice(0, 40),
                     fg: cs.color, bg: `rgb(${effBg(el).map(Math.round).join(',')})`,
                     ratio: r, need, fontSize: size, weight: cs.fontWeight, tag: el.tagName.toLowerCase(),
+                    path: chain.join(' < '),
                 })
             }
         }

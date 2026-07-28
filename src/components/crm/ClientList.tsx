@@ -151,7 +151,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient, clarify
                             left: 14,
                             width: 15,
                             height: 15,
-                            color: '#52525b',
+                            color: '#878790',
                             pointerEvents: 'none',
                         }}
                     />
@@ -211,7 +211,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient, clarify
                         style={{
                             fontSize: 10,
                             fontWeight: 700,
-                            color: '#52525b',
+                            color: '#878790',
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em',
                         }}
@@ -227,7 +227,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient, clarify
                     style={{
                         textAlign: 'center',
                         padding: '48px 20px',
-                        color: '#52525b',
+                        color: '#878790',
                         fontSize: 13,
                     }}
                 >
@@ -495,7 +495,7 @@ function ClientItem({
                     {!isSubsidiary && (
                         <div
                             style={{
-                                color: '#52525b',
+                                color: '#878790',
                                 display: 'flex',
                                 alignItems: 'center',
                                 flexShrink: 0,
@@ -595,21 +595,21 @@ function ClientItem({
                                     border: 'none',
                                     padding: 0,
                                     cursor: 'pointer',
-                                    color: '#52525b',
+                                    color: '#878790',
                                     display: 'flex',
                                     alignItems: 'center',
                                     transition: 'color 0.15s',
                                     flexShrink: 0,
                                 }}
                                 onMouseEnter={(e) => { e.currentTarget.style.color = '#c4b5fd' }}
-                                onMouseLeave={(e) => { e.currentTarget.style.color = '#52525b' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.color = '#878790' }}
                                 title="Sửa tên"
                             >
                                 <Pencil style={{ width: 11, height: 11 }} />
                             </button>
                         </div>
                         {!isSubsidiary && subCount > 0 && (
-                            <div style={{ fontSize: 10, color: '#52525b', marginTop: 1 }}>
+                            <div style={{ fontSize: 10, color: '#878790', marginTop: 1 }}>
                                 {subCount} brand con
                             </div>
                         )}
@@ -874,7 +874,7 @@ function ClientItem({
                             style={{
                                 padding: '16px 20px 16px 80px',
                                 fontSize: 12,
-                                color: '#52525b',
+                                color: '#878790',
                                 fontStyle: 'italic',
                             }}
                         >

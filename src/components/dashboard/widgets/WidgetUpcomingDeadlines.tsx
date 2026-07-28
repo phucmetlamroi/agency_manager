@@ -27,6 +27,10 @@ const NP = {
     border: "rgba(139,92,246,0.15)",
     borderSubtle: "rgba(139,92,246,0.10)",
     accent: "#8B5CF6",
+    // [audit 2026-07 §12] Violet one step darker, for the ONE place white text sits on it:
+    // today's date cell below. #FFFFFF on #8B5CF6 measured 4.23:1, under the 4.5:1 AA floor;
+    // #7C3AED is 5.70:1. `accent` above still paints the calendar icons and the glow.
+    accentSolid: "#7C3AED",
     textPrimary: "#FFFFFF",
     textSecondary: "#A1A1AA",
     textMuted: "#878790",
@@ -223,7 +227,7 @@ export default function WidgetUpcomingDeadlines({ tasks }: Props) {
                                     width: 28,
                                     height: 28,
                                     borderRadius: "50%",
-                                    background: isToday ? NP.accent : "transparent",
+                                    background: isToday ? NP.accentSolid : "transparent",
                                     color: isToday ? "#FFFFFF" : NP.textPrimary,
                                     fontSize: 12,
                                     fontWeight: isToday ? 700 : 500,

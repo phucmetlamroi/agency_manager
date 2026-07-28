@@ -36,7 +36,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     "Revision":            { label: "Sửa lại",             color: "#EF4444" },
     "Hoàn tất":     { label: "Hoàn tất",     color: "#10B981" },
     "Quá hạn":      { label: "Quá hạn",      color: "#DC2626" },
-    "Đã hủy":       { label: "Đã hủy",       color: "#52525B" },
+    "Đã hủy":       { label: "Đã hủy",       color: "#878790" },
 }
 
 // ─── Tabs config — mirrors the admin board (TaskWorkflowTabs) ─
@@ -89,6 +89,11 @@ const NP = {
     borderSubtle: "rgba(139,92,246,0.10)",
     borderCell: "rgba(139,92,246,0.12)",
     accent: "#8B5CF6",
+    // [audit 2026-07 §12] Violet one step darker, used ONLY where white text sits on it.
+    // #FFFFFF on accent #8B5CF6 measured 4.23:1, under the 4.5:1 AA floor; #7C3AED is 5.70:1
+    // and reads as the same brand colour. `accent` above still paints glows, borders and
+    // dots, where no text sits and the contrast rule does not apply.
+    accentSolid: "#7C3AED",
     accentGlow: "rgba(139,92,246,0.35)",
     textPrimary: "#FFFFFF",
     textSecondary: "#A1A1AA",
@@ -253,7 +258,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                 gap: 8,
                                 padding: "10px 20px",
                                 borderRadius: 26,
-                                background: isActive ? NP.accent : NP.surface,
+                                background: isActive ? NP.accentSolid : NP.surface,
                                 border: `1px solid ${isActive ? NP.accent : NP.border}`,
                                 color: isActive ? "#FFFFFF" : NP.textSecondary,
                                 fontSize: 14,
@@ -339,7 +344,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                         gap: 8,
                         padding: "12px 20px",
                         borderRadius: 26,
-                        background: NP.accent,
+                        background: NP.accentSolid,
                         border: "none",
                         color: "#FFFFFF",
                         fontSize: 14,

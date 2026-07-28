@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     'Hoàn tất':     { label: 'Hoàn tất',     color: '#10B981' },
     // Cron auto-set khi deadline qua → cần dedicated tab cho admin theo dõi
     'Quá hạn':      { label: 'Quá hạn',      color: '#DC2626' },
-    'Đã hủy':       { label: 'Đã hủy',       color: '#52525B' },
+    'Đã hủy':       { label: 'Đã hủy',       color: '#878790' },
 }
 
 const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -277,7 +277,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                         >
                             <span style={{
                                 width: 5, height: 5, borderRadius: '50%',
-                                background: isActive ? tab.color : '#52525B',
+                                background: isActive ? tab.color : '#878790',
                                 flexShrink: 0,
                             }} />
                             {tab.label}
@@ -388,7 +388,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                         border: '1px solid rgba(255,255,255,0.06)',
                     }}
                 >
-                    <Search style={{ width: 14, height: 14, color: '#52525B', flexShrink: 0 }} />
+                    <Search style={{ width: 14, height: 14, color: '#878790', flexShrink: 0 }} />
                     <input
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -475,7 +475,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             style={{
                                 fontSize: 10,
                                 fontWeight: 700,
-                                color: '#52525B',
+                                color: '#878790',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.08em',
                             }}
@@ -820,7 +820,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                     width: 30, height: 30, borderRadius: 8,
                                     background: page === n ? 'rgba(99,102,241,0.20)' : 'transparent',
                                     border: page === n ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent',
-                                    color: page === n ? '#A5B4FC' : '#52525B',
+                                    color: page === n ? '#A5B4FC' : '#878790',
                                     fontSize: 11,
                                     fontWeight: page === n ? 800 : 500,
                                     cursor: 'pointer',

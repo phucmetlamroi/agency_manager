@@ -711,9 +711,22 @@ export function TeamBrowser({
                 .filter((a): a is NonNullable<typeof a> => !!a && a.currentVersion?.uploadStatus === 'ready' && !!a.currentVersionId)
             const notReady = assetItems.length - readyAssets.length
 
-            // Download rule (owner): a folder → the WHOLE folder as ONE .zip. Assets only → 3+ videos
-            // bundle into a .zip; 1–2 download as separate individual files. (A single video → direct.)
-            const useZip = folderItems.length > 0 || readyAssets.length >= 3
+            // Download rule (owner): a folder → the WHOLE folder as ONE .zip.
+            //
+            // [sự cố 2026-07-29] Ngưỡng CŨ là `readyAssets.length >= 3` → chọn 3 video là đi qua
+            // /api/review/download-zip, tức MỌI BYTE chui qua serverless function. Function đó chạy
+            // ở mức bộ nhớ mặc định (~1 GB) trong khi một video của xưởng đã ~964 MB. Bộ nhớ nó
+            // tiêu = (byte đọc từ R2) − (byte trình duyệt đã tải về); R2 thì nhanh, mạng người dùng
+            // thì không, nên hiệu số đó phình tới bằng cả file. Log production:
+            //   "instance was killed because it ran out of available memory" @ /api/review/download-zip
+            // Bị giết giữa chừng thì KHÔNG có phản hồi HTTP nào cả — trình duyệt treo request, vòng
+            // xoay quay mãi, không bao giờ hiện hộp thoại lưu file. Đúng triệu chứng đã quay lại.
+            //
+            // Asset thì không cần gói: mỗi asset đã có sẵn URL ký sẵn của R2, để R2 tự phục vụ byte
+            // — 0 MB RAM của function, không dính trần 300 giây, và tải nhanh hơn vì không qua trung
+            // gian. Nên asset LUÔN tải thẳng, bất kể số lượng. Chỉ thư mục mới cần .zip (vẫn là
+            // đường có rủi ro — xem chú thích ở route).
+            const useZip = folderItems.length > 0
             const tid = toast.loading('Đang chuẩn bị tải xuống…')
             try {
                 if (useZip) {
@@ -734,7 +747,9 @@ export function TeamBrowser({
                     for (const a of readyAssets) {
                         await downloadVersion(a.currentVersionId!)
                         count += 1
-                        // stagger the (at most 2) downloads so the browser doesn't drop the second one.
+                        // Giãn nhịp để trình duyệt không bỏ rơi lượt sau. Trước đây chú thích ghi
+                        // "at most 2" vì ngưỡng cũ chỉ cho tối đa 2 file đi đường này; nay asset
+                        // luôn tải thẳng nên vòng lặp phải đúng với MỌI số lượng.
                         if (count < readyAssets.length) await new Promise((r) => setTimeout(r, 400))
                     }
                     toast.success(`Đã bắt đầu tải ${count} tệp${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })

@@ -494,12 +494,27 @@ export async function createFolderTree(input: {
 // ─────────────────────── get + breadcrumb ───────────────────────
 
 export async function getFolder(folderId: string): Promise<{ folder: FolderDto; breadcrumb: BreadcrumbItem[] }> {
+    // [kiểm toán 2026-07 · §11] Cùng một câu cho "không tồn tại" và "không có quyền". Bản vá
+    // trước chỉ làm ở listChildren, nên endpoint anh em này vẫn còn nguyên phép thử tồn tại:
+    // 404 cho id bịa ra, 403 cho id có thật ở workspace khác.
+    const hidden = () => apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
     const folder = await prisma.reviewFolder.findFirst({ where: { id: folderId, deletedAt: null } })
-    if (!folder) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-    const access = await requireReviewAccess({ workspaceId: folder.workspaceId })
+    if (!folder) {
+        await requireReviewAccess() // chặn người chưa đăng nhập dùng đây làm cổng dò
+        throw hidden()
+    }
+    // [Q3] Khách cần đường này để có TÊN thư mục và đường dẫn quay lui; thiếu nó thì khách
+    // duyệt trong một cái cây không nhãn. Phạm vi vẫn do isPathVisible bên dưới quyết.
+    let access
+    try {
+        access = await requireReviewAccess({ workspaceId: folder.workspaceId, allowGuest: true })
+    } catch (e) {
+        if (e instanceof ReviewAccessError && e.status === 401) throw e
+        throw hidden()
+    }
     // [FR-03] editor chỉ xem folder trong phạm vi được giao (tổ tiên / self / con).
     const scope = await getFolderScope({ userId: access.userId, workspaceId: folder.workspaceId, isAdmin: access.isAdmin })
-    if (!isPathVisible(scope, folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem thư mục này.')
+    if (!isPathVisible(scope, folder.path)) throw hidden()
 
     const ancestorIds = ancestorIdsAbove(folder)
     let breadcrumb: BreadcrumbItem[] = []

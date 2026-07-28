@@ -126,10 +126,23 @@ async function resolveVersionCtx(versionId: string, allowGuest = false): Promise
     return { version, asset, access, isImage: asset.mediaKind === 'IMAGE' }
 }
 
-async function resolveCommentCtx(commentId: string): Promise<{ comment: import('@prisma/client').ReviewComment } & VersionCtx> {
+/**
+ * @param allowGuest [Q3] Mặc định false — mọi đường SỬA/XOÁ/ĐÁNH DẤU/THẢ CẢM XÚC đi qua đây
+ *   phải chặn khách. Chỉ getAttachmentRawUrl (đường ĐỌC ảnh trong bình luận) truyền true, và
+ *   khi đó phải tự kiểm `comment.isInternal` — hàm này nhận commentId thẳng từ client nên
+ *   khách có thể đưa id của một bình luận nội bộ mà họ chưa từng nhìn thấy trong danh sách.
+ */
+async function resolveCommentCtx(
+    commentId: string,
+    allowGuest = false,
+): Promise<{ comment: import('@prisma/client').ReviewComment } & VersionCtx> {
     const comment = await prisma.reviewComment.findFirst({ where: { id: commentId, deletedAt: null } })
     if (!comment) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy bình luận.')
-    const ctx = await resolveVersionCtx(comment.versionId)
+    const ctx = await resolveVersionCtx(comment.versionId, allowGuest)
+    // Khách không được biết bình luận nội bộ tồn tại → 404, cùng câu với "không có", đúng §11.
+    if (ctx.access.isGuest && comment.isInternal) {
+        throw apiError(404, 'NOT_FOUND', 'Không tìm thấy bình luận.')
+    }
     return { comment, ...ctx }
 }
 
@@ -609,6 +622,8 @@ export async function getAttachmentRawUrl(attachmentId: string): Promise<string>
     const attach = await prisma.commentAttachment.findUnique({ where: { id: attachmentId } })
     if (!attach) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy ảnh.')
     // Re-check access through comment → version → asset → workspace.
-    await resolveCommentCtx(attach.commentId)
+    // [Q3] Khách xem được ảnh đính kèm của những bình luận họ được thấy — nếu không, khung
+    // bình luận của khách sẽ toàn ảnh vỡ. resolveCommentCtx tự chặn bình luận nội bộ.
+    await resolveCommentCtx(attach.commentId, true)
     return presignGetObject(attach.r2Key, { expiresIn: 15 * 60 })
 }

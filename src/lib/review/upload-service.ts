@@ -1092,7 +1092,12 @@ export async function getVersionPlaybackTokens(versionId: string): Promise<Playb
         select: { id: true, workspaceId: true, pipelineStatus: true, mediaKind: true, muxPlaybackId: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [kiểm toán 2026-07 · Q3] Khách được XEM. listVersions đã mở nên player của khách dựng
+    // được metadata, nhưng nếu đường này còn đòi MEMBER thì HLS xin token bị 403 và khách
+    // nhìn vào một khung đen — tức tính năng hỏng đúng ngay mục đích của nó. Đây là token
+    // PHÁT (Mux, 6h, streaming), không phải file gốc; phạm vi vẫn do assertVersionInScope
+    // bên dưới quyết, và khách không bao giờ là isAdmin nên scope luôn bị giới hạn theo task.
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId, allowGuest: true })
     // [FR-03] editor chỉ mint playback token cho version trong phạm vi được giao.
     await assertVersionInScope(
         await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),
@@ -1123,10 +1128,19 @@ const DOWNLOAD_TTL_SEC = 15 * 60 // short-lived presigned R2 GET for the origina
 export async function getVersionDownloadUrl(versionId: string): Promise<DownloadUrlResult> {
     const version = await prisma.reviewVersion.findFirst({
         where: { id: versionId, deletedAt: null },
-        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true },
+        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true, mediaKind: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [kiểm toán 2026-07 · Q3] Đường này gánh HAI việc khác hẳn nhau: hiển thị ảnh trong
+    // player (player-env cắm fetchImageUrl = fetchDownloadUrl) và tải file GỐC về máy.
+    // Khách được "chỉ xem", nên chỉ mở đúng việc thứ nhất: ẢNH thì cho qua vì không có nó
+    // thì không xem được gì; VIDEO và mọi loại khác giữ MEMBER, bởi với video khách đã có
+    // đường xem riêng là playback token (luồng Mux), còn file gốc là bản master — cho tải
+    // là vượt quá mức chủ sản phẩm chốt.
+    const access = await requireReviewAccess({
+        workspaceId: version.workspaceId,
+        allowGuest: version.mediaKind === ReviewMediaKind.IMAGE,
+    })
     // [FR-03] editor chỉ tải version trong phạm vi được giao.
     await assertVersionInScope(
         await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),

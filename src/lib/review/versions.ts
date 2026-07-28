@@ -81,7 +81,7 @@ export async function listVersions(assetId: string): Promise<ListVersionsResult>
     }
     let access
     try {
-        access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+        access = await requireReviewAccess({ workspaceId: asset.workspaceId, allowGuest: true }) // [Q3] đường đọc
     } catch (e) {
         if (e instanceof ReviewAccessError && e.status === 401) throw e
         throw hidden()

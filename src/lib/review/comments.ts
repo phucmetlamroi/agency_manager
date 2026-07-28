@@ -103,12 +103,18 @@ interface VersionCtx {
     isImage: boolean
 }
 
-async function resolveVersionCtx(versionId: string): Promise<VersionCtx> {
+/**
+ * @param allowGuest [Q3] Phễu này gác MỌI lối vào bình luận, nên KHÔNG mở nó cho khách
+ *   một cách đại trà. Chủ sản phẩm chốt mức "chỉ xem + bình luận": chỉ listComments và
+ *   createComment truyền true. Sửa/xoá/đánh dấu xong/thả cảm xúc/tải đính kèm giữ mặc
+ *   định false → khách bị verifyWorkspaceAccess chặn ngay, không cần thêm chốt nào.
+ */
+async function resolveVersionCtx(versionId: string, allowGuest = false): Promise<VersionCtx> {
     const version = await prisma.reviewVersion.findFirst({ where: { id: versionId, deletedAt: null } })
     if (!version) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
     const asset = await prisma.reviewAsset.findFirst({ where: { id: version.assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId, allowGuest })
     // [FR-03] editor chỉ đọc/ghi comment trên version trong phạm vi được giao — funnel này
     // gác MỌI entry point (list/create/edit/delete/resolve/reaction/attachment-raw). Out-of-scope
     // = không xem được → chặn cả đọc lẫn ghi + rò ảnh đính kèm R2.
@@ -222,7 +228,7 @@ export interface ListCommentsOpts {
 }
 
 export async function listComments(versionId: string, opts: ListCommentsOpts = {}): Promise<ListCommentsResult> {
-    const { version, asset, access } = await resolveVersionCtx(versionId)
+    const { version, asset, access } = await resolveVersionCtx(versionId, true) // [Q3] khách được XEM bình luận
 
     const filterWhere: Prisma.ReviewCommentWhereInput = { versionId }
     if (opts.filter === 'unresolved') filterWhere.resolvedAt = null
@@ -280,7 +286,8 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
 // ─────────────────────────── create (+ reply) ───────────────────────────
 
 export async function createComment(versionId: string, input: CreateCommentInput): Promise<{ comment: CommentDto }> {
-    const { version, asset, access, isImage } = await resolveVersionCtx(versionId)
+    // [Q3] Đường GHI DUY NHẤT mở cho khách — chủ sản phẩm chốt mức "chỉ xem + bình luận".
+    const { version, asset, access, isImage } = await resolveVersionCtx(versionId, true)
     if (version.pipelineStatus !== ReviewPipelineStatus.READY) {
         throw apiError(409, 'STATE_INVALID', 'Phiên bản chưa sẵn sàng để bình luận.', { reason: 'not_ready' })
     }

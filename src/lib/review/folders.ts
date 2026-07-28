@@ -565,7 +565,9 @@ export async function listChildren(input: {
     let access
     if (input.folderId == null) {
         if (!input.workspaceId) throw apiError(400, 'VALIDATION_ERROR', 'Thiếu workspaceId cho thư mục gốc.')
-        access = await requireReviewAccess({ workspaceId: input.workspaceId })
+        // [Q3] Đường ĐỌC — khách của workspace vào được. getFolderScope bên dưới vẫn
+        // giới hạn họ theo task được giao (khách không phải admin nên không unrestricted).
+        access = await requireReviewAccess({ workspaceId: input.workspaceId, allowGuest: true })
         const root = await readRoot(input.workspaceId)
         if (!root) {
             return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null }
@@ -590,7 +592,7 @@ export async function listChildren(input: {
             throw hidden()
         }
         try {
-            access = await requireReviewAccess({ workspaceId: row.workspaceId })
+            access = await requireReviewAccess({ workspaceId: row.workspaceId, allowGuest: true }) // [Q3] đường đọc
         } catch (e) {
             if (e instanceof ReviewAccessError && e.status === 401) throw e
             throw hidden()
@@ -800,7 +802,7 @@ export async function listChildren(input: {
 export async function getFolderTree(
     workspaceId: string,
 ): Promise<{ folders: { id: string; parentId: string | null; name: string; hasChildren: boolean }[] }> {
-    const access = await requireReviewAccess({ workspaceId })
+    const access = await requireReviewAccess({ workspaceId, allowGuest: true }) // [Q3] đường đọc (cây thư mục)
     const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
     const rows = await prisma.reviewFolder.findMany({
         where: { workspaceId, deletedAt: null },

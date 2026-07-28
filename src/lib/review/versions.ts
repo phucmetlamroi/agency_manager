@@ -12,7 +12,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma, ReviewPipelineStatus } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { requireReviewAccess } from './access'
+import { requireReviewAccess, ReviewAccessError } from './access'
 import { getFolderScope, assertAssetInScope } from './folder-scope'
 import { apiError } from './errors'
 import { pathIds, addBytesToAncestors } from './folders'
@@ -71,8 +71,21 @@ export interface ListVersionsResult {
 
 export async function listVersions(assetId: string): Promise<ListVersionsResult> {
     const asset = await prisma.reviewAsset.findFirst({ where: { id: assetId, deletedAt: null } })
-    if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    // [kiểm toán 2026-07 · §11] Cùng lỗi và cùng cách chữa như listChildren: id không tồn tại
+    // và id có thật ở workspace khác phải trả lời Y HỆT NHAU, nếu không endpoint này thành
+    // phép thử "asset này có thật không". Xem chú thích dài ở folders.ts (listChildren).
+    const hidden = () => apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
+    if (!asset) {
+        await requireReviewAccess()
+        throw hidden()
+    }
+    let access
+    try {
+        access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    } catch (e) {
+        if (e instanceof ReviewAccessError && e.status === 401) throw e
+        throw hidden()
+    }
     // [FR-03] editor chỉ xem version của asset trong phạm vi được giao.
     await assertAssetInScope(await getFolderScope({ userId: access.userId, workspaceId: asset.workspaceId, isAdmin: access.isAdmin }), asset.id, 'read')
 

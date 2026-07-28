@@ -13,7 +13,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma, ReviewState } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { requireReviewAccess } from './access'
+import { requireReviewAccess, ReviewAccessError } from './access'
 import {
     getFolderScope,
     isScopeEmpty,
@@ -578,8 +578,23 @@ export async function listChildren(input: {
             where: { id: input.folderId, deletedAt: null },
             select: { id: true, workspaceId: true, totalSizeBytes: true, path: true },
         })
-        if (!row) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-        access = await requireReviewAccess({ workspaceId: row.workspaceId })
+        // [kiểm toán 2026-07 · §11] "Không tìm thấy" và "không có quyền" phải trả lời Y HỆT
+        // NHAU. Không thể kiểm quyền trước phép tra — workspaceId chỉ biết được TỪ hàng vừa
+        // tra ra, nên thứ tự này là bắt buộc. Cái sửa được là CÂU TRẢ LỜI: trước đây id không
+        // tồn tại -> 404, còn id có thật ở workspace khác -> 403; hai câu khác nhau biến
+        // endpoint này thành phép thử "id này có thật không" cho bất kỳ ai đã đăng nhập.
+        // 401 vẫn giữ riêng: chưa đăng nhập không phải tín hiệu về sự tồn tại.
+        const hidden = () => apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
+        if (!row) {
+            await requireReviewAccess() // chặn người chưa đăng nhập dùng đây làm cổng dò
+            throw hidden()
+        }
+        try {
+            access = await requireReviewAccess({ workspaceId: row.workspaceId })
+        } catch (e) {
+            if (e instanceof ReviewAccessError && e.status === 401) throw e
+            throw hidden()
+        }
         container = row
     }
     const parentId = container.id

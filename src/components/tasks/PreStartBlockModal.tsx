@@ -8,6 +8,7 @@ import { X, Lock, Play, Loader2, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { failureMessage } from "@/lib/ui/action-feedback"
 
 /**
  * [Sprint P GĐ2] PreStartBlockModal — popup BLOCKING khi user click task ở
@@ -55,8 +56,8 @@ export function PreStartBlockModal({ task, isOpen, workspaceId, onClose, onStart
             } else {
                 toast.error(res?.error || "Không thể bắt đầu task. Vui lòng thử lại.")
             }
-        } catch {
-            toast.error("Không thể bắt đầu task. Vui lòng thử lại.")
+        } catch (e) {
+            toast.error(failureMessage(e, "Không thể bắt đầu task. Vui lòng thử lại."))
         } finally {
             setStarting(false)
         }

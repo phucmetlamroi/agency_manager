@@ -8,6 +8,7 @@ import { validateTransition } from '@/lib/fsm-config'
 // ... existing imports
 import { deleteTask, assignTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
+import { failureMessage, isNetworkFailure, OFFLINE_MESSAGE } from '@/lib/ui/action-feedback'
 import { updateTaskDetails } from '@/actions/update-task-details'
 import { statusLabel } from '@/lib/display-labels'
 import DeleteTaskButton from './DeleteTaskButton'
@@ -133,14 +134,21 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
                     // @ts-ignore
                     return await updateTaskStatus(id, newStatus, workspaceId, notes, feedback)
                 } catch (e) {
-                    return { error: 'Failed' }
+                    // Gi\u1eef l\u1ea1i NGUY\u00caN NH\u00c2N, kh\u00f4ng ch\u1ec9 "h\u1ecfng": l\u00e1t n\u1eefa c\u00f2n ph\u1ea3i ph\u00e2n bi\u1ec7t
+                    // m\u1ea1ng ch\u1ebft v\u1edbi m\u00e1y ch\u1ee7 t\u1eeb ch\u1ed1i \u0111\u1ec3 ch\u1ecdn c\u00e2u b\u00e1o.
+                    return { error: 'Failed', offline: isNetworkFailure(e) }
                 }
             }))
 
 
             const errors = results.filter(r => r.error)
             if (errors.length > 0) {
-                toast.error(`C\u1eadp nh\u1eadt th\u1ea5t b\u1ea1i cho ${errors.length}/${tasksToUpdate.length} tasks.`)
+                // M\u1ea5t m\u1ea1ng th\u00ec M\u1eccI task \u0111\u1ec1u h\u1ecfng v\u00ec c\u00f9ng m\u1ed9t l\u00fd do \u2014 n\u00f3i "th\u1ea5t b\u1ea1i
+                // cho 8/8 task" l\u00e0 \u0111\u00fang s\u1ed1 m\u00e0 v\u00f4 ngh\u0129a v\u1edbi ng\u01b0\u1eddi d\u00f9ng.
+                const offline = results.some((r: any) => r?.offline)
+                toast.error(offline
+                    ? OFFLINE_MESSAGE
+                    : `C\u1eadp nh\u1eadt th\u1ea5t b\u1ea1i cho ${errors.length}/${tasksToUpdate.length} tasks.`)
             } else {
                 toast.success(`\u0110\u00e3 c\u1eadp nh\u1eadt tr\u1ea1ng th\u00e1i cho ${tasksToUpdate.length} tasks.`)
                 setSelectedIds([])
@@ -148,7 +156,7 @@ export default function TaskTable({ tasks, isAdmin = false, users = [], workspac
             router.refresh()
         } catch (error) {
             console.error("Bulk update failed:", error)
-            toast.error("Cập nhật thất bại. Vui lòng thử lại.")
+            toast.error(failureMessage(error, "Cập nhật thất bại. Vui lòng thử lại."))
         } finally {
             setIsUpdating(false)
         }

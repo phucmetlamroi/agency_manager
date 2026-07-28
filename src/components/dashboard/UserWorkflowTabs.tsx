@@ -36,7 +36,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     "Revision":            { label: "Sửa lại",             color: "#EF4444" },
     "Hoàn tất":     { label: "Hoàn tất",     color: "#10B981" },
     "Quá hạn":      { label: "Quá hạn",      color: "#DC2626" },
-    "Đã hủy":       { label: "Đã hủy",       color: "#52525B" },
+    "Đã hủy":       { label: "Đã hủy",       color: "#878790" },
 }
 
 // ─── Tabs config — mirrors the admin board (TaskWorkflowTabs) ─
@@ -67,7 +67,7 @@ const TABS: TabConfig[] = [
     // introduce — would otherwise fall out of every tab and DISAPPEAR from the editor's home. This
     // tab surfaces those so a task can never silently vanish. Rendered only when it has tasks (see
     // visibleTabs), so it stays invisible in normal 14-status operation.
-    { id: "other",    label: "Khác",         statuses: [],                                                          color: "#71717A" },
+    { id: "other",    label: "Khác",         statuses: [],                                                          color: "#878790" },
 ]
 
 // Statuses claimed by a real tab — the "other" catch-all shows everything NOT in here.
@@ -89,10 +89,15 @@ const NP = {
     borderSubtle: "rgba(139,92,246,0.10)",
     borderCell: "rgba(139,92,246,0.12)",
     accent: "#8B5CF6",
+    // [audit 2026-07 §12] Violet one step darker, used ONLY where white text sits on it.
+    // #FFFFFF on accent #8B5CF6 measured 4.23:1, under the 4.5:1 AA floor; #7C3AED is 5.70:1
+    // and reads as the same brand colour. `accent` above still paints glows, borders and
+    // dots, where no text sits and the contrast rule does not apply.
+    accentSolid: "#7C3AED",
     accentGlow: "rgba(139,92,246,0.35)",
     textPrimary: "#FFFFFF",
     textSecondary: "#A1A1AA",
-    textMuted: "#71717A",
+    textMuted: "#878790",
     lilac: "#D8B4FE",
     pageActive: "rgba(139,92,246,0.20)",
     pageActiveBorder: "rgba(139,92,246,0.30)",
@@ -253,7 +258,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                                 gap: 8,
                                 padding: "10px 20px",
                                 borderRadius: 26,
-                                background: isActive ? NP.accent : NP.surface,
+                                background: isActive ? NP.accentSolid : NP.surface,
                                 border: `1px solid ${isActive ? NP.accent : NP.border}`,
                                 color: isActive ? "#FFFFFF" : NP.textSecondary,
                                 fontSize: 14,
@@ -294,7 +299,10 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
             </div>
 
             {/* ─── Search + View ─── */}
-            <div className="flex items-center" style={{ gap: 10 }}>
+            {/* items-stretch, not items-center: the search input carries a minHeight (WCAG 2.5.8)
+                that makes its pill ~3px taller than the button beside it. Stretching keeps the pair
+                the same height by construction instead of by matching padding arithmetic. */}
+            <div className="flex items-stretch" style={{ gap: 10 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{
@@ -321,6 +329,11 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             color: NP.textPrimary,
                             fontSize: 14,
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            // A bare borderless input takes its height from the font alone (~21px
+                            // measured), so the pointer target was under the WCAG 2.2 SC 2.5.8 24px
+                            // floor even though the pill AROUND it looks generous — clicking that
+                            // padding does not focus the field. minHeight raises the real target.
+                            minHeight: 24,
                         }}
                     />
                 </div>
@@ -331,7 +344,7 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                         gap: 8,
                         padding: "12px 20px",
                         borderRadius: 26,
-                        background: NP.accent,
+                        background: NP.accentSolid,
                         border: "none",
                         color: "#FFFFFF",
                         fontSize: 14,
@@ -379,8 +392,18 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                 </div>
 
                 {/* Rows */}
+                {/*
+                  [kiểm toán 2026-07 · S2-6] BA lý do rỗng, ba câu khác nhau.
+                  Trước đây cả ba đều nhận đúng một câu "Chưa có task nào ở đây." — nên lọc
+                  không ra và chưa có gì trông y hệt nhau, và người dùng không biết mình nên
+                  chờ hay nên xóa bộ lọc.
+                  role="status" + aria-live: câu này đổi theo từng ký tự gõ vào ô tìm kiếm mà
+                  không có gì nhận focus, nên trình đọc màn hình sẽ im lặng nếu thiếu (WCAG 4.1.3).
+                */}
                 {paged.length === 0 && (
                     <div
+                        role="status"
+                        aria-live="polite"
                         style={{
                             padding: "40px 20px",
                             textAlign: "center",
@@ -389,7 +412,33 @@ export default function UserWorkflowTabs({ tasks, workspaceId, currentUserId, in
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                         }}
                     >
-                        Chưa có task nào ở đây.
+                        {tasks.length === 0 ? (
+                            "Chưa có task nào. Task sẽ hiện ở đây khi được tạo."
+                        ) : search.trim() ? (
+                            <>
+                                <div>Không tìm thấy task nào khớp «{search.trim()}»</div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearch("")
+                                        setPage(1)
+                                        // Ô nhập nằm ở UserHomeTopBar — báo cho nó tự xóa,
+                                        // nếu không chữ cũ vẫn nằm đó sau khi bảng đã bỏ lọc.
+                                        window.dispatchEvent(new Event("user-home-search-clear"))
+                                    }}
+                                    className="mt-3 inline-flex items-center justify-center rounded-full px-4 py-2 text-[13px] font-semibold transition-colors"
+                                    style={{
+                                        color: "#FFFFFF",
+                                        background: NP.pageActive,
+                                        border: `1px solid ${NP.pageActiveBorder}`,
+                                    }}
+                                >
+                                    Xóa bộ lọc
+                                </button>
+                            </>
+                        ) : (
+                            "Không có task nào ở trạng thái này."
+                        )}
                     </div>
                 )}
 

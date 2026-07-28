@@ -18,6 +18,7 @@ import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { bulkUpdateTaskDetails, bulkUpdateTaskResourceSubfields } from "@/actions/bulk-task-actions"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { failureMessage, isNetworkFailure } from "@/lib/ui/action-feedback"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
@@ -141,8 +142,8 @@ export function TaskDetailModal({
                 setEditingMap(false)
                 toast.success('Đã lưu Multi-Hook Map.')
             }
-        } catch {
-            toast.error('Lưu Multi-Hook Map thất bại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Lưu Multi-Hook Map thất bại.'))
         } finally {
             setSavingMap(false)
         }
@@ -413,8 +414,16 @@ export function TaskDetailModal({
                     // allows Đang thực hiện → Revision).
                     toast.error(res?.error || 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
                 }
-            } catch {
-                toast.error('Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
+            } catch (e) {
+                // [kiểm toán 2026-07 · phản biện] KHÔNG dùng failureMessage ở đây. Tới được dòng
+                // này nghĩa là saveSingle() đã thành công — link NẰM TRONG database rồi. Câu mất
+                // kết nối dùng chung ("Thay đổi chưa được lưu") sẽ đè lên sự thật đó và nói ngược,
+                // khiến người dùng tưởng mất bài và nhập lại. Mất mạng chỉ chặn bước ĐỔI TRẠNG THÁI.
+                toast.error(
+                    isNetworkFailure(e)
+                        ? 'Link đã lưu. Mất kết nối nên chưa chuyển status — thử lại khi có mạng.'
+                        : 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.',
+                )
             }
         }
 
@@ -511,8 +520,8 @@ export function TaskDetailModal({
             } else {
                 toast.error(res?.error || 'Không thể bắt đầu task. Vui lòng thử lại.')
             }
-        } catch {
-            toast.error('Không thể bắt đầu task. Vui lòng thử lại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Không thể bắt đầu task. Vui lòng thử lại.'))
         } finally {
             setStarting(false)
         }

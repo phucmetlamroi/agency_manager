@@ -128,14 +128,14 @@ export default function GlobalError({
                             marginBottom: 20,
                         }}
                     >
-                        <p style={{ fontSize: 11, color: '#71717a', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700, marginBottom: 6 }}>
+                        <p style={{ fontSize: 11, color: '#878790', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700, marginBottom: 6 }}>
                             Chi tiết lỗi
                         </p>
                         <p style={{ fontSize: 12, color: '#fca5a5', wordBreak: 'break-word', fontFamily: 'monospace', marginBottom: 6 }}>
                             {error.message || 'Unknown error'}
                         </p>
                         {error.digest && (
-                            <p style={{ fontSize: 11, color: '#71717a', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                            <p style={{ fontSize: 11, color: '#878790', wordBreak: 'break-all', fontFamily: 'monospace' }}>
                                 ID: {error.digest}
                             </p>
                         )}

@@ -47,6 +47,8 @@ import {
 import { Logo } from "@/components/brand/Logo"
 import { getUnreadRequestCount } from "@/actions/client-request-actions"
 import { setUiPref } from "@/actions/ui-actions"
+// Chỉ lấy KIỂU — `import type` bị xoá lúc biên dịch nên không kéo lib server vào bundle.
+import type { NavAccess } from "@/lib/nav-access"
 
 type ViewRole = 'ADMIN' | 'USER'
 
@@ -63,6 +65,11 @@ interface SidebarProps {
     viewRole?: ViewRole
     /** Workspace-scoped role (OWNER/ADMIN/MEMBER/GUEST). Used for nav filtering instead of global role. */
     workspaceRole?: string
+    /**
+     * [kiểm toán 2026-07 · S2-1 / Q1] Quyền điều hướng đã tính sẵn ở layout (server).
+     * BỎ TRỐNG = không lọc gì cả — xem ghi chú "mở-khi-thiếu" ở getNavItems.
+     */
+    navAccess?: NavAccess
 }
 
 interface NavItem {
@@ -73,45 +80,75 @@ interface NavItem {
     danger?: boolean
     /** Render as <a> with target="_blank" instead of next/link (for mailto: / external) */
     external?: boolean
+    /**
+     * [kiểm toán 2026-07 · S2-1] Cờ quyền TỐI THIỂU để mục này thật sự mở được.
+     * Bỏ trống = ai cũng vào được (trang tự gác theo membership, không theo admin).
+     * Xem bản đồ cờ ↔ cổng thật trong src/lib/nav-access.ts.
+     */
+    gate?: keyof NavAccess
 }
 
-const getNavItems = (workspaceId: string, viewRole: ViewRole): NavItem[] => {
-    // [Sprint F.4] Unified nav: USER view shows ALL items same as ADMIN view.
-    // Page-level guards (admin layout `canAccessAdmin`) handle permission gating —
-    // non-admin click → admin layout redirects back to /dashboard automatically.
+const getNavItems = (workspaceId: string, viewRole: ViewRole, navAccess?: NavAccess): NavItem[] => {
+    // [kiểm toán 2026-07 · S2-1 / Q1] Nav ĐÃ LỌC THEO QUYỀN.
+    //
+    // Thay cho quy ước [Sprint F.4] cũ ("hiện hết, để trang tự đá"): đo được 9 trên
+    // 15 mục ném editor về /dashboard không một lời giải thích. Q1 chốt: không vào
+    // được thì ẩn hẳn.
+    //
+    // `gate` dưới đây ánh xạ 1-1 với cổng THẬT của từng trang (đã đọc từng file).
     // [Sprint F.5] Hiệu suất entry removed entirely (page + actions deleted).
     const allItems: NavItem[] = [
         { label: "Tổng quan", href: viewRole === 'USER' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`, icon: LayoutDashboard, roles: ['ADMIN', 'USER'] },
-        { label: "Hàng chờ task", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'] },
+        { label: "Hàng chờ task", href: `/${workspaceId}/admin/queue`, icon: ListTodo, roles: ['ADMIN', 'USER'], gate: 'admin' },
         // [Client Task Submission v2] Client-submitted requests inbox (badge = NEW count).
-        { label: "Hộp thư yêu cầu", href: `/${workspaceId}/admin/requests`, icon: Inbox, roles: ['ADMIN', 'USER'] },
-        // [Review module P2] Team asset browser (video review). Admin-only in P2 —
-        // the /admin layout guard gates entry; shown in both views per the unified-nav
-        // convention above (non-admin click → layout redirects to /dashboard).
+        { label: "Hộp thư yêu cầu", href: `/${workspaceId}/admin/requests`, icon: Inbox, roles: ['ADMIN', 'USER'], gate: 'admin' },
+        // [Review module P2 → sửa chú thích, kiểm toán 2026-07 F-10] KHÔNG còn admin-only:
+        // team/layout.tsx gác bằng requireReviewAccess (MEMBERSHIP), editor vào được thật.
+        // Vì vậy mục này KHÔNG có `gate` — đặt gate:'admin' ở đây sẽ giấu mất Tệp của editor.
         { label: REVIEW_MODULE_LABEL, href: `/${workspaceId}/team`, icon: Clapperboard, roles: ['ADMIN', 'USER'] },
         // [CM merge] "Clients Manager" đã gộp vào Dashboard → bỏ khỏi sidebar.
         { label: "Lịch", href: viewRole === 'USER' ? `/${workspaceId}/dashboard/schedule` : `/${workspaceId}/admin/schedule`, icon: CalendarDays, roles: ['ADMIN', 'USER'] },
         { label: "Lỗi của tôi", href: `/${workspaceId}/dashboard/errors`, icon: AlertOctagon, roles: ['USER'], danger: true },
         { label: "Hồ sơ", href: `/${workspaceId}/dashboard/profile`, icon: UserCircle, roles: ['USER'] },
-        { label: "Bảng lương", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN', 'USER'] },
-        { label: "Tài chính", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN', 'USER'] },
+        { label: "Bảng lương", href: `/${workspaceId}/admin/payroll`, icon: Wallet, roles: ['ADMIN', 'USER'], gate: 'admin' },
+        // Tài chính gác bằng profileRole (page.tsx: getProfileRole ∈ OWNER|ADMIN), KHÔNG
+        // phải cổng /admin — một ADMIN chỉ có hàng WorkspaceMember vào sẽ gặp "Quyền truy
+        // cập bị từ chối".
+        { label: "Tài chính", href: `/${workspaceId}/admin/finance`, icon: Building2, roles: ['ADMIN', 'USER'], gate: 'profileAdmin' },
         // [Merge: one membership menu] The per-workspace "Members" entry was merged into the
         // org-level membership page below (ProfileAccess, org-wide). Single roster + invite path.
-        { label: "Thành viên", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
-        // [Sprint Z+1] Profile Trash — Owner only (page-level guard)
-        { label: "Thùng rác tổ chức", href: `/${workspaceId}/admin/profile-trash`, icon: UsersRound, roles: ['ADMIN', 'USER'] },
-        { label: "Phân tích", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'] },
-        { label: "Nhật ký hoạt động", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN', 'USER'] },
-        { label: "Cài đặt", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN', 'USER'] },
+        { label: "Thành viên", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'], gate: 'profileAdmin' },
+        // [Sprint Z+1 → sửa chú thích, kiểm toán 2026-07 F-10] KHÔNG có cổng "Owner only" nào
+        // ở trang này: nó chỉ đòi có phiên đăng nhập. Chính DỮ LIỆU mới giới hạn —
+        // getMyTrashedProfiles chỉ liệt kê profile mà bạn là OWNER, nên người khác thấy
+        // danh sách rỗng chứ không bị đá ra. Giữ ở mức cổng /admin.
+        { label: "Thùng rác tổ chức", href: `/${workspaceId}/admin/profile-trash`, icon: UsersRound, roles: ['ADMIN', 'USER'], gate: 'admin' },
+        { label: "Phân tích", href: `/${workspaceId}/admin/analytics`, icon: Activity, roles: ['ADMIN', 'USER'], gate: 'workspaceAdmin' },
+        { label: "Nhật ký hoạt động", href: `/${workspaceId}/admin/audit-log`, icon: ScrollText, roles: ['ADMIN', 'USER'], gate: 'workspaceAdmin' },
+        { label: "Cài đặt", href: `/${workspaceId}/admin/settings`, icon: Settings, roles: ['ADMIN', 'USER'], gate: 'workspaceAdmin' },
         // [User Dashboard Redesign D.7] Help & Feedback — placeholder mailto link
         { label: "Trợ giúp & Góp ý", href: "mailto:support@hustlytasker.xyz", icon: LifeBuoy, roles: ['USER'], external: true },
     ]
-    return allItems.filter(item => item.roles.includes(viewRole))
+    // MỞ-KHI-THIẾU, có chủ đích: thiếu `navAccess` (một shell mới quên truyền) thì hiện
+    // đủ như trước, KHÔNG phải giấu sạch. Ẩn ở đây thuần tuý là chuyện giao diện — mọi
+    // trang vẫn tự gác — nên hỏng theo hướng "thừa một lối đi" rẻ hơn nhiều so với hướng
+    // "một quản trị viên mất trắng thanh điều hướng".
+    return allItems.filter(item =>
+        item.roles.includes(viewRole) && (!item.gate || !navAccess || navAccess[item.gate])
+    )
 }
 
 /* ── Neon Purple Dark palette constants ── */
 const SIDEBAR_BG = "#0A0A0A"
 const ACTIVE_BG = "#8B5CF6"
+/**
+ * [audit 2026-07 §12] The SAME violet, one step darker, for the places white text sits ON it.
+ * Measured: #FFFFFF on #8B5CF6 = 4.23:1, just under the 4.5:1 AA floor — so the active nav
+ * label and the unread badge were failing. violet-600 #7C3AED = 5.70:1 and reads as the same
+ * brand colour. Deliberately NOT a global swap: ACTIVE_BG above still paints the decorative
+ * dot and the glow, where no text sits and the contrast rule does not apply.
+ */
+const ACTIVE_FILL = "#7C3AED"
 const ACTIVE_GLOW = "0 4px 20px rgba(139,92,246,0.35)"
 const INACTIVE_TEXT = "#A1A1AA"
 const INACTIVE_HOVER_BG = "#211B31"
@@ -125,13 +162,20 @@ const LOGO_ICON_GLOW = "0 0 18px rgba(139,92,246,0.40)"
 // thay vì hardcode → khi đổi font system sau này tự sync, mobile + desktop nhất quán.
 const FONT = "var(--font-sans), 'Plus Jakarta Sans', sans-serif"
 
-export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN', workspaceRole }: SidebarProps) {
+export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'ADMIN', workspaceRole, navAccess }: SidebarProps) {
     const pathname = usePathname()
     const [collapsed, setCollapsed] = React.useState(false)
-    // Use workspace role for permission checks, falling back to global role for backwards compat
-    const isAdminUser = workspaceRole
-        ? (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN' || user.role === 'ADMIN')
-        : user.role === 'ADMIN'
+    // [kiểm toán 2026-07 · S2-1] Gác hai mục trong menu hồ sơ ("Chuyển sang chế độ Quản trị"
+    // và "Giao diện 2 · Mission Control") bằng ĐÚNG cổng của đích đến: mọi trang /mc/** đều
+    // gọi verifyProfileAdminAccess. Biểu thức cũ có nhánh `user.role === 'ADMIN'` — vai trò
+    // TOÀN CỤC, không ràng buộc workspace — nên một quản trị viên của tổ chức khác đang là
+    // thành viên thường ở đây vẫn thấy lối vào Mission Control rồi bị đá về /dashboard.
+    // Thiếu navAccess thì giữ nguyên hành vi cũ (xem ghi chú mở-khi-thiếu ở getNavItems).
+    const isAdminUser = navAccess
+        ? navAccess.admin
+        : workspaceRole
+            ? (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN' || user.role === 'ADMIN')
+            : user.role === 'ADMIN'
     const otherViewRole: ViewRole = viewRole === 'ADMIN' ? 'USER' : 'ADMIN'
     const switchRoleHref = viewRole === 'ADMIN' ? `/${workspaceId}/dashboard` : `/${workspaceId}/admin`
 
@@ -149,10 +193,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
         return name.slice(0, 2).toUpperCase()
     }
 
-    // [Sprint F.4] Show ALL nav items per user spec: "tùy mỗi phân quyền thì họ ko
-    // có quyền xem/thao tác phần đó của bên profile đó thôi". Page-level guards
-    // (admin layout `canAccessAdmin` redirect) handle permission gating.
-    const filteredNavItems = getNavItems(workspaceId, viewRole)
+    const filteredNavItems = getNavItems(workspaceId, viewRole, navAccess)
 
     // [Client Task Submission v2] Live NEW-request count for the inbox nav badge.
     const requestsHref = `/${workspaceId}/admin/requests`
@@ -252,7 +293,7 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                         const isActive = !item.external && pathname === item.href
                         const dangerActiveBg = "#EF4444"
                         const dangerGlow = "0 4px 20px rgba(239,68,68,0.35)"
-                        const activeBg = item.danger ? dangerActiveBg : ACTIVE_BG
+                        const activeBg = item.danger ? dangerActiveBg : ACTIVE_FILL
                         const activeGlow = item.danger ? dangerGlow : ACTIVE_GLOW
                         const inactiveColor = item.danger ? "#F87171" : INACTIVE_TEXT
                         // External links (mailto:, https://…) bypass next/link to avoid runtime warnings.
@@ -332,8 +373,8 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
                                 {item.href === requestsHref && reqCount > 0 && (
                                     <span style={{
                                         minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999,
-                                        background: isActive ? '#FFFFFF' : ACTIVE_BG,
-                                        color: isActive ? ACTIVE_BG : '#FFFFFF',
+                                        background: isActive ? '#FFFFFF' : ACTIVE_FILL,
+                                        color: isActive ? ACTIVE_FILL : '#FFFFFF',
                                         fontSize: 11, fontWeight: 800, display: 'inline-flex',
                                         alignItems: 'center', justifyContent: 'center',
                                         boxShadow: isActive ? 'none' : '0 0 10px rgba(139,92,246,0.5)',

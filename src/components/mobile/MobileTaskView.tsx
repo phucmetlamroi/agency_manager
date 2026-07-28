@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { TaskWithUser } from '@/types/admin'
 import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
+import { failureMessage } from '@/lib/ui/action-feedback'
 import { bulkAssignTasks, bulkUpdateStatus, bulkUpdateTaskStatus } from '@/actions/bulk-task-actions'
 import MobileTaskCard from './MobileTaskCard'
 import MobileTaskCardSkeleton from './MobileTaskCardSkeleton'
@@ -289,9 +290,9 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                 toast.success(`Đã chuyển trạng thái sang "${status}"`)
                 startTransition(() => router.refresh())
             }
-        } catch {
+        } catch (e) {
             rollback()
-            toast.error('Không thể cập nhật trạng thái. Vui lòng thử lại.')
+            toast.error(failureMessage(e, 'Không thể cập nhật trạng thái. Vui lòng thử lại.'))
         } finally {
             setPendingStatusIds(prev => {
                 const next = new Set(prev)
@@ -341,8 +342,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             toast.success(assigneeId ? `Đã giao ${res?.count ?? ids.length} task` : `Đã trả ${res?.count ?? ids.length} task về kho`)
             exitSelection()
             startTransition(() => router.refresh())
-        } catch {
-            toast.error('Giao task thất bại. Vui lòng thử lại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Giao task thất bại. Vui lòng thử lại.'))
         }
     }
     const runBulkStatus = async (status: string) => {
@@ -360,8 +361,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             toast.success(`Đã chuyển ${res?.count ?? ids.length} task → "${status}"`)
             exitSelection()
             startTransition(() => router.refresh())
-        } catch {
-            toast.error('Đổi trạng thái thất bại. Vui lòng thử lại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Đổi trạng thái thất bại. Vui lòng thử lại.'))
         }
     }
 

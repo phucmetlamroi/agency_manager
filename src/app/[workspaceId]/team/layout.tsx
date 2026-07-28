@@ -24,7 +24,10 @@ export default async function TeamLayout({
     // USER pass; LOCKED/CLIENT + non-member bị chặn. KHÔNG dùng verifyProfileAdminAccess
     // (đó là lỗi gốc B2/B3/B9: guard admin đá editor về dashboard).
     try {
-        await requireReviewAccess({ workspaceId })
+        // [kiểm toán 2026-07 · Q3] Khách của workspace vào được Tệp. Đây chỉ là cửa vào —
+        // họ thấy gì thì do getFolderScope quyết (chỉ tài nguyên gắn task được giao), và
+        // mọi đường GHI vẫn đòi MEMBER nên khách chạm vào là 403.
+        await requireReviewAccess({ workspaceId, allowGuest: true })
     } catch (e) {
         if (e instanceof ReviewAccessError && e.status === 401) redirect('/login')
         redirect(`/${workspaceId}/dashboard`)

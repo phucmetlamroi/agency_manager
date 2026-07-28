@@ -83,7 +83,7 @@ export function AutocompleteInput({
     return (
         <div ref={wrapperRef} className="relative">
             <div className="relative">
-                <div className="pointer-events-none absolute left-[14px] top-1/2 -translate-y-1/2 text-[#71717A]">
+                <div className="pointer-events-none absolute left-[14px] top-1/2 -translate-y-1/2 text-[#878790]">
                     <Search size={14} />
                 </div>
                 <input

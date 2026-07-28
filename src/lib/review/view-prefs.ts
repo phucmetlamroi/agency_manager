@@ -114,15 +114,17 @@ export const STATUS_COLORS: Record<string, string> = {
     Revision: '#EF4444',
     'Sửa frame': '#EC4899',
     'Gửi lại': '#F97316',
-    'Tạm ngưng': '#71717A',
+    // [audit 2026-07 F-12] Greys raised to clear WCAG AA — kept in lockstep with the same two
+    // entries in src/lib/status-colors.ts (see the note there for the measured ratios).
+    'Tạm ngưng': '#A1A1AA',
     'Hoàn tất': '#10B981',
     'Quá hạn': '#DC2626',
-    'Đã hủy': '#52525B',
+    'Đã hủy': '#878790',
 }
 
 export function statusColor(status: string | null | undefined): string {
-    if (!status) return '#71717A'
-    return STATUS_COLORS[status] ?? '#71717A'
+    if (!status) return '#878790'
+    return STATUS_COLORS[status] ?? '#878790'
 }
 
 // ── Formatters ──

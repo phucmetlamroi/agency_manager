@@ -111,6 +111,13 @@ interface ChildrenResult {
     assets: AssetDto[]
     summary: { folderCount: number; assetCount: number; totalBytes: string }
     nextCursor: string | null
+    /**
+     * [kiểm toán 2026-07 · T-04] true = tài khoản này chưa được giao task nào, nên lưới rỗng
+     * vì PHẠM VI rỗng chứ không phải vì chưa có dữ liệu. Chỉ dùng để chọn câu chữ.
+     * Bản sao của trường cùng tên ở ListChildrenResult (src/lib/review/folders.ts) — thiếu ở
+     * đây thì data?.scopeEmpty luôn undefined và nhánh mới không bao giờ chạy.
+     */
+    scopeEmpty?: boolean
 }
 interface TreeNode {
     id: string
@@ -704,9 +711,22 @@ export function TeamBrowser({
                 .filter((a): a is NonNullable<typeof a> => !!a && a.currentVersion?.uploadStatus === 'ready' && !!a.currentVersionId)
             const notReady = assetItems.length - readyAssets.length
 
-            // Download rule (owner): a folder → the WHOLE folder as ONE .zip. Assets only → 3+ videos
-            // bundle into a .zip; 1–2 download as separate individual files. (A single video → direct.)
-            const useZip = folderItems.length > 0 || readyAssets.length >= 3
+            // Download rule (owner): a folder → the WHOLE folder as ONE .zip.
+            //
+            // [sự cố 2026-07-29] Ngưỡng CŨ là `readyAssets.length >= 3` → chọn 3 video là đi qua
+            // /api/review/download-zip, tức MỌI BYTE chui qua serverless function. Function đó chạy
+            // ở mức bộ nhớ mặc định (~1 GB) trong khi một video của xưởng đã ~964 MB. Bộ nhớ nó
+            // tiêu = (byte đọc từ R2) − (byte trình duyệt đã tải về); R2 thì nhanh, mạng người dùng
+            // thì không, nên hiệu số đó phình tới bằng cả file. Log production:
+            //   "instance was killed because it ran out of available memory" @ /api/review/download-zip
+            // Bị giết giữa chừng thì KHÔNG có phản hồi HTTP nào cả — trình duyệt treo request, vòng
+            // xoay quay mãi, không bao giờ hiện hộp thoại lưu file. Đúng triệu chứng đã quay lại.
+            //
+            // Asset thì không cần gói: mỗi asset đã có sẵn URL ký sẵn của R2, để R2 tự phục vụ byte
+            // — 0 MB RAM của function, không dính trần 300 giây, và tải nhanh hơn vì không qua trung
+            // gian. Nên asset LUÔN tải thẳng, bất kể số lượng. Chỉ thư mục mới cần .zip (vẫn là
+            // đường có rủi ro — xem chú thích ở route).
+            const useZip = folderItems.length > 0
             const tid = toast.loading('Đang chuẩn bị tải xuống…')
             try {
                 if (useZip) {
@@ -727,7 +747,9 @@ export function TeamBrowser({
                     for (const a of readyAssets) {
                         await downloadVersion(a.currentVersionId!)
                         count += 1
-                        // stagger the (at most 2) downloads so the browser doesn't drop the second one.
+                        // Giãn nhịp để trình duyệt không bỏ rơi lượt sau. Trước đây chú thích ghi
+                        // "at most 2" vì ngưỡng cũ chỉ cho tối đa 2 file đi đường này; nay asset
+                        // luôn tải thẳng nên vòng lặp phải đúng với MỌI số lượng.
                         if (count < readyAssets.length) await new Promise((r) => setTimeout(r, 400))
                     }
                     toast.success(`Đã bắt đầu tải ${count} tệp${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })
@@ -1256,6 +1278,11 @@ export function TeamBrowser({
             onResetName:
                 target.type === 'asset' && acting.length === 1 ? () => void doResetName(target.id) : undefined,
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
+            // [kiểm toán 2026-07 · §5.3] Video 1 phiên bản (hoặc 0) thì KHÔNG có gì để quản lý.
+            // Tách khỏi `onManageVersions` có lý do: callback đó undefined còn vì "đang chọn
+            // nhiều mục", và mục menu lúc ấy hiện mờ kèm gợi ý "Chọn đúng một asset" — gợi ý
+            // đúng. Gộp hai lý do vào một cờ sẽ hiện gợi ý SAI cho video 1 phiên bản.
+            canManageVersions: (assetById.get(target.id)?.versionCount ?? 0) >= 2,
             // P5.5 — share the acting selection (multi-select works via right-click).
             onCreateShare: () =>
                 setShareTarget({
@@ -1411,6 +1438,7 @@ export function TeamBrowser({
                             ) : isEmpty ? (
                                 <EmptyState
                                     atRoot={folderId === null}
+                                    scopeEmpty={data?.scopeEmpty}
                                     onUpload={() => filesInputRef.current?.click()}
                                     onNewFolder={startNewFolder}
                                 />
@@ -1448,7 +1476,8 @@ export function TeamBrowser({
                                             asset={selectedAsset}
                                             onClose={clearSelection}
                                             onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
-                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                            // [kiểm toán 2026-07 · §5.3] Không truyền callback = InfoPanel tự bỏ nút.
+                                            onManageVersions={selectedAsset.versionCount >= 2 ? () => openManageVersions(selectedAsset.id) : undefined}
                                         />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
@@ -1509,7 +1538,8 @@ export function TeamBrowser({
                                             asset={selectedAsset}
                                             onClose={clearSelection}
                                             onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
-                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                            // [kiểm toán 2026-07 · §5.3] Không truyền callback = InfoPanel tự bỏ nút.
+                                            onManageVersions={selectedAsset.versionCount >= 2 ? () => openManageVersions(selectedAsset.id) : undefined}
                                         />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
@@ -1533,7 +1563,7 @@ export function TeamBrowser({
                     onDelete={() => requestDelete(toItemRefs([...selectedIds]))}
                     onClear={clearSelection}
                     onManageVersions={
-                        selectedFolders.length === 0 && selectedAssets.length === 1
+                        selectedFolders.length === 0 && selectedAssets.length === 1 && selectedAssets[0].versionCount >= 2
                             ? () => openManageVersions(selectedAssets[0].id)
                             : undefined
                     }
@@ -1789,8 +1819,12 @@ function TreeSidebar({
     const roots = childrenOf.get(null) ?? []
     if (roots.length === 0) {
         return (
+            // [kiểm toán 2026-07 · T-04] Câu cũ "Chưa có thư mục nào." khẳng định về CẢ
+            // workspace, mà cột này chỉ thấy phần trong phạm vi của người xem — với editor
+            // chưa có task, nó nói dối trong khi lưới bên phải đã nói đúng. Câu mới chỉ
+            // nói về những gì hiển thị được, nên đúng ở cả hai trường hợp.
             <p className="px-3 py-6 text-center text-[11.5px] leading-relaxed text-muted-foreground">
-                Chưa có thư mục nào.
+                Không có thư mục nào để hiển thị.
                 <br />
                 Bản dựng tải lên từ task sẽ hiện ở đây.
             </p>
@@ -1815,13 +1849,16 @@ function TreeSidebar({
                         <button
                             type="button"
                             onClick={() => onToggle(node.id)}
-                            className="flex h-6 w-5 items-center justify-center text-muted-foreground hover:text-zinc-200"
+                            // w-6 not w-5: 20px wide fails WCAG 2.2 SC 2.5.8 (24x24 min) and the
+                            // spacing exception does not save it — the navigate button sits gap-1 away.
+                            className="flex h-6 w-6 items-center justify-center text-muted-foreground hover:text-zinc-200"
                             aria-label={isOpen ? 'Thu gọn' : 'Mở rộng'}
                         >
                             {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                         </button>
                     ) : (
-                        <span className="h-6 w-5" />
+                        // Spacer must track the button's width or childless rows lose their indent.
+                        <span className="h-6 w-6" />
                     )}
                     <button
                         type="button"
@@ -1943,23 +1980,44 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
     )
 }
 
-function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUpload: () => void; onNewFolder: () => void }) {
+function EmptyState({ atRoot, scopeEmpty, onUpload, onNewFolder }: { atRoot: boolean; scopeEmpty?: boolean; onUpload: () => void; onNewFolder: () => void }) {
     return (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
                 <Clapperboard size={26} />
             </div>
             <div>
+                {/*
+                  [kiểm toán 2026-07 · T-04] Nhánh thứ ba: phân quyền hoạt động ĐÚNG (chỉ thấy
+                  tài nguyên của task được giao) nhưng cách BÁO thì sai — editor chưa có task nào
+                  nhận đúng câu "chưa có asset nào trong workspace", nghe như hệ thống rỗng hoặc
+                  hỏng, chứ không phải "phần của bạn chưa có gì".
+                */}
                 <p className="text-[14px] font-medium text-zinc-200">
-                    {atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
+                    {scopeEmpty ? 'Bạn chưa được giao task nào' : atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
                 </p>
                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
-                    {atRoot
+                    {scopeEmpty
+                        ? 'Video sẽ hiện ở đây khi bạn nhận task. Câu này không nói gì về việc workspace có dữ liệu hay không — chỉ nói phần được giao cho bạn đang trống.'
+                        : atRoot
                         ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng, hoặc kéo thả file vào đây.'
                         : 'Kéo thả file vào đây, hoặc dùng nút “+ Mới” để tải lên.'}
                 </p>
             </div>
             <div className="mt-1 flex items-center gap-2">
+                {/*
+                  ⚠️ CHỈ ẨN NÚT TẢI LÊN, KHÔNG ẨN "THƯ MỤC MỚI" — hai nút này có hậu quả TRÁI
+                  NGƯỢC nhau và kế hoạch ban đầu gộp chung là sai:
+
+                  · Tải lên ở gốc → asset rơi thẳng vào thư mục gốc, mà gốc mang systemKey nên
+                    bị chính bộ lọc phạm vi loại ra. Upload THÀNH CÔNG, tốn dung lượng R2 + phí
+                    Mux, rồi lưới vẫn báo rỗng y như cũ. Đó là một cái hố đen im lặng.
+                  · Thư mục mới ở gốc → thư mục được tạo mang createdById = chính họ và KHÔNG có
+                    systemKey, tức đúng hình dạng mà bộ tính phạm vi công nhận. Phạm vi hết rỗng,
+                    màn hình này tự tắt. Đây là LỐI THOÁT TỰ CHỮA DUY NHẤT của editor — ẩn nó đi
+                    là nhốt họ vĩnh viễn trong màn rỗng, phải chờ admin giao task mới ra được.
+                */}
+                {!scopeEmpty && (
                 <button
                     type="button"
                     onClick={onUpload}
@@ -1967,6 +2025,7 @@ function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUplo
                 >
                     <UploadCloud size={14} /> Tải asset lên
                 </button>
+                )}
                 <button
                     type="button"
                     onClick={onNewFolder}

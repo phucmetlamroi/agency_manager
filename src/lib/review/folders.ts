@@ -13,9 +13,10 @@
 import { prisma } from '@/lib/db'
 import { Prisma, ReviewState } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { requireReviewAccess } from './access'
+import { requireReviewAccess, ReviewAccessError } from './access'
 import {
     getFolderScope,
+    isScopeEmpty,
     isPathVisible,
     isPathMutable,
     assertFolderPathMutable,
@@ -63,6 +64,19 @@ export interface ListChildrenResult {
     assets: AssetDto[]
     summary: { folderCount: number; assetCount: number; totalBytes: string }
     nextCursor: string | null
+    /**
+     * [kiểm toán 2026-07 · T-04] true = người gọi CHƯA được giao gì trong workspace này, nên
+     * lưới rỗng vì phạm vi rỗng chứ không phải vì chưa có dữ liệu. Chỉ để chọn CÂU CHỮ.
+     *
+     * TUỲ CHỌN có lý do: nhánh "workspace chưa có thư mục gốc" thoát TRƯỚC khi phạm vi được
+     * tính, nên ở đó cờ này vắng mặt — và vắng mặt là đúng nghĩa (workspace rỗng thật, không
+     * phải vấn đề phân quyền). Đừng "sửa" bằng cách tính thêm: sẽ tốn 4 truy vấn cho một
+     * nhánh không cần.
+     *
+     * An toàn: xem isScopeEmpty trong folder-scope.ts — nó chỉ suy từ quyền của chính người
+     * gọi, không phụ thuộc thư mục đang mở.
+     */
+    scopeEmpty?: boolean
 }
 
 export interface TrashItemDto {
@@ -440,6 +454,17 @@ export async function createFolderTree(input: {
         select: { id: true, path: true, depth: true },
     })
     if (!base) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục đích.')
+    // [audit 2026-07 S1-4] Thiếu hẳn chốt phạm vi ở đây, trong khi createFolder (hàm anh em,
+    // cùng file) ĐÃ có `assertFolderPathMutable(scope, parent.path)`. Đây không phải chủ đích
+    // mà là bỏ sót, và nó nặng hơn "ghi ngoài phạm vi": mỗi thư mục tạo ra được đóng dấu
+    // createdById = người gọi và systemKey = null — đúng hình dạng mà getFolderScope nguồn 3
+    // biến thành allowedPrefix. Tức đây là công cụ TỰ CẤP THÊM phạm vi, không chỉ ghi bậy.
+    // Chỉ chặn khi người gọi tự chỉ định parentId; nhánh parentId = null rơi về gốc workspace,
+    // đúng luồng kéo-thả hợp lệ mà chính S1-4 phải giữ cho chạy được.
+    if (input.parentId != null) {
+        const scope = await getFolderScope({ userId: access.userId, workspaceId: input.workspaceId, isAdmin: access.isAdmin })
+        assertFolderPathMutable(scope, base.path)
+    }
 
     // Fail fast on the ABSOLUTE resulting depth (base.depth + deepest relative path).
     // getOrCreateChild also enforces MAX_DEPTH per folder, but its per-folder tx commits
@@ -469,12 +494,27 @@ export async function createFolderTree(input: {
 // ─────────────────────── get + breadcrumb ───────────────────────
 
 export async function getFolder(folderId: string): Promise<{ folder: FolderDto; breadcrumb: BreadcrumbItem[] }> {
+    // [kiểm toán 2026-07 · §11] Cùng một câu cho "không tồn tại" và "không có quyền". Bản vá
+    // trước chỉ làm ở listChildren, nên endpoint anh em này vẫn còn nguyên phép thử tồn tại:
+    // 404 cho id bịa ra, 403 cho id có thật ở workspace khác.
+    const hidden = () => apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
     const folder = await prisma.reviewFolder.findFirst({ where: { id: folderId, deletedAt: null } })
-    if (!folder) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-    const access = await requireReviewAccess({ workspaceId: folder.workspaceId })
+    if (!folder) {
+        await requireReviewAccess() // chặn người chưa đăng nhập dùng đây làm cổng dò
+        throw hidden()
+    }
+    // [Q3] Khách cần đường này để có TÊN thư mục và đường dẫn quay lui; thiếu nó thì khách
+    // duyệt trong một cái cây không nhãn. Phạm vi vẫn do isPathVisible bên dưới quyết.
+    let access
+    try {
+        access = await requireReviewAccess({ workspaceId: folder.workspaceId, allowGuest: true })
+    } catch (e) {
+        if (e instanceof ReviewAccessError && e.status === 401) throw e
+        throw hidden()
+    }
     // [FR-03] editor chỉ xem folder trong phạm vi được giao (tổ tiên / self / con).
     const scope = await getFolderScope({ userId: access.userId, workspaceId: folder.workspaceId, isAdmin: access.isAdmin })
-    if (!isPathVisible(scope, folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem thư mục này.')
+    if (!isPathVisible(scope, folder.path)) throw hidden()
 
     const ancestorIds = ancestorIdsAbove(folder)
     let breadcrumb: BreadcrumbItem[] = []
@@ -540,7 +580,9 @@ export async function listChildren(input: {
     let access
     if (input.folderId == null) {
         if (!input.workspaceId) throw apiError(400, 'VALIDATION_ERROR', 'Thiếu workspaceId cho thư mục gốc.')
-        access = await requireReviewAccess({ workspaceId: input.workspaceId })
+        // [Q3] Đường ĐỌC — khách của workspace vào được. getFolderScope bên dưới vẫn
+        // giới hạn họ theo task được giao (khách không phải admin nên không unrestricted).
+        access = await requireReviewAccess({ workspaceId: input.workspaceId, allowGuest: true })
         const root = await readRoot(input.workspaceId)
         if (!root) {
             return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null }
@@ -553,8 +595,23 @@ export async function listChildren(input: {
             where: { id: input.folderId, deletedAt: null },
             select: { id: true, workspaceId: true, totalSizeBytes: true, path: true },
         })
-        if (!row) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
-        access = await requireReviewAccess({ workspaceId: row.workspaceId })
+        // [kiểm toán 2026-07 · §11] "Không tìm thấy" và "không có quyền" phải trả lời Y HỆT
+        // NHAU. Không thể kiểm quyền trước phép tra — workspaceId chỉ biết được TỪ hàng vừa
+        // tra ra, nên thứ tự này là bắt buộc. Cái sửa được là CÂU TRẢ LỜI: trước đây id không
+        // tồn tại -> 404, còn id có thật ở workspace khác -> 403; hai câu khác nhau biến
+        // endpoint này thành phép thử "id này có thật không" cho bất kỳ ai đã đăng nhập.
+        // 401 vẫn giữ riêng: chưa đăng nhập không phải tín hiệu về sự tồn tại.
+        const hidden = () => apiError(404, 'NOT_FOUND', 'Không tìm thấy thư mục.')
+        if (!row) {
+            await requireReviewAccess() // chặn người chưa đăng nhập dùng đây làm cổng dò
+            throw hidden()
+        }
+        try {
+            access = await requireReviewAccess({ workspaceId: row.workspaceId, allowGuest: true }) // [Q3] đường đọc
+        } catch (e) {
+            if (e instanceof ReviewAccessError && e.status === 401) throw e
+            throw hidden()
+        }
         container = row
     }
     const parentId = container.id
@@ -564,7 +621,7 @@ export async function listChildren(input: {
     // -không-mutable) → chỉ hiện folder-con-on-path, KHÔNG hiện asset (asset chỉ ở folder được giao).
     const scope = await getFolderScope({ userId: access.userId, workspaceId: container.workspaceId, isAdmin: access.isAdmin })
     if (!isPathVisible(scope, container.path)) {
-        return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null }
+        return { folders: [], assets: [], summary: { folderCount: 0, assetCount: 0, totalBytes: '0' }, nextCursor: null, scopeEmpty: isScopeEmpty(scope) }
     }
     const showAssets = isPathMutable(scope, container.path)
 
@@ -751,6 +808,7 @@ export async function listChildren(input: {
                   : '0',
         },
         nextCursor,
+        scopeEmpty: isScopeEmpty(scope),
     }
 }
 
@@ -759,7 +817,7 @@ export async function listChildren(input: {
 export async function getFolderTree(
     workspaceId: string,
 ): Promise<{ folders: { id: string; parentId: string | null; name: string; hasChildren: boolean }[] }> {
-    const access = await requireReviewAccess({ workspaceId })
+    const access = await requireReviewAccess({ workspaceId, allowGuest: true }) // [Q3] đường đọc (cây thư mục)
     const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
     const rows = await prisma.reviewFolder.findMany({
         where: { workspaceId, deletedAt: null },
@@ -1788,8 +1846,8 @@ export async function copyItems(input: {
     // [FR-03] editor chỉ copy TỪ mục xem được (nguồn) VÀO đích trong phạm vi được giao.
     const scope = await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin })
     if (!scope.unrestricted) {
-        for (const f of srcFolders) if (!isPathVisible(scope, f.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
-        for (const a of srcAssets) if (!isPathVisible(scope, a.folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
+        for (const f of srcFolders) if (!isPathVisible(scope, f.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem nội dung này.')
+        for (const a of srcAssets) if (!isPathVisible(scope, a.folder.path)) throw apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem nội dung này.')
         assertFolderPathMutable(scope, target.path)
     }
 

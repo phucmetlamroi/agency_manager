@@ -763,6 +763,19 @@ function ReviewPlayerShellInner({
             }}
           />
 
+          {/*
+            [kiểm toán 2026-07 · §5.3] Chồng phiên bản chỉ hiện khi THẬT SỰ có chồng.
+            Dữ liệu của chính workspace này: 113/170 video có đúng 1 phiên bản, 18 video có 0
+            — tức 77% người xem đang phải nhìn một bộ chọn chỉ có một lựa chọn.
+
+            ⚠️ RANH GIỚI QUAN TRỌNG: điều kiện này bọc ĐÚNG cụm CHỌN phiên bản. Nút "Tải phiên
+            bản mới" ngay bên dưới (UploadCloud) và ô input ẩn ở trên nằm CÙNG một thẻ cha
+            flex — nhưng chúng là đường DUY NHẤT trong trình phát để đi từ 1 lên 2 phiên bản.
+            Ẩn cả cụm cho gọn = khoá vĩnh viễn video 1 phiên bản ở mức 1. Không được đụng.
+
+            Dùng `>= 2` chứ KHÔNG phải `!== 1`: 18 video có 0 phiên bản cũng phải ẩn.
+          */}
+          {data.versions.length >= 2 && (
           <div className="relative shrink-0">
             <button
               onClick={() => setSelectorOpen((open) => !open)}
@@ -838,7 +851,9 @@ function ReviewPlayerShellInner({
               </>
             )}
           </div>
+          )}
 
+          {/* KHÔNG nằm trong điều kiện phiên bản ở trên — xem cảnh báo tại đó. */}
           <button
             onClick={() => versionInputRef.current?.click()}
             className="hidden h-8 w-8 shrink-0 place-items-center rounded-md text-white/65 transition hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300 sm:grid"
@@ -860,7 +875,12 @@ function ReviewPlayerShellInner({
         />
 
         <div className="flex shrink-0 items-center gap-1">
-          <div className="hidden items-center overflow-hidden rounded-md border border-white/[0.12] bg-white/[0.035] md:flex">
+          {/* [kiểm toán 2026-07 · phản biện] Cụm điều hướng này nằm NGOÀI khối >= 2 ở trên,
+              nên video một phiên bản vẫn bày ra "1 / 1" cùng hai mũi tên chết — đúng thứ §5.3
+              muốn giấu. Cùng điều kiện với thanh chọn phiên bản, không phải điều kiện riêng. */}
+          <div
+            className={`${data.versions.length >= 2 ? "hidden md:flex" : "hidden"} items-center overflow-hidden rounded-md border border-white/[0.12] bg-white/[0.035]`}
+          >
             <button
               type="button"
               onClick={() =>

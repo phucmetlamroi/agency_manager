@@ -89,8 +89,19 @@ const nextConfig: NextConfig = {
               // video AND gets no file (owner's bug video 2026-07-21 @00:34; the reported "we're also not
               // able to download"). It never reproduced on staff pages: there the player is top-level, and
               // frame-src does not apply to top-level navigations.
-              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com;"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com; upgrade-insecure-requests;"
+              // NOTE (Supabase Realtime — audit 2026-07 F-01): connect-src needs BOTH tokens; neither is
+              // redundant. `wss://` is required because a scheme-less host-source inherits the document
+              // scheme (https), and https does NOT match wss — so the socket in useSupabaseChannel /
+              // usePresence is refused outright. `https://` is required because realtime-js falls back to
+              // POSTing /realtime/v1/api/broadcast over HTTP whenever the socket is down mid-session
+              // (RealtimeChannel.send when !canPush), and that failure is swallowed silently. This was
+              // missed once already: *.supabase.co WAS added to img-src below but forgotten here, which
+              // blocked every realtime feature on every logged-in page for all 4 roles while leaving the
+              // socket retrying in an unbounded loop. The wildcard matches the img-src / remotePatterns
+              // stance ([Hosting-portable]) and grants nothing new — img-src already trusts this host,
+              // so an injected script could already exfiltrate via <img> to any *.supabase.co.
+              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://lh3.googleusercontent.com https://avatar.vercel.sh https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud wss://*.supabase.co https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com;"
+              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://lh3.googleusercontent.com https://avatar.vercel.sh https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud wss://*.supabase.co https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com; upgrade-insecure-requests;"
           },
           {
             key: 'X-Content-Type-Options',

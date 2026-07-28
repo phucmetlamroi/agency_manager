@@ -9,16 +9,19 @@ import { BrandLogo } from '@/components/layout/BrandLogo'
 import { useScrollDirection } from '@/hooks/useScrollDirection'
 import { cn } from '@/lib/utils'
 import AccountSheet from '@/components/layout/AccountSheet'
+import type { NavAccess } from '@/lib/nav-access'
 
 interface AppHeaderProps {
     user: { username: string; role: string; avatarUrl?: string }
     workspaceId: string
-    /** Workspace-scoped role — gates admin links trong AccountSheet. */
+    /** Workspace-scoped role — giữ lại cho các nhánh chưa truyền navAccess. */
     workspaceRole?: string
+    /** [kiểm toán 2026-07 · S2-1] Quyền điều hướng — gác link admin trong AccountSheet. */
+    navAccess?: NavAccess
     handleLogout: () => void
 }
 
-export default function AppHeader({ user, workspaceId, workspaceRole, handleLogout }: AppHeaderProps) {
+export default function AppHeader({ user, workspaceId, workspaceRole, navAccess, handleLogout }: AppHeaderProps) {
     const [sheetOpen, setSheetOpen] = useState(false)
     const hidden = useScrollDirection(80)
 
@@ -60,6 +63,7 @@ export default function AppHeader({ user, workspaceId, workspaceRole, handleLogo
                 user={user}
                 workspaceId={workspaceId}
                 workspaceRole={workspaceRole}
+                navAccess={navAccess}
                 handleLogout={handleLogout}
             />
         </>

@@ -34,6 +34,7 @@ import { useTaskUploads } from '@/lib/review/use-upload-store'
 import { formatBytes, type UploadItem } from '@/lib/review/upload-store'
 import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
 import { apiConfirmTaskComplete, apiConfirmFix } from '@/lib/review/team-actions'
+import { failureMessage } from '@/lib/ui/action-feedback'
 import type { TaskAssetsResult, TaskDeliverableDto } from '@/lib/review/task-assets'
 import type { ReviewStateDto } from '@/lib/review/dto'
 
@@ -204,7 +205,9 @@ export function TaskReviewUploadSection({
                 await refetch()
                 onTaskStatusChanged?.(res.status)
             } catch (e) {
-                toast.error(e instanceof Error ? e.message : 'Không xác nhận được. Thử lại.', { id: tid })
+                // failureMessage đứng NGOÀI e.message có chủ đích: khi mất mạng, e.message
+                // là "Failed to fetch" — tiếng Anh, của trình duyệt, người dùng không hiểu.
+                toast.error(failureMessage(e, e instanceof Error ? e.message : 'Không xác nhận được. Thử lại.'), { id: tid })
             } finally {
                 setConfirmingFix(false)
             }
@@ -257,7 +260,7 @@ export function TaskReviewUploadSection({
             toast.success('Đã chuyển task sang Hoàn tất.', { id: tid })
             onTaskCompleted?.()
         } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Không chuyển được trạng thái task.', { id: tid })
+            toast.error(failureMessage(e, e instanceof Error ? e.message : 'Không chuyển được trạng thái task.'), { id: tid })
         } finally {
             setConfirmingComplete(false)
         }

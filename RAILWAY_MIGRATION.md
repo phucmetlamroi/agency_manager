@@ -28,8 +28,21 @@ Supabase Dashboard → Storage → New bucket → tên `public-uploads`, bật *
 3. Service app: Settings → Variables → dán toàn bộ env ở mục 0 (đặt `DATABASE_URL` = tham chiếu tới Postgres của Railway: `${{ Postgres.DATABASE_URL }}`).
 
 ## 3. Deploy lần đầu (tạo schema rỗng)
-Railway tự build (`next build --webpack`) rồi chạy `next start`. Trong lúc `npm install`, script
-`postinstall` chạy `prisma db push` → **tạo toàn bộ bảng trên Postgres Railway (đang rỗng)**. Chưa có dữ liệu.
+Railway tự build (`next build --webpack`) rồi chạy `next start`.
+
+> ⚠️ **CẬP NHẬT (kiểm toán 2026-07, commit `0756cfb`).** Bước này TRƯỚC ĐÂY dựa vào `postinstall`
+> tự chạy `prisma db push`. **Cơ chế đó đã bị gỡ** — `postinstall` nay chỉ `prisma generate`, còn
+> `db push` phải gọi tay có chủ đích. Làm theo bản cũ sẽ ra một database **KHÔNG có bảng nào**, và
+> bước `pg_restore --data-only` ở mục 4 sẽ thất bại vì không có bảng để đổ dữ liệu vào.
+>
+> Tạo schema bằng tay, trỏ đúng vào Postgres của Railway:
+>
+> ```
+> ALLOW_DB_PUSH=1 DATABASE_URL="<DATABASE_URL của Railway>" node scripts/maybe-db-push.mjs
+> ```
+>
+> Truyền `DATABASE_URL` nội tuyến là bắt buộc: Prisma CLI đọc `.env` (production) chứ không đọc
+> `.env.local`, nên lệnh trần sẽ trúng nhầm database.
 > Nếu build fail ở bước cài Chromium: tạm xoá `nixpacks.toml`, deploy cho chạy được, rồi xử lý PDF sau (xem mục 7).
 
 ## 4. Chuyển DỮ LIỆU từ Neon → Railway (data-only)

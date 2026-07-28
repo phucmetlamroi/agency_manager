@@ -371,7 +371,13 @@ async function replaySession(sessionId: string): Promise<InitiateResult> {
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     const v = session.version
-    await requireReviewAccess({ workspaceId: v.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: v.workspaceId })
+    // [audit 2026-07 S1-4] initiateUpload gọi hàm này ngay khi trúng idempotencyKey và trả về
+    // TRƯỚC các assertion phạm vi phía dưới — kèm URL presign R2 mới. Không có chốt này, ai
+    // biết khoá của người khác sẽ nhận được quyền ghi vào file của họ.
+    if (!access.isAdmin && v.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     const done = session.completedAt != null || session.abortedAt != null
     const parts = done ? [] : await partUrlsFor(session.r2Key, session.r2UploadId, session.partsTotal, v.mimeType)
@@ -500,7 +506,21 @@ export async function completeUpload(
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     const version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Một phiên tải lên thuộc về NGƯỜI khởi tạo nó, không phải
+    // "bất kỳ thành viên workspace nào" — requireReviewAccess ở trên chỉ hỏi được câu thứ hai.
+    // Ranh giới là version.uploaderId: gán lúc initiate từ phiên đăng nhập, BẤT BIẾN (chỉ có
+    // 2 chỗ ghi trong toàn repo, cả hai đều lúc tạo), đã nằm sẵn trong `include` nên KHÔNG
+    // tốn thêm truy vấn.
+    //
+    // CỐ Ý KHÔNG dùng folder-scope ở đây, dù đó là lớp phân quyền chuẩn của module. Asset của
+    // một lần kéo-thả vào GỐC Tệp không có taskId, và thư mục gốc mang systemKey nên bị loại
+    // khỏi cả ba nguồn của getFolderScope -> assertVersionInScope('write') sẽ 403 CHÍNH CHỦ,
+    // và 403 đó rơi SAU khi cả file đã đẩy xong lên R2. uploaderId hẹp hơn, đúng ngữ nghĩa hơn,
+    // và không có âm tính giả nào.
+    if (!access.isAdmin && version.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     if (session.abortedAt) fail(409, 'STATE_INVALID', 'Phiên tải lên đã bị hủy.')
 
@@ -587,7 +607,11 @@ export async function abortUpload(uploadSessionId: string): Promise<{ aborted: t
     // Returning the same shape for "gone" and "not yours" also denies an enumeration oracle.
     if (!session) return { aborted: true }
     const version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Chỉ người khởi tạo (hoặc admin workspace) mới hủy được. Trả về ĐÚNG
+    // shape của nhánh "không tìm thấy" ở trên — giữ trọn lời hứa chống dò id đã ghi trong
+    // comment của hàm, thay vì để 403 lộ ra "phiên này có thật".
+    if (!access.isAdmin && version.uploaderId !== access.userId) return { aborted: true }
 
     if (session.abortedAt) return { aborted: true }
     // Only an in-flight upload (version still UPLOADING) may be discarded. Once a complete has
@@ -634,7 +658,13 @@ export async function getUploadStatus(uploadSessionId: string): Promise<UploadSt
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     let version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Ràng theo người khởi tạo như complete/abort. Đây KHÔNG phải phép đọc
+    // vô hại: hàm mint token phát Mux đã ký, trả nguyên VersionDto (tên file, dung lượng, danh
+    // tính người upload), và tự gọi driveCompletion — tức có cả tác dụng phụ ghi.
+    if (!access.isAdmin && version.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     // Self-heal the crash window: if a complete finalized R2 (completedAt set) but died before
     // driving the transition, the version is stuck UPLOADED. The client's 3s poller only stops on
@@ -1062,7 +1092,12 @@ export async function getVersionPlaybackTokens(versionId: string): Promise<Playb
         select: { id: true, workspaceId: true, pipelineStatus: true, mediaKind: true, muxPlaybackId: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [kiểm toán 2026-07 · Q3] Khách được XEM. listVersions đã mở nên player của khách dựng
+    // được metadata, nhưng nếu đường này còn đòi MEMBER thì HLS xin token bị 403 và khách
+    // nhìn vào một khung đen — tức tính năng hỏng đúng ngay mục đích của nó. Đây là token
+    // PHÁT (Mux, 6h, streaming), không phải file gốc; phạm vi vẫn do assertVersionInScope
+    // bên dưới quyết, và khách không bao giờ là isAdmin nên scope luôn bị giới hạn theo task.
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId, allowGuest: true })
     // [FR-03] editor chỉ mint playback token cho version trong phạm vi được giao.
     await assertVersionInScope(
         await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),
@@ -1093,10 +1128,19 @@ const DOWNLOAD_TTL_SEC = 15 * 60 // short-lived presigned R2 GET for the origina
 export async function getVersionDownloadUrl(versionId: string): Promise<DownloadUrlResult> {
     const version = await prisma.reviewVersion.findFirst({
         where: { id: versionId, deletedAt: null },
-        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true },
+        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true, mediaKind: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [kiểm toán 2026-07 · Q3] Đường này gánh HAI việc khác hẳn nhau: hiển thị ảnh trong
+    // player (player-env cắm fetchImageUrl = fetchDownloadUrl) và tải file GỐC về máy.
+    // Khách được "chỉ xem", nên chỉ mở đúng việc thứ nhất: ẢNH thì cho qua vì không có nó
+    // thì không xem được gì; VIDEO và mọi loại khác giữ MEMBER, bởi với video khách đã có
+    // đường xem riêng là playback token (luồng Mux), còn file gốc là bản master — cho tải
+    // là vượt quá mức chủ sản phẩm chốt.
+    const access = await requireReviewAccess({
+        workspaceId: version.workspaceId,
+        allowGuest: version.mediaKind === ReviewMediaKind.IMAGE,
+    })
     // [FR-03] editor chỉ tải version trong phạm vi được giao.
     await assertVersionInScope(
         await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),

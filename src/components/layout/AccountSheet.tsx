@@ -10,6 +10,7 @@ import { UserCircle, AlertTriangle, ArrowLeftRight, Settings, Monitor, LogOut, U
 import { roleLabel } from '@/lib/display-labels'
 import { useHistoryBackClose } from '@/hooks/useHistoryBackClose'
 import { cn } from '@/lib/utils'
+import type { NavAccess } from '@/lib/nav-access'
 
 interface AccountSheetProps {
     open: boolean
@@ -17,11 +18,19 @@ interface AccountSheetProps {
     user: { username: string; role: string; avatarUrl?: string }
     workspaceId: string
     workspaceRole?: string
+    /** [kiểm toán 2026-07 · S2-1] Quyền điều hướng tính ở layout. */
+    navAccess?: NavAccess
     handleLogout: () => void
 }
 
-export default function AccountSheet({ open, onOpenChange, user, workspaceId, workspaceRole, handleLogout }: AccountSheetProps) {
-    const isAdmin = workspaceRole === 'OWNER' || workspaceRole === 'ADMIN'
+export default function AccountSheet({ open, onOpenChange, user, workspaceId, workspaceRole, navAccess, handleLogout }: AccountSheetProps) {
+    // [kiểm toán 2026-07 · S2-1] Ba link admin dưới đây có HAI cổng khác nhau, không phải
+    // một: Thành viên đòi profileRole ∈ OWNER|ADMIN, còn Nhật ký + Cài đặt đòi
+    // workspaceRole ≥ ADMIN. Điều kiện cũ (`workspaceRole === 'OWNER' || 'ADMIN'`) lệch
+    // theo cả hai chiều — nó GIẤU cả ba link khỏi một profile ADMIN vào được thật, đồng
+    // thời VẼ link Thành viên cho một ADMIN không có ProfileAccess rồi để trang đá họ ra.
+    const canSeeMembers = navAccess ? navAccess.profileAdmin : (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN')
+    const canSeeWorkspaceAdmin = navAccess ? navAccess.workspaceAdmin : (workspaceRole === 'OWNER' || workspaceRole === 'ADMIN')
     const [confirmLogout, setConfirmLogout] = useState(false)
     const close = useCallback(() => onOpenChange(false), [onOpenChange])
     useHistoryBackClose(open, close)
@@ -52,12 +61,18 @@ export default function AccountSheet({ open, onOpenChange, user, workspaceId, wo
                         <SheetLink href={`/${workspaceId}/dashboard/errors`} icon={AlertTriangle} danger onClick={close}>Hồ sơ vi phạm</SheetLink>
                         <SheetLink href={`/api/profile/select`} icon={ArrowLeftRight} onClick={close}>Đổi Team / Workspace</SheetLink>
 
-                        {isAdmin && (
+                        {(canSeeMembers || canSeeWorkspaceAdmin) && (
                             <>
                                 <div className="my-1 h-px bg-white/10" />
-                                <SheetLink href={`/${workspaceId}/admin/profile-members`} icon={UsersRound} onClick={close}>Thành viên</SheetLink>
-                                <SheetLink href={`/${workspaceId}/admin/audit-log`} icon={ScrollText} onClick={close}>Nhật ký hoạt động</SheetLink>
-                                <SheetLink href={`/${workspaceId}/admin/settings`} icon={Settings} onClick={close}>Cài đặt</SheetLink>
+                                {canSeeMembers && (
+                                    <SheetLink href={`/${workspaceId}/admin/profile-members`} icon={UsersRound} onClick={close}>Thành viên</SheetLink>
+                                )}
+                                {canSeeWorkspaceAdmin && (
+                                    <>
+                                        <SheetLink href={`/${workspaceId}/admin/audit-log`} icon={ScrollText} onClick={close}>Nhật ký hoạt động</SheetLink>
+                                        <SheetLink href={`/${workspaceId}/admin/settings`} icon={Settings} onClick={close}>Cài đặt</SheetLink>
+                                    </>
+                                )}
                             </>
                         )}
 

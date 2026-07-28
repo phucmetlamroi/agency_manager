@@ -1,7 +1,8 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession, verifyProfileAdminAccess } from '@/lib/security'
+import { verifyActiveSession } from '@/lib/security'
+import { deriveNavAccess } from '@/lib/nav-access'
 import RoleWatcher from '@/components/RoleWatcher'
 import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
@@ -53,15 +54,13 @@ export default async function AdminLayout({
     // existed — it never checked the row's ROLE, so a treasurer of profile A who was only a
     // USER/CLIENT of profile B got full /admin in B (salaries + jobPriceUSD revenue).
     // verifyProfileAdminAccess never consults the global flag and requires an OWNER/ADMIN role.
-    let canAccessAdmin = false
-    try {
-        await verifyProfileAdminAccess(workspaceId)
-        canAccessAdmin = true
-    } catch {
-        canAccessAdmin = false
-    }
+    //
+    // [kiểm toán 2026-07 · S2-1] deriveNavAccess gọi ĐÚNG verifyProfileAdminAccess đó và
+    // trả thêm hai cờ con (workspaceAdmin/profileAdmin) để lọc sidebar. Một lời gọi, một
+    // vị từ — cổng vào vẫn y hệt trước.
+    const navAccess = await deriveNavAccess(workspaceId)
 
-    if (!canAccessAdmin) {
+    if (!navAccess.admin) {
         redirect(`/${workspaceId}/dashboard`)
     }
 
@@ -82,7 +81,7 @@ export default async function AdminLayout({
 
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
-        <AppShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined} handleLogout={handleLogout}>
+        <AppShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />

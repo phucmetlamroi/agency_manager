@@ -6,10 +6,11 @@
 // /api/auth/role) để không lặp refresh; viewRole (workspace-scoped) chỉ dùng lọc nav.
 import { redirect } from 'next/navigation'
 import { logout } from '@/lib/auth'
-import { verifyActiveSession, verifyProfileAdminAccess } from '@/lib/security'
+import { verifyActiveSession } from '@/lib/security'
 import RoleWatcher from '@/components/RoleWatcher'
 import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
+import { deriveNavAccess } from '@/lib/nav-access'
 
 export default async function TeamBrowserLayout({
     children,
@@ -26,21 +27,19 @@ export default async function TeamBrowserLayout({
     if (status === 'unauthorized' || !dbUser) redirect('/login')
     if (status === 'locked') redirect('/api/auth/logout')
 
-    const membership = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
-        select: { role: true },
-    })
+    const [membership, navAccess] = await Promise.all([
+        prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
+            select: { role: true },
+        }),
+        // [kiểm toán 2026-07 · S2-1] Cùng verifyProfileAdminAccess như trước, chỉ khác là
+        // giữ lại kết quả để lọc sidebar thay vì vứt đi.
+        deriveNavAccess(workspaceId),
+    ])
     const workspaceRole = membership?.role ?? null
 
     // Workspace-scoped admin → nav viewRole (KHÔNG dùng global User.role cho nav).
-    let isWorkspaceAdmin = false
-    try {
-        await verifyProfileAdminAccess(workspaceId)
-        isWorkspaceAdmin = true
-    } catch {
-        isWorkspaceAdmin = false
-    }
-    const viewRole: 'ADMIN' | 'USER' = isWorkspaceAdmin ? 'ADMIN' : 'USER'
+    const viewRole: 'ADMIN' | 'USER' = navAccess.admin ? 'ADMIN' : 'USER'
 
     const user = { username: dbUser.username, role: dbUser.role, isTreasurer: dbUser.isTreasurer, id: dbUser.id, avatarUrl: (dbUser as any).avatarUrl }
 
@@ -52,7 +51,7 @@ export default async function TeamBrowserLayout({
 
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
-        <AppShell user={user} workspaceId={workspaceId} viewRole={viewRole} workspaceRole={workspaceRole ?? undefined} handleLogout={handleLogout}>
+        <AppShell user={user} workspaceId={workspaceId} viewRole={viewRole} workspaceRole={workspaceRole ?? undefined} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole={dbUser.role} isTreasurer={user.isTreasurer} />
             {children}
         </AppShell>

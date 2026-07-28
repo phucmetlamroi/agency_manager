@@ -6,6 +6,7 @@ import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import { deriveNavAccess } from '@/lib/nav-access'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
 // (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
@@ -43,11 +44,16 @@ export default async function UserLayout({
     const { user: sessionUser } = session
     const dbUserRole = dbUser.role
 
-    // Query workspace membership for role-based nav filtering
-    const membership = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
-        select: { role: true },
-    })
+    // Query workspace membership for role-based nav filtering.
+    // [kiểm toán 2026-07 · S2-1 / Q1] deriveNavAccess chạy SONG SONG — đây là vỏ mà
+    // editor sống trong đó, nên cũng là nơi 9 mục /admin/** từng đá họ đi không một lời.
+    const [membership, navAccess] = await Promise.all([
+        prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId: dbUser.id, workspaceId } },
+            select: { role: true },
+        }),
+        deriveNavAccess(workspaceId),
+    ])
     const workspaceRole = membership?.role ?? undefined
 
     // [Sprint B] Trial banner removed.
@@ -74,7 +80,7 @@ export default async function UserLayout({
 
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
-        <AppShell user={user} workspaceId={workspaceId} viewRole="USER" workspaceRole={workspaceRole} handleLogout={handleLogout}>
+        <AppShell user={user} workspaceId={workspaceId} viewRole="USER" workspaceRole={workspaceRole} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />

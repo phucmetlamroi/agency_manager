@@ -8,6 +8,7 @@ import { AppSidebar } from "./AppSidebar"
 import { CommandMenu } from "./CommandMenu"
 import { UploadTray } from "@/components/review/UploadTray"
 import { cn } from "@/lib/utils"
+import type { NavAccess } from "@/lib/nav-access"
 
 interface AppShellDesktopProps {
     children: React.ReactNode
@@ -21,14 +22,16 @@ interface AppShellDesktopProps {
     viewRole?: 'ADMIN' | 'USER'
     /** Workspace-scoped role for nav filtering */
     workspaceRole?: string
+    /** [kiểm toán 2026-07 · S2-1] Quyền điều hướng tính ở layout — lọc mục sidebar. */
+    navAccess?: NavAccess
 }
 
-export function AppShellDesktop({ children, user, workspaceId, viewRole = 'ADMIN', workspaceRole }: AppShellDesktopProps) {
+export function AppShellDesktop({ children, user, workspaceId, viewRole = 'ADMIN', workspaceRole, navAccess }: AppShellDesktopProps) {
     const [collapsed, setCollapsed] = React.useState(false)
 
     return (
         <div className="flex min-h-dvh bg-background text-foreground">
-            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} viewRole={viewRole} workspaceRole={workspaceRole} />
+            <AppSidebar user={user} workspaceId={workspaceId} onCollapsedChange={setCollapsed} viewRole={viewRole} workspaceRole={workspaceRole} navAccess={navAccess} />
             <main
                 className={cn(
                     "flex-1 overflow-x-hidden pt-16 md:pt-0 relative transition-all duration-300",

@@ -8,6 +8,13 @@
       "port": 3000
     },
     {
+      "//": "Dùng entry NÀY khi kiểm chứng đợt audit-2026-07. `npm run dev` ở trên KHÔNG an toàn cho việc đó: nếu NODE_ENV=test thì Next bỏ qua .env.local và rơi về .env = database PRODUCTION, im lặng. Xem đầu file scripts/audit-2026-07/dev-audit.mjs.",
+      "name": "Next.js Dev (nhánh audit — fail-closed)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/audit-2026-07/dev-audit.mjs"],
+      "port": 3000
+    },
+    {
       "name": "htl-landing",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "website", "run", "dev", "--", "--port", "5179", "--strictPort"],

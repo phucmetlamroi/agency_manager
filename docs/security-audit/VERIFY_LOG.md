@@ -1130,3 +1130,63 @@ Tự xác minh được. src/lib/review/download-zip.ts:110-113 dựng zipPath b
 **Rủi ro còn lại:** Chỉ vá ở tầng zip (bullet 1 của Đề xuất sửa); CHẶN TẠI NGUỒN chưa làm: validateName trong src/lib/review/folders.ts vẫn nhận tên folder '..' và tên chứa '\\', upload-service.ts vẫn chỉ kiểm độ dài fileName. Nghĩa là dữ liệu bẩn (fileName '../../x', folder tên '..') vẫn được TẠO và nằm lại trong ReviewVersion.fileName/ReviewFolder.name; hai route zip hiện tại trung hoà được, nhưng bất kỳ consumer mới nào của relPath/fileName (export khác, rsync, script vận hành, tên file gợi ý khi tải lẻ) sẽ mở lại lỗ hổng vì bất biến chỉ tồn tại ở nơi tiêu thụ chứ không ở nơi lưu.
 
 ---
+
+---
+
+# PHẦN II — Nhật ký VÁ (cập nhật 2026-07-29)
+
+> Codex hết hạn mức tài khoản tới 2026-08-04, gateway CLIController không chạy, agy không đọc
+> được file trong chế độ print. Cổng review độc lập vì vậy do **agent Claude phản biện** đảm nhiệm,
+> chủ dự án đã duyệt phương án thay thế này. **Chưa ID nào qua Codex.**
+
+## Đã vá
+
+| ID | Mức | Commit | Vòng phản biện |
+|----|-----|--------|----------------|
+| HT-007 | High | `556e6b9` | 3 người soi · 1 BÁC BỎ vòng đầu (allowlist còn chứa tiền/FK/status) → thu hẹp → APPROVE |
+| HT-002 | High | `9dfbd06` | 1 người · APPROVE + chỉ ra 2 chỗ cùng họ (`x-client-ip`, bản chép tay ở auth-actions) → đã vá |
+| HT-022 | High | `524b9d6` + `d972627` | 1 người · **BÁC BỎ vòng 2** kèm chuỗi tự-cấp `isTreasurer` 4 bước → chuyển sang env → chủ dự án chọn gỡ hẳn tính năng |
+| HT-031 | High | `e30c050` | 1 người · **BÁC BỎ vòng đầu** (hồi quy ghi hỏng link `/r/` vào DB + sink Mission Control + đường ghi MCP) → sửa cả 3 |
+| HT-029 | High | `dc21e37` | tự kiểm chứng cổng chặn hai chiều (cây sạch → 0, cắm `.env` lồng 4 tầng → 1) |
+| HT-018 | Med | `3755000` | 1 người · **BÁC BỎ vòng đầu** (đường mobile bỏ sót + CSRF mới + bump dây chuyền + comment nói ngược) → sửa cả 4 |
+| HT-006 | Med | `6f2351e` | vá đúng phần chủ dự án chốt (chỉ vết kiểm toán) |
+
+**Phản biện đã lật tổng cộng 9 lần** — 5 ở bước xác minh, 4 ở bước vá. Không lần nào là bắt bẻ
+hình thức; lần nào cũng kèm đường khai thác hoặc hồi quy cụ thể.
+
+## Ba lần bản vá của chính đợt này gây hại
+
+1. **HT-031 vòng đầu** — hàm lọc URL biến `productLink` tương đối `/r/<slug>` (portal CỐ Ý dùng)
+   thành `https:///r/…`. Link chết, và phá luôn cơ chế thay link sống khi bản cũ bị thu hồi. Tệ
+   nhất: nó GHI XUỐNG DB nên không lùi lại được.
+2. **HT-018 vòng đầu** — chỉ vá đường desktop, để nguyên đường mobile. Lặp lại đúng cái bẫy
+   (nhiều bản cài đặt, vá nhầm cái không ai gọi) đã sinh ra chính finding đó.
+3. **HT-018 vòng đầu** — biến `GET /api/auth/logout` thành endpoint ghi DB → đẻ ra CSRF mới.
+
+## Còn lại 11 ID, tất cả đều Medium
+
+`HT-015` `HT-020` `HT-021` `HT-023` `HT-026` `HT-033` `HT-035` `HT-037` `HT-038` `HT-039` `HT-040`
+
+**Cả 6 High trong danh sách 42 đã đóng.**
+
+## Phát hiện MỚI, không nằm trong 42
+
+| # | Nội dung | Trạng thái |
+|---|----------|-----------|
+| N1 | `toggleTreasurer` cho OWNER cấp tenant ghi một cờ `User` **toàn cục** → gốc của chuỗi tự-cấp HT-022 | chưa vá, cần ticket riêng |
+| N2 | `admin/crm/[id]/page.tsx:33-42` — `include: { tasks }` thiếu `where: { workspaceId }` → rò `notes_vi` chéo workspace | chưa vá |
+| N3 | Hai script migration kéo hàng chứa mật khẩu Frame.io vào workspace | ✅ vá trong `524b9d6` |
+| N4 | `mission-control/McTaskDrawer.tsx:266` render `productLink` thô — vùng đóng băng | ✅ vá ở tầng dữ liệu `mc-task-drawer-data.ts` |
+| N5 | `audit-log.ts` — khối đọc header chưa bao giờ chạy (`=== undefined` luôn false) | ✅ vá trong `9dfbd06` |
+| N6 | `POST /api/profile/select` nhận JWT từ **body** rồi ký lại cookie → giặt token đã thu hồi | ✅ vá trong `3755000` |
+| N7 | ~20 server action/route xác thực CHỈ bằng `getSession()`, không kiểm `sessionVersion` — gồm `deleteProfile` (xoá cả tenant) và `searchContacts` (liệt kê email toàn hệ thống) | chưa vá — thuộc phạm vi HT-033 |
+| N8 | `middleware.ts:145-162` rolling-refresh chép nguyên `sessionVersion` cũ vào cookie 30 ngày mới → token cũ gần như bất tử ở các cửa thuộc N7 | chưa vá |
+
+## Việc của chủ dự án, code không làm thay được
+
+- **Đổi mật khẩu Frame.io.** Giá trị cũ đọc được bởi mọi tài khoản đăng nhập suốt vòng đời hàng
+  dữ liệu. Chạy `npx tsx scripts/delete-frame-credential-row.ts` (mặc định chỉ xem) để xoá hàng.
+- **Đổi toàn bộ secret trong `.env`** (DATABASE_URL, JWT_SECRET, CRON_SECRET, RESEND, UPSTASH,
+  TURNSTILE) — chúng đã nằm trong một artifact Electron trên đĩa. Lưu ý đổi JWT_SECRET sẽ vô hiệu
+  mọi phiên đang mở.
+- **Quyết định về việc AuditLog nay ghi IP khách mở portal chia sẻ** (hệ quả của HT-002).

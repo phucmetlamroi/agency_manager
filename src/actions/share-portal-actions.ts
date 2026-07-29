@@ -34,6 +34,7 @@ import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
 import { limitDb } from '@/lib/review/rate-limit-db'
+import { canonicalEmailKey } from '@/lib/review/email-key'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { generateOtp, hashOtp, verifyOtp, generateRandomToken } from '@/lib/otp'
 import { sendEmail } from '@/lib/email'
@@ -523,42 +524,19 @@ function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
 }
 
 /**
- * Collapse an address to the mailbox it actually reaches, for rate-limit keys ONLY.
- * Never store or send this — it is deliberately lossy. `+tag` suffixes are stripped for every
- * provider (universally a same-inbox alias); dots are stripped only for Gmail, which is the one
- * major provider that ignores them.
+ * [AUDIT HT-015] Câu "quá nhiều lần thử" kèm THỜI GIAN CHỜ THẬT.
+ *
+ * `limitDb` đã tính sẵn `retryAfterSec` mà mọi nơi gọi ở đây đều vứt đi, rồi in một câu cứng
+ * "thử lại sau một giờ" — sai với người bấm ở phút thứ 55, và không cho họ biết nên đợi bao lâu.
+ * Các route /r/ anh em đều trả `retryAfterSec` ra ngoài; làm theo.
  */
-const PLUS_ALIAS_DOMAINS = new Set([
-    'gmail.com', 'googlemail.com',
-    'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
-    'yahoo.com', 'ymail.com',
-    'icloud.com', 'me.com', 'mac.com',
-    'protonmail.com', 'proton.me', 'pm.me',
-    'fastmail.com', 'zoho.com', 'aol.com',
-])
-
-function notifyInboxKey(email: string): string {
-    const at = email.lastIndexOf('@')
-    if (at < 1) return email
-    let local = email.slice(0, at)
-    const domain = email.slice(at + 1)
-    // [Review round 2] Only for providers that DEFINITELY treat +tag as an alias of one
-    // mailbox. Stripping it everywhere was wrong: a company running its own mail server can
-    // provision ops@ and ops+vip@ as two real, separate mailboxes, and collapsing them meant
-    // three code requests to the first told the second "Too many attempts for this email"
-    // before it had ever asked for one. Unknown domains keep their local part intact — the
-    // worst case there is a cap that is merely per-address, which is where it started.
-    if (PLUS_ALIAS_DOMAINS.has(domain)) {
-        const plus = local.indexOf('+')
-        if (plus > 0) local = local.slice(0, plus)
+function tooManyAttempts(retryAfterSec: number, scopeNote?: string): { success: false; error: string } {
+    const mins = Math.max(1, Math.ceil(retryAfterSec / 60))
+    const when = mins === 1 ? 'about a minute' : `about ${mins} minutes`
+    return {
+        success: false,
+        error: `Too many attempts${scopeNote ? ` ${scopeNote}` : ''}. Please try again in ${when}.`,
     }
-    // Dots are ignored by Gmail only — and googlemail.com is the SAME mailbox as gmail.com,
-    // so it has to fold into one key or the alias this exists to close survives at half
-    // strength (a.b@googlemail.com and ab@gmail.com are one inbox, two buckets).
-    if (domain === 'gmail.com' || domain === 'googlemail.com') {
-        return `${local.replace(/\./g, '')}@gmail.com`
-    }
-    return `${local}@${domain}`
 }
 
 /** Current notify-email state for the portal Settings panel. Null = invalid token. */
@@ -589,21 +567,48 @@ export async function requestPortalNotifyEmail(
     if (!NOTIFY_EMAIL_RX.test(email) || email.length > 200) {
         return { success: false, error: 'Please enter a valid email address.' }
     }
-    // [AUDIT HT-015 fix] Cap verification emails PER TARGET INBOX with the PERSISTENT DB limiter
-    // (survives serverless cold-starts, unlike the in-memory rateLimit below). Without a per-inbox
-    // cap keyed on the destination address, the portal could be abused to email-bomb an arbitrary
-    // victim inbox (the per-link+ip cap doesn't bound how many distinct addresses one caller hits).
-    // [Authz 2026-07] Key on the DELIVERY inbox, not the typed string. The cap existed to stop
-    // this endpoint being used to email-bomb an arbitrary victim, but keying on the raw address
-    // meant victim+1@gmail.com, victim+2@… and v.i.c.t.i.m@… were three separate buckets
-    // delivering to one mailbox — 3/hour became unbounded for the cost of typing a plus sign.
-    const inboxRl = await limitDb(`portal-notify-inbox:${notifyInboxKey(email)}`, 3, 60 * 60)
-    if (!inboxRl.success) {
-        return { success: false, error: 'Too many attempts for this email. Please try again later.' }
-    }
+    // [AUDIT HT-015 fix] Chặn dùng endpoint này làm máy bắn thư vào một hộp thư bất kỳ.
+    //
+    // Bệnh gốc: cả hai chốt cũ đều là `rateLimit()` in-memory — reset mỗi lần cold-start và không
+    // chia sẻ giữa các instance serverless, tức trên Vercel gần như không chặn được gì. Nay dùng
+    // `limitDb` (bộ đếm bền trên Postgres) với `failClosed: true`: limitDb mặc định fail-OPEN cho
+    // sẵn sàng dịch vụ — đúng với đường ĐỌC — nhưng ở đây một sự cố DB sẽ biến endpoint thành máy
+    // gửi thư không giới hạn, nên thà chặn.
+    //
+    // HÌNH DẠNG CHỐT LẤY NGUYÊN CỦA LUỒNG KHÁCH /r/ (request-pin), là nơi codebase đã trả lời
+    // đúng câu hỏi này rồi. Mọi tầng đều gắn vào NGƯỜI GỬI (ip) hoặc NGƯỜI NHẬN (hộp thư), KHÔNG
+    // tầng nào chỉ gắn vào link.
+    //
+    // VÌ SAO KHÔNG CÓ TRẦN THEO LINK — vòng trước tôi thêm một cái 10/giờ và bị bác đúng chỗ này:
+    // xô đếm theo link là XÔ CHUNG SỐ PHẬN. Ai cầm link chuyển tiếp (đúng mô hình đe doạ của
+    // chính finding) chỉ cần bắn 10 lượt vào địa chỉ của chính họ là khách thật hết quota cả giờ,
+    // không đặt nổi email nhận thông báo, không đổi được khi chuyển hòm thư, không xin lại được
+    // mã khi mã cũ rơi vào spam. Chạy cron mỗi đầu giờ là khoá vĩnh viễn với giá 3 thư/giờ gửi
+    // cho chính mình. `share-link-auth.ts` đã ghi rõ bài học này và cố ý để tầng theo token ở
+    // 2000/phút chỉ làm "chốt chặn chạy loạn, không phải chốt sắc" — tôi thì đặt 10/GIỜ, chật hơn
+    // 12000 lần, ngay trong cùng luồng.
+    const inboxKey = canonicalEmailKey(email)
     const ip = await getRequestIp()
-    const rl = await rateLimit(`portal-notify-req:${scope.shareLinkId}:${ip}`, 5, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many attempts. Please try again in an hour.' }
+
+    // Tầng 1 — NGƯỜI GỬI. Bỏ qua hoàn toàn khi nền tảng không cho biết IP: `getRequestIp` trả
+    // chuỗi 'unknown', và gộp mọi khách vào một xô 'unknown' bền chính là lỗi khoá nhầm ở trên,
+    // chỉ khác là không tự lành sau cold-start nữa. `resolveShareToken` bỏ qua tầng IP của nó
+    // trong đúng tình huống này, vì đúng lý do này.
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`portal-notify-ip:${ip}`, 10, 60 * 60, { failClosed: true })
+        if (!ipRl.success) return tooManyAttempts(ipRl.retryAfterSec)
+    }
+    // Tầng 2 — chống bấm liên tục, và tầng 3 — chống bùng phát. Cả hai khoá theo (hộp thư, link).
+    const cooldown = await limitDb(`portal-notify-cd:${inboxKey}:${scope.shareLinkId}`, 1, 60, { failClosed: true })
+    if (!cooldown.success) return tooManyAttempts(cooldown.retryAfterSec)
+    const burst = await limitDb(`portal-notify-burst:${inboxKey}:${scope.shareLinkId}`, 3, 10 * 60, { failClosed: true })
+    if (!burst.success) return tooManyAttempts(burst.retryAfterSec)
+    // Tầng 4 — NGƯỜI NHẬN, và là chốt SẮC của finding này: trần theo hộp thư đích, tính chung
+    // trên MỌI link. Không có tầng này thì một botnet cầm nhiều link vẫn dồn thư về một nạn nhân,
+    // mỗi link một hạn mức riêng. Khoá theo hộp thư CHÍNH TẮC nên victim+1@, victim+2@ và
+    // v.i.c.t.i.m@ dùng chung một hạn mức thay vì mỗi cách viết được cấp một hạn mức mới.
+    const inboxRl = await limitDb(`portal-notify-inbox:${inboxKey}`, 10, 24 * 60 * 60, { failClosed: true })
+    if (!inboxRl.success) return tooManyAttempts(inboxRl.retryAfterSec, 'for this email address')
 
     const code = generateOtp()
     await prisma.clientShareLink.update({
@@ -632,8 +637,28 @@ export async function verifyPortalNotifyEmail(
     // Bound OTP brute-force: a 6-digit code with a 15-min TTL must not be guessable. Cap attempts
     // per link+ip (defense-in-depth on top of resolveShareToken's per-ip limiter).
     const ip = await getRequestIp()
-    const rl = await rateLimit(`portal-notify-verify:${scope.shareLinkId}:${ip}`, 10, NOTIFY_CODE_TTL_MS)
-    if (!rl.success) return { success: false, error: 'Too many attempts. Please try again later.' }
+    // [AUDIT HT-015 fix — lỗ liền kề, KHÔNG thuộc phạm vi finding] Chốt chống dò mã này cũng dùng
+    // bộ đếm in-memory, tức là trên serverless nó gần như không chặn được gì: mã 6 chữ số = 1 triệu
+    // tổ hợp, và mỗi cold-start/instance mới lại cho thêm 10 lượt. Cùng gốc bệnh với HT-015 nên
+    // chuyển sang bộ đếm bền luôn; ghi lại là phát hiện mới, không phải một phần của HT-015.
+    //
+    // ⚠️ ĐÍNH CHÍNH lý lẽ tôi viết vòng trước: đoán trúng mã KHÔNG cho kẻ tấn công "đặt email nhận
+    // thông báo của khách thành địa chỉ của họ". Xác thực chỉ THĂNG CẤP giá trị đang nằm ở
+    // notifyEmailPending, mà người duy nhất đặt được pending lại chính là người cầm token — họ chỉ
+    // cần xin mã về địa chỉ của mình rồi xác thực hợp lệ. Việc chuyển sang bộ đếm bền vẫn đúng
+    // (chốt in-memory trên serverless là chốt giả), nhưng lý do thì hẹp hơn tôi đã viết.
+    //
+    // CỐ Ý KHÔNG thêm trần theo link ở đây, dù bên request đã có nhiều tầng: trần theo link ở bước
+    // xác thực sẽ cho người cầm link khoá luôn bước xác thực của khách thật — đúng kiểu chặn dịch
+    // vụ mà bản vá này vừa gỡ bỏ ở bên request. Hệ quả còn lại đã ghi vào nợ: xoay IP thì mỗi IP
+    // lại được 10 lượt mới, trần thật là 2000/phút theo token của resolveShareToken.
+    const rl = await limitDb(
+        `portal-notify-verify:${scope.shareLinkId}:${ip}`,
+        10,
+        Math.ceil(NOTIFY_CODE_TTL_MS / 1000),
+        { failClosed: true },
+    )
+    if (!rl.success) return tooManyAttempts(rl.retryAfterSec)
     const link = await prisma.clientShareLink.findUnique({
         where: { id: scope.shareLinkId },
         select: { notifyEmailPending: true, notifyEmailCodeHash: true, notifyEmailCodeExpiresAt: true },

@@ -5,6 +5,31 @@ import { verifyActiveSession } from '@/lib/security'
 
 const GLOBAL_FRAME_TASK_ID = 'global-system-settings'
 
+/**
+ * [AUDIT HT-022 fix, vòng 3] Ai được chạm vào credential Frame.io DÙNG CHUNG.
+ *
+ * Hai vòng trước đều thất bại vì cùng một lý do, và lý do đó đáng ghi lại: KHÔNG CÓ CỜ NÀO
+ * TRONG DATABASE mà một người tự đăng ký không với tới được.
+ *   · vòng 1 — "OWNER/ADMIN của bất kỳ workspace nào": signup tự tạo workspace và tự phong OWNER.
+ *   · vòng 2 — "isTreasurer": vẫn tự cấp được qua chuỗi 4 bước, toàn bằng server action công khai —
+ *     đăng ký → createUser đúc tài khoản thứ hai TRONG CHÍNH profile mình (mật khẩu do mình đặt) →
+ *     inviteToWorkspace, cùng profile nên thêm thẳng không cần Accept → toggleTreasurer bật cờ
+ *     TOÀN CỤC cho tài khoản đó → đăng nhập bằng nó.
+ * Chốt "không được tự toggle cho mình" chỉ buộc kẻ tấn công dùng hai tài khoản, mà bước 2 đúc tài
+ * khoản thứ hai miễn phí.
+ *
+ * Nên thẩm quyền phải đến từ ngoài DB. Danh sách dưới đây đọc từ biến môi trường, thứ mà không
+ * server action nào ghi được. Bỏ trống = KHÔNG AI đọc được (fail-closed) — đúng ý muốn, vì tích
+ * hợp Frame.io đã bị module review thay thế và hàm này hiện không có caller nào trong repo.
+ */
+function isFrameOperator(email: string | null | undefined): boolean {
+    const raw = process.env.FRAME_ACCOUNT_OPERATORS
+    if (!raw || !email) return false
+    const allow = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    if (!allow.length) return false
+    return allow.includes(email.trim().toLowerCase())
+}
+
 export async function getFrameAccount() {
     // [AUDIT R1 — BLOCKER fix] These were unauthenticated server actions exposing a
     // shared credential to anyone. Require an authenticated, active (non-locked)
@@ -13,17 +38,9 @@ export async function getFrameAccount() {
     if (sess.status !== 'active') {
         return { account: '', password: '' }
     }
-    // [AUDIT HT-022 fix] Requiring merely an active session still let ANY authenticated user —
-    // including a self-signed-up USER in no workspace — read this SHARED plaintext credential.
-    // Restrict to privileged staff: a workspace OWNER/ADMIN (or treasurer). A normal user must
-    // never receive the shared Frame.io password.
-    const uid = (sess.session as any)?.user?.id as string | undefined
-    if (!uid) return { account: '', password: '' }
-    const adminMembership = await prisma.workspaceMember.findFirst({
-        where: { userId: uid, role: { in: ['OWNER', 'ADMIN'] } },
-        select: { id: true },
-    })
-    if (!adminMembership && !sess.isAdmin) {
+    // [AUDIT HT-022 fix] Xem isFrameOperator ở đầu file: thẩm quyền phải đến từ biến môi trường,
+    // vì mọi vai trong DB đều tự cấp được từ luồng đăng ký công khai.
+    if (!isFrameOperator(sess.dbUser?.email)) {
         return { account: '', password: '' }
     }
     try {
@@ -57,6 +74,13 @@ export async function updateFrameAccount(account: string, password: string) {
     const sess = await verifyActiveSession()
     if (sess.status !== 'active') {
         return { error: 'Bạn cần đăng nhập.' }
+    }
+    // [AUDIT HT-022 fix] Bản mô tả finding giả định hàm GHI này đã có phân quyền ("scope theo
+    // workspace ADMIN như updateFrameAccount") — nó KHÔNG có. Chỉ cần đăng nhập là ghi đè được
+    // credential dùng chung của cả hệ thống. Khoá đường ghi bằng đúng cổng của đường đọc: khoá
+    // một bên mà để hở bên kia thì kẻ tấn công chỉ cần ghi giá trị của mình vào rồi đọc lại.
+    if (!isFrameOperator(sess.dbUser?.email)) {
+        return { error: 'Bạn không có quyền thay đổi cài đặt dùng chung.' }
     }
     try {
         const payload = JSON.stringify({ account, password })

@@ -33,7 +33,7 @@ import {
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
 import { rateLimit } from '@/lib/rate-limit'
-import { limitDb } from '@/lib/review/rate-limit-db'
+import { limitDb, type RateLimitResult } from '@/lib/review/rate-limit-db'
 import { canonicalEmailKey } from '@/lib/review/email-key'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { generateOtp, hashOtp, verifyOtp, generateRandomToken } from '@/lib/otp'
@@ -530,12 +530,30 @@ function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
  * "thử lại sau một giờ" — sai với người bấm ở phút thứ 55, và không cho họ biết nên đợi bao lâu.
  * Các route /r/ anh em đều trả `retryAfterSec` ra ngoài; làm theo.
  */
-function tooManyAttempts(retryAfterSec: number, scopeNote?: string): { success: false; error: string } {
-    const mins = Math.max(1, Math.ceil(retryAfterSec / 60))
-    const when = mins === 1 ? 'about a minute' : `about ${mins} minutes`
+function formatWait(sec: number): string {
+    // Tầng hộp thư có cửa sổ 24 giờ, nên chia phút ra là "about 1440 minutes" — đúng số nhưng
+    // người đọc không dùng được. Đổi đơn vị theo độ lớn.
+    if (sec < 90) return 'about a minute'
+    const mins = Math.ceil(sec / 60)
+    if (mins < 90) return `about ${mins} minutes`
+    const hours = Math.ceil(mins / 60)
+    if (hours < 36) return hours === 1 ? 'about an hour' : `about ${hours} hours`
+    const days = Math.ceil(hours / 24)
+    return days === 1 ? 'about a day' : `about ${days} days`
+}
+
+function tooManyAttempts(rl: RateLimitResult, scopeNote?: string): { success: false; error: string } {
+    // [AUDIT HT-015 — vòng 2] PHÂN BIỆT "BẠN LÀM QUÁ NHIỀU" VỚI "PHÍA CHÚNG TÔI HỎNG".
+    // Với failClosed, một sự cố của limiter (thiếu bảng RateLimitBucket, statement timeout) cũng
+    // trả success=false kèm retryAfterSec = trọn cửa sổ — tức khách bị báo "quá nhiều lần thử, đợi
+    // khoảng 60 phút" cho một lỗi máy chủ mà họ không gây ra và đợi bao lâu cũng không hết. Chặn
+    // vẫn đúng; đổ lỗi cho khách thì không.
+    if (rl.errored) {
+        return { success: false, error: 'Something went wrong on our side. Please try again in a few minutes.' }
+    }
     return {
         success: false,
-        error: `Too many attempts${scopeNote ? ` ${scopeNote}` : ''}. Please try again in ${when}.`,
+        error: `Too many attempts${scopeNote ? ` ${scopeNote}` : ''}. Please try again in ${formatWait(rl.retryAfterSec)}.`,
     }
 }
 
@@ -596,19 +614,24 @@ export async function requestPortalNotifyEmail(
     // trong đúng tình huống này, vì đúng lý do này.
     if (ip !== 'unknown') {
         const ipRl = await limitDb(`portal-notify-ip:${ip}`, 10, 60 * 60, { failClosed: true })
-        if (!ipRl.success) return tooManyAttempts(ipRl.retryAfterSec)
+        if (!ipRl.success) return tooManyAttempts(ipRl)
     }
     // Tầng 2 — chống bấm liên tục, và tầng 3 — chống bùng phát. Cả hai khoá theo (hộp thư, link).
     const cooldown = await limitDb(`portal-notify-cd:${inboxKey}:${scope.shareLinkId}`, 1, 60, { failClosed: true })
-    if (!cooldown.success) return tooManyAttempts(cooldown.retryAfterSec)
+    if (!cooldown.success) return tooManyAttempts(cooldown)
     const burst = await limitDb(`portal-notify-burst:${inboxKey}:${scope.shareLinkId}`, 3, 10 * 60, { failClosed: true })
-    if (!burst.success) return tooManyAttempts(burst.retryAfterSec)
+    if (!burst.success) return tooManyAttempts(burst)
     // Tầng 4 — NGƯỜI NHẬN, và là chốt SẮC của finding này: trần theo hộp thư đích, tính chung
     // trên MỌI link. Không có tầng này thì một botnet cầm nhiều link vẫn dồn thư về một nạn nhân,
-    // mỗi link một hạn mức riêng. Khoá theo hộp thư CHÍNH TẮC nên victim+1@, victim+2@ và
-    // v.i.c.t.i.m@ dùng chung một hạn mức thay vì mỗi cách viết được cấp một hạn mức mới.
+    // mỗi link một hạn mức riêng. Khoá theo hộp thư CHÍNH TẮC nên victim+1@, victim+2@ (mọi domain)
+    // dùng chung một hạn mức thay vì mỗi cách viết được cấp một hạn mức mới.
+    // ⚠️ GIỚI HẠN THẬT CỦA CHỐT NÀY, nói đúng để người sau không tin quá: dấu chấm chỉ được bỏ cho
+    // gmail.com/googlemail.com. Nhà cung cấp khác cũng bỏ qua dấu chấm (ví dụ Google Workspace trên
+    // tên miền riêng) thì v.ictim@ và vi.ctim@ vẫn là các xô đếm riêng — hạn mức thực tế nhân lên
+    // theo số cách rắc dấu chấm. Không nới rộng ở đây vì với đa số nhà cung cấp, dấu chấm là ký tự
+    // THẬT của địa chỉ; gộp bừa sẽ khoá nhầm hai người khác nhau. Hành vi này giống hệt luồng /r/.
     const inboxRl = await limitDb(`portal-notify-inbox:${inboxKey}`, 10, 24 * 60 * 60, { failClosed: true })
-    if (!inboxRl.success) return tooManyAttempts(inboxRl.retryAfterSec, 'for this email address')
+    if (!inboxRl.success) return tooManyAttempts(inboxRl, 'for this email address')
 
     const code = generateOtp()
     await prisma.clientShareLink.update({
@@ -658,7 +681,7 @@ export async function verifyPortalNotifyEmail(
         Math.ceil(NOTIFY_CODE_TTL_MS / 1000),
         { failClosed: true },
     )
-    if (!rl.success) return tooManyAttempts(rl.retryAfterSec)
+    if (!rl.success) return tooManyAttempts(rl)
     const link = await prisma.clientShareLink.findUnique({
         where: { id: scope.shareLinkId },
         select: { notifyEmailPending: true, notifyEmailCodeHash: true, notifyEmailCodeExpiresAt: true },

@@ -12,6 +12,13 @@ export interface RateLimitResult {
     success: boolean
     remaining: number
     retryAfterSec: number
+    /**
+     * [AUDIT HT-015] True chỉ khi chính bộ đếm hỏng (nhánh catch), không phải khi người gọi vượt
+     * hạn mức. Cần để nơi gọi `failClosed` phân biệt được hai chuyện mà `success: false` gộp làm
+     * một: "bạn làm quá nhiều" và "phía chúng tôi hỏng". Trường TUỲ CHỌN nên mọi nơi gọi cũ không
+     * đổi hành vi; chỉ nơi nào muốn nói thật với người dùng mới cần đọc.
+     */
+    errored?: boolean
 }
 
 export async function limitDb(
@@ -42,7 +49,7 @@ export async function limitDb(
         reviewLog('error', 'rate_limit.error', { key, error: String(e) })
         // [AUDIT M5] Brute-force-sensitive callers (e.g. the pre-bcrypt cap on share /unlock) pass
         // failClosed:true so a limiter/DB outage can't silently disable throttling; reads stay fail-open.
-        return { success: !opts.failClosed, remaining: 0, retryAfterSec: windowSec }
+        return { success: !opts.failClosed, remaining: 0, retryAfterSec: windowSec, errored: true }
     }
 }
 

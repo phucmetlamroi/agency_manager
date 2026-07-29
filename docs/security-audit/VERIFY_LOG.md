@@ -1190,3 +1190,86 @@ hình thức; lần nào cũng kèm đường khai thác hoặc hồi quy cụ t
   TURNSTILE) — chúng đã nằm trong một artifact Electron trên đĩa. Lưu ý đổi JWT_SECRET sẽ vô hiệu
   mọi phiên đang mở.
 - **Quyết định về việc AuditLog nay ghi IP khách mở portal chia sẻ** (hệ quả của HT-002).
+
+---
+
+# PHẦN III — Đợt vá thứ hai: 11 ID Medium còn lại (2026-07-29/30)
+
+**Kết quả: 42/42 CONFIRMED đã xử lý.** 10 ID vá bằng mã, HT-021 đóng bằng quyết định của chủ
+dự án (giữ nguyên tự-nhận-diện khách quen, chấp nhận rủi ro). 13 commit trên nhánh
+`claude/security-remediation-2026-07`. `npx tsc --noEmit` và `npm run build` xanh. **Chưa push.**
+
+## Từng ID và số vòng bị phản biện lật
+
+| ID | Commit | Vòng bị BÁC | Cái phản biện tìm ra mà tôi không tự thấy |
+|---|---|---|---|
+| HT-040 | `f7a1b55` | 2 | Ghi `task.assigned` với actor null → 2 giao diện đang chạy hiển thị thành "khách hàng đã giao task"; 150 truy vấn trong transaction 5s mặc định → P2028 rollback tất cả |
+| HT-020 | `ebc9da7` | 2 | Bản vá VÔ TÁC DỤNG: tôi chặn Content-Type của presigned PUT, mà AWS SDK đưa header đó vào `unsignableHeaders`. Gốc: một **chú thích SAI trong repo** khẳng định ngược lại |
+| HT-026 | `f8133f8` | 1 | Vị từ nhận diện khách của tôi trả về tập RỖNG với khách thật — `clientId` là dấu vết LEGACY, không nơi nào trong mã ứng dụng ghi nó |
+| HT-039 | `c495969` | 4 | pg trộn chuỗi kết nối ĐÈ LÊN `ssl` → bản vá bị vứt bỏ; regex của tôi quét cả chuỗi thô nên "no-verify" nằm trong MẬT KHẨU cũng tắt được xác thực |
+| HT-023 | `305d376` | 4 | **Remedy trong tài liệu kiểm toán SAI** (`User.profileId` không bao giờ được ghi khi tham gia profile khác) → bản vá của tôi là no-op; rồi dấu APPROVED sống lâu hơn quyền ở 4 nơi thu hồi |
+| HT-037 | `66692ff` | 1 | File mới chưa `git add` → commit sẽ đóng lỗ hổng nhưng LÀM CHẾT bước cài đặt lần đầu |
+| HT-038 | `b5d1997` | 0 | duyệt ngay vòng đầu |
+| HT-035 | `a81dab7` | 1 | Chú thích kiểm toán của chính bản vá lọt vào THÂN EMAIL gửi đi thật (template đang chạy) |
+| HT-015 | `c298372` + `5dfbd7b` | 1 | Bản vá của tôi tạo ra CHẶN DỊCH VỤ MỚI: trần theo link là xô chung số phận — người cầm link chuyển tiếp khoá được khách thật |
+| HT-033 | `dec04ce` + `718adfe` | duyệt, 1 đính chính | Mục #11 của bảng ghi "xem finding riêng"; finding đó đã ĐÓNG là FALSE_POSITIVE và nói về chuyện khác → khoảng hở không thuộc về ai |
+
+**Tổng: 16 vòng bị bác trên 10 ID.**
+
+## Ba lần bản vá của chính đợt này GÂY HẠI
+
+1. **HT-035** — ba chú thích `<!-- -->` đặt trong template literal nên đi thẳng vào email gửi cho
+   editor: lộ mã finding, xác nhận từng có lỗ chèn HTML, và chỉ đúng trường đáng thử.
+2. **HT-015** — trần 10 thư/giờ theo link biến một lỗi tự-lành-sau-cold-start thành công cụ để
+   người cầm link khoá vĩnh viễn tính năng của khách thật, giá 3 thư/giờ gửi cho chính mình.
+3. **HT-015 (vòng 2)** — khi chính bộ đếm hỏng, hệ thống báo "bạn thử quá nhiều lần"; tức đổ lỗi
+   cho khách vì một sự cố máy chủ, đúng trong kịch bản dễ xảy ra nhất (bảng chưa có trên prod).
+
+## Bài học lặp lại đủ nhiều để ghi thành quy tắc
+
+**Tin MÔ TẢ thay vì đọc CƠ CHẾ — 5 lần.** Chú thích trong repo (HT-020), remedy của tài liệu
+kiểm toán (HT-023), mô hình dữ liệu trong đầu tôi (HT-026), bảng liệt kê tham số thư viện
+(HT-039), một ô trong bảng phát hiện (HT-033 mục #11).
+→ Đối sách đã dùng và đều bắt được lỗi thật: **chạy thứ thật** (cài `pg` thật, chạy AWS presigner
+thật) và **kiểm KẾT QUẢ, không kiểm DANH SÁCH** (hậu kiểm TLS ở HT-039, script
+`assert-r2-presign-contract.mjs` ở HT-020).
+
+**Bắt từng nơi gọi tự nhớ chính là cách lỗ hổng sinh ra.** HT-035: 8/9 template quên escape.
+HT-037/038: xoá hàm nhưng để lại tên kênh. → Vá ở ĐIỂM NGHẼN khi có (`wrapTemplate`, `setEnvVar`,
+`getAuthSession`, `getAuthUserId`), chỉ rải khi không có.
+
+## Đính chính cho các phần trước của tài liệu này
+
+- **HT-033 / N7 ghi cửa sổ phơi nhiễm là 7 ngày. SAI — là 30 ngày** (`src/lib/auth.ts:6-7`,
+  `DEFAULT_SESSION_DAYS = REMEMBER_ME_DAYS = 30`). Tài liệu kiểm toán đánh giá thấp hơn 4 lần.
+- **N7 nêu `searchContacts` như một đường liệt kê email đang sống. Không đúng hôm nay:**
+  `contact-actions.ts` không có nơi nào import (mã chết), nên nó không nằm trong action manifest.
+  Đã gác, nhưng như phòng thủ chiều sâu.
+- **N7 nay ĐÃ VÁ** qua HT-033 (`dec04ce` + `718adfe`), gồm cả `deleteProfile`.
+
+## Phát hiện MỚI của đợt này
+
+| # | Nội dung | Trạng thái |
+|---|----------|-----------|
+| N9 | 3/4 limiter in-memory còn lại trong `share-portal-actions.ts` (`client-create-task`, `client-submit-request`, `client-comment`) CÓ dẫn tới email thật qua `notifyStaff` → `createNotificationInternal` → `maybeSendNotificationEmail` (mặc định `emailEnabled=true, digestMode=REALTIME`). Nửa "uy tín tên miền gửi" của HT-015 vẫn hở qua ba đường này. **Tự kiểm chứng, không tin mô tả.** | chưa vá — cả bốn đều khoá theo `shareLinkId`, tức đúng hình dạng xô-chung-số-phận vừa bị bác ở HT-015. Chuyển sang bộ đếm bền y nguyên sẽ biến lỗi tự-lành thành lỗi khoá khách vĩnh viễn. **Cần chủ dự án chốt ngưỡng.** |
+| N10 | `wrapTemplate.ts:159` — `avatar()` nội suy `url` THÔ vào `img src`, đang chạy ở email bình luận task và email đổi trạng thái. Người phản biện nói "chỉ một nơi ghi `avatarUrl`" — **tôi kiểm và điều đó SAI: đăng nhập Google cũng ghi** (`google-auth.ts:189`, `:213`). Chưa khai thác được vì `info.picture` do Google trả về, nhưng bất biến thật là "mọi nơi ghi đều từ nguồn tin cậy", yếu hơn nhiều. `profile-actions.ts` còn sẵn dòng `// avatar: data.avatar` bị comment. | chưa vá — sửa là **một dòng** (`escapeHtml(url)`) |
+| N11 | `getStoredEnvVars()` (electron) KHÔNG lọc khoá, và `next-server.ts` trải thẳng kết quả vào `env` của tiến trình con → bất kỳ khoá nào lọt vào file store đều thành biến môi trường Node (`NODE_OPTIONS`…). Danh sách cho phép của HT-038 chỉ đối xứng ở chiều GHI. | chưa vá — một dòng `if (!isWritableEnvKey(key)) continue` |
+| N12 | `impersonation-actions.ts:78-84` select thiếu `sessionVersion` → token impersonation mang 0 và HỎNG với mọi tài khoản đích có `sessionVersion >= 1`. Có từ trước, không phải hồi quy. | chưa vá |
+| N13 | `savePushSubscription` upsert theo `endpoint` duy nhất và GHI ĐÈ `userId` → ai biết endpoint của người khác thì cướp/giết được kênh đẩy đó. | chưa vá |
+| N14 | `src/app/api/test-email/route.ts` tự ghi "DELETE after debugging", gác bằng `CRON_SECRET` mà mặc định là chuỗi đoán được `local-cron` → renderer fetch same-origin lấy được 6 ký tự đầu `RESEND_API_KEY`. | chưa vá |
+| N15 | Chín bản `escapeHtml` chép tay trong repo; và ngoài `email-templates.ts` KHÔNG có bản `safeEmailUrl` nào — `wrapTemplate.ts`, `guest-emails/wrap.ts` và 4 template auth đều đặt URL vào `href` không kiểm scheme. | chưa vá |
+
+## Việc của chủ dự án — BỔ SUNG cho đợt này
+
+- **⚠️ TRƯỚC KHI PHÁT HÀNH HT-015: xác nhận bảng `RateLimitBucket` có trên prod.** Nó chỉ tồn tại
+  trong `schema.prisma:2052`, KHÔNG có migration trong repo (được tạo bằng `db push`). Với
+  `failClosed: true`, thiếu bảng nghĩa là tính năng đặt email nhận thông báo CHẾT HẲN với mọi
+  khách, kèm câu báo lỗi đổ lỗi cho khách. (`/api/r/[slug]/unlock` đã dùng `failClosed` với cùng
+  bảng này trên `main`, nên nhiều khả năng có — vẫn phải xác nhận.)
+- **Chốt ngưỡng cho N9** (4 limiter còn lại): tôi không tự chọn con số vì ranh giới giữa "chốt
+  chặn chạy loạn" và "khoá nhầm khách" là quyết định sản phẩm. Đề xuất của người phản biện:
+  100–200/ngày theo link.
+- **TRƯỚC KHI PHÁT HÀNH HT-020**, chạy `SELECT "mimeType", count(*) FROM "CommentAttachment" GROUP BY 1;`
+- **SAU KHI PHÁT HÀNH HT-026**: các truy vấn đo mức độ đã lộ, ghi trong commit `f8133f8`.
+- **TRƯỚC KHI PHÁT HÀNH HT-023**: truy vấn đếm quyền cũ, ghi trong commit `305d376`.
+- **Quyết N10 và N11** — mỗi cái một dòng, nói một tiếng là vá.

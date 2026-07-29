@@ -818,11 +818,29 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
         `Khách hàng "${scope.clientName}" đã duyệt "${task.title}" (qua link chia sẻ). Task được đánh dấu Hoàn tất.`,
     )
 
+    // [AUDIT HT-006 fix] Chủ dự án đã chốt "khách duyệt = hoàn tất" (OPEN_QUESTIONS Q1, phương án
+    // b), nên hành vi kích hoạt tính lương giữ nguyên — đó là rủi ro đã được chấp nhận, không
+    // phải lỗi cần vá. Cái CÒN LẠI phải vá là vết kiểm toán: đây là lượt ghi duy nhất trong hệ
+    // thống vừa đưa task vào trạng thái TÍNH LƯƠNG vừa không có người dùng nào đứng tên.
+    //
+    // actorUserId buộc phải là null — người cầm link chia sẻ không có tài khoản User, không có
+    // id nào để điền. Nên phải ghi lại mọi thứ CÓ THỂ nhận dạng được: link nào, của khách nào,
+    // từ đâu, bằng trình duyệt gì. Nếu sau này tranh chấp "ai bấm duyệt cái này", đây là toàn bộ
+    // bằng chứng tồn tại. (ipAddress/userAgent nay được audit() tự lấy — xem HT-002.)
     void audit({
         workspaceId: task.workspaceId, actorUserId: null, action: 'task.client_approved',
         targetType: 'Task', targetId: taskId,
-        before: { status: task.status },
-        after: { status: 'Hoàn tất', clientReview: 'APPROVED', viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+        before: { status: task.status, clientReview: task.clientReview },
+        after: {
+            status: 'Hoàn tất',
+            clientReview: 'APPROVED',
+            triggersPayroll: true,
+            actor: 'share-link-holder (không có tài khoản User)',
+            viaShareLinkId: scope.shareLinkId,
+            clientId: scope.clientId,
+            clientName: scope.clientName,
+            ip: await getRequestIp(),
+        },
     })
 
     if (task.workspaceId) {

@@ -8,6 +8,7 @@ import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
 import { isValidStatus, type TaskStatus } from './statuses.js'
 import { assertWorkspaceMember, assertClientInProfile } from './guards.js'
+import { sanitizeExternalUrl } from '../safe-url.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -235,7 +236,11 @@ export async function updateTaskDetails(
     const updateData: Record<string, any> = {}
 
     // Non-financial fields
-    if (data.productLink !== undefined) updateData.productLink = data.productLink
+    // [AUDIT HT-031 fix] productLink được render làm `href` ở portal KHÁCH và app nội bộ, mà
+    // React không chặn `javascript:` trong href — nên đây phải lọc scheme y như các đường ghi
+    // bên web. Khả năng tiếp cận thấp (MCP chạy stdio trên máy chủ sở hữu), nhưng để hở một
+    // đường ghi là đủ để lỗ hổng sống lại.
+    if (data.productLink !== undefined) updateData.productLink = sanitizeExternalUrl(data.productLink)
     if (data.resources !== undefined) updateData.resources = data.resources
     if (data.references !== undefined) updateData.references = data.references
     if (data.notes !== undefined) updateData.notes_vi = data.notes

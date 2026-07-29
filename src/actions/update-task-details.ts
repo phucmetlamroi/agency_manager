@@ -4,20 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
 
-// [AUDIT HT-031 fix] Neutralize dangerous URI schemes before storing productLink — it is later
-// rendered as an <a href> in the CLIENT portal (DeliverableDetailPanel) and the staff app. A
-// `javascript:`/`data:`/`vbscript:` value there is stored XSS: an editor (assignee) could hijack
-// the client's portal session or forge an approval. Accept only http(s); prepend https:// to a
-// bare domain; drop anything carrying another scheme.
-function sanitizeExternalUrl(raw: string | undefined): string | undefined {
-    if (raw === undefined) return undefined
-    const s = String(raw).trim()
-    if (!s) return ''
-    if (/^https?:\/\//i.test(s)) return s
-    if (/^[a-z][a-z0-9+.\-]*:/i.test(s)) return '' // non-http scheme (javascript:, data:, …) → drop
-    return `https://${s}`
-}
+// [AUDIT HT-031 fix] Bản chép cục bộ đã chuyển sang @/lib/safe-url (xem import phía trên) —
+// ba đường ghi khác từng bị bỏ sót đúng vì logic này nằm rải rác.
 
 export async function updateTaskDetails(id: string, data: {
     resources?: string

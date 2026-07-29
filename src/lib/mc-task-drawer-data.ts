@@ -14,6 +14,15 @@ import { getTaskAssets } from '@/lib/review/task-assets'
 import { getDisplayName } from '@/lib/display-name'
 import type { McTaskDetail, McReviewAsset } from '@/components/mission-control/McTaskDrawer'
 
+import { sanitizeExternalUrl } from '@/lib/safe-url'
+
+// [AUDIT HT-031 fix] Trả null (không phải '#') vì McTaskDrawer gác bằng `detail.productLink &&`
+// — null làm nút biến mất hẳn, tốt hơn một nút trông bấm được nhưng không đi đâu.
+function safeExternal(raw: unknown): string | null {
+    const cleaned = sanitizeExternalUrl(typeof raw === 'string' ? raw : undefined)
+    return cleaned ? cleaned : null
+}
+
 const STATUS_HEX: Record<string, string> = {
     'Đang đợi giao': '#A855F7', 'Nhận task': '#3B82F6', 'Đã nhận task': '#3B82F6', 'Đang thực hiện': '#EAB308',
     'Đã nộp video (nội bộ)': '#6366F1', 'Đang sửa feedback (nội bộ)': '#F59E0B', 'Đã sửa feedback (nội bộ)': '#14B8A6', 'Revision': '#EF4444',
@@ -113,7 +122,11 @@ export async function buildMcTaskDrawerData(workspaceId: string, taskId: string)
         assignedByName: t.assignedBy ? getDisplayName(t.assignedBy) : null,
         deadline: fmtDT(t.deadline),
         wageVND: Number(t.wageVND ?? t.value ?? 0),
-        productLink: t.productLink && String(t.productLink).trim() ? String(t.productLink).trim() : null,
+        // [AUDIT HT-031 fix] McTaskDrawer render giá trị này thẳng vào `href` mà không lọc, và
+        // file component đó thuộc vùng Mission Control phải giữ nguyên byte. Lọc ở ĐÂY — tầng
+        // dữ liệu, ngoài vùng đóng băng — nên lỗ đóng được mà không chạm vào component. Nạn nhân
+        // ở màn này là admin, nên nó nặng hơn kịch bản khách trong finding gốc.
+        productLink: safeExternal(t.productLink),
         rawFootageLink: extractRaw(t.resources),
         createdAt: fmtDate(t.createdAt),
         updatedAt: fmtDate(t.updatedAt),

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { getSession } from '@/lib/auth'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
@@ -225,7 +226,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
                 fileLink: fileLink || null,
                 collectFilesLink: collectFilesLink || null,
                 submissionFolder: submissionFolder || null,
-                productLink: productLink || null,
+                // [AUDIT HT-031 fix] formData thô — chưa từng lọc scheme ở đường này.
+                productLink: sanitizeExternalUrl(productLink) || null,
                 frameUsername: frameUsername || null,
                 framePassword: framePassword || null,
                 frameNote: frameNote || null,

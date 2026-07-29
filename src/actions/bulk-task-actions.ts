@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { enforceAssigneeStatusInvariant, enforceStatusDeadlineInvariant, STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
@@ -145,7 +146,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         // Additional fields
                         fileLink: data.fileLink || null,
                         submissionFolder: data.submissionFolder || null,
-                        productLink: data.productLink || null,
+                        // [AUDIT HT-031 fix] lọc scheme trước khi lưu.
+                        productLink: sanitizeExternalUrl(data.productLink) || null,
                         frameUsername: data.frameUsername || null,
                         framePassword: data.framePassword || null,
                         frameNote: data.frameNote || null,
@@ -262,7 +264,8 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         if ('references' in data) updateData.references = data.references || null
         if ('notes' in data) updateData.notes_vi = data.notes || null
         if ('notes_en' in data) updateData.notes_en = data.notes_en || null
-        if ('productLink' in data) updateData.productLink = data.productLink || null
+        // [AUDIT HT-031 fix] lọc scheme trước khi lưu.
+        if ('productLink' in data) updateData.productLink = sanitizeExternalUrl(data.productLink) || null
         if ('deadline' in data) updateData.deadline = data.deadline ? parseVietnamDate(data.deadline) : null
         if ('jobPriceUSD' in data) updateData.jobPriceUSD = data.jobPriceUSD
         if ('value' in data) updateData.value = data.value

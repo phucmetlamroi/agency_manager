@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
@@ -118,6 +119,13 @@ export async function updateTask(id: string, input: any, workspaceId: string) {
             }
         }
         if (Object.keys(data).length === 0) return { error: 'No updatable fields provided' }
+
+        // [AUDIT HT-031 fix] Đây là ĐƯỜNG GHI THỨ HAI vào productLink mà bộ vá XSS trước bỏ sót:
+        // nhánh non-admin cho đúng editor được giao task đi qua, rồi ghi thô. `javascript:` lưu
+        // được ở đây sẽ chạy trong phiên của KHÁCH khi khách bấm link trên portal.
+        if (typeof data.productLink === 'string') {
+            data.productLink = sanitizeExternalUrl(data.productLink)
+        }
 
         // [AUDIT HT-007 fix] An admin may reassign, but only to someone who is actually in this
         // workspace's profile — otherwise the allowlist would still let a task be handed to an

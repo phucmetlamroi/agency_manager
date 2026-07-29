@@ -25,8 +25,12 @@ contextBridge.exposeInMainWorld('hustly', {
     // không mất chức năng nào. Wizard — nơi thật sự cần — nay dùng `wizard-preload.ts` riêng.
     // ⚠️ ĐỪNG thêm lại vào đây. Nếu về sau cần màn Cài đặt trong app, hãy trả về danh sách key
     // KHÔNG nhạy cảm qua một kênh riêng, đừng mở lại cả object.
-    setEnvVar: (key: string, value: string): Promise<void> =>
-        ipcRenderer.invoke('env:set', key, value),
+    //
+    // [AUDIT HT-038 fix] `setEnvVar` cũng đã gỡ. Đóng mỗi đường ĐỌC là chưa đủ: GHI dẫn tới đúng
+    // cái đích mà đọc từng dẫn tới. `setEnvVar('JWT_SECRET', <giá trị của kẻ tấn công>)` rồi khởi
+    // động lại là ký được phiên của bất kỳ admin nào — không cần đọc secret cũ, chỉ cần thay nó
+    // bằng cái mình biết. `setEnvVar('DATABASE_URL', …)` lái toàn bộ ứng dụng sang Postgres của
+    // kẻ tấn công. Cả hai giá trị này được next-server.ts trải vào env của tiến trình Next.js con.
 
     // ---------------------------------------------------------------------------
     // Window control
@@ -68,8 +72,9 @@ contextBridge.exposeInMainWorld('hustly', {
         // Cùng lý do, 'wizard:*' cũng chuyển sang wizard-preload: 'wizard:test-db' cho phép người
         // gọi bắt tiến trình chính kết nối tới MỘT máy chủ Postgres BẤT KỲ do họ chỉ định — không
         // có việc gì để web app chạm tới nó.
+        // [AUDIT HT-038 fix] 'env:set' gỡ nốt, đúng cái bẫy đã gặp ở HT-037: xoá hàm `setEnvVar`
+        // ở trên mà để tên kênh lại thì `invoke('env:set', …)` vẫn ghi được như thường.
         const allowedChannels = [
-            'env:set',
             'app:version',
             'cron:status',
         ]

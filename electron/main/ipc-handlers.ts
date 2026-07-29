@@ -5,7 +5,7 @@
  * exposed by the preload contextBridge.
  */
 import { ipcMain, app, BrowserWindow } from 'electron'
-import { getAllEnvVars, setEnvVar } from './env-manager'
+import { getAllEnvVars, setEnvVar, isWritableEnvKey, isValidEnvValue } from './env-manager'
 import { getCronJobNames } from './cron-scheduler'
 import { isWizardWebContents } from './setup-wizard'
 
@@ -63,8 +63,24 @@ export function registerIpcHandlers(): void {
         return getAllEnvVars()
     })
 
-    ipcMain.handle('env:set', (_event, key: string, value: string) => {
-        setEnvVar(key as any, value)
+    ipcMain.handle('env:set', (event, key: unknown, value: unknown) => {
+        // [AUDIT HT-038 fix] Cùng chốt danh tính với env:get-all. GHI cấu hình dẫn tới đúng cái
+        // đích mà ĐỌC từng dẫn tới: đổi JWT_SECRET thành giá trị mình biết là ký được phiên admin
+        // mà chẳng cần đọc secret cũ; đổi DATABASE_URL là lái cả ứng dụng sang Postgres của kẻ
+        // tấn công. Nên nó phải cùng một hàng rào, không phải hàng rào yếu hơn.
+        if (!isConfigWindow(event)) {
+            console.error(`[ipc] env:set bị TỪ CHỐI — người gọi không phải cửa sổ cấu hình: ${senderLabel(event)}`)
+            throw new Error('Not allowed')
+        }
+        // Vế thứ hai: `key as any` cũ vứt bỏ ràng buộc `K extends keyof EnvSchema`, mà electron-store
+        // thì không đặt additionalProperties:false — nên khoá tuỳ ý ghi được và sẽ được trải vào env
+        // của tiến trình Next.js con (NODE_OPTIONS, NODE_TLS_REJECT_UNAUTHORIZED…). Vị từ dưới đây
+        // thu hẹp kiểu THẬT, nên `as any` biến mất chứ không phải bị giấu đi.
+        if (!isWritableEnvKey(key) || !isValidEnvValue(value)) {
+            console.error(`[ipc] env:set bị TỪ CHỐI — khoá hoặc giá trị không hợp lệ: ${String(key)}`)
+            throw new Error('Not allowed')
+        }
+        setEnvVar(key, value)
     })
 
     // ---------------------------------------------------------------------------

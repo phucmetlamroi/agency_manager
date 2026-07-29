@@ -10,7 +10,7 @@
     "postinstall": "prisma generate && node scripts/maybe-db-push.mjs",
     "build:mcp": "cd mcp-server && npm run build",
     "build:electron": "cd electron && npm run build",
-    "build:desktop": "cross-env ELECTRON_DESKTOP=1 next build && cd mcp-server && npm run build && cd ../electron && npm run build",
+    "build:desktop": "cross-env ELECTRON_DESKTOP=1 next build && node scripts/assert-no-env-in-standalone.mjs && cd mcp-server && npm run build && cd ../electron && npm run build",
     "dev:electron": "cross-env ELECTRON_DESKTOP=1 next dev",
     "test:invite-security": "tsx scripts/test-invite-security.ts",
     "test:client-invariant": "tsx scripts/test-client-name-invariant.ts",

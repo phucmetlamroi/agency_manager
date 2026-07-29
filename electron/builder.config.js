@@ -74,7 +74,12 @@ const config = {
         {
             from: '../.next/standalone',
             to: 'standalone',
-            filter: ['**/*'],
+            // [AUDIT HT-029] `output: 'standalone'` chép NGUYÊN cây dự án, nên nó cuốn theo cả
+            // file .env thật. `filter: ['**/*']` trước đây đóng gói thẳng nó vào installer:
+            // ai cầm bản cài là đọc được JWT_SECRET (tự ký cookie cho bất kỳ tài khoản nào) và
+            // DATABASE_URL (nối thẳng Postgres, đi vòng qua mọi lớp phân quyền).
+            // Tuyến hai: scripts/assert-no-env-in-standalone.mjs làm gãy bản dựng nếu lọt.
+            filter: ['**/*', '!**/.env', '!**/.env.*'],
         },
         {
             from: '../.next/static',

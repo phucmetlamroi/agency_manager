@@ -12,6 +12,18 @@ import { Client } from 'pg'
 let wizardWindow: BrowserWindow | null = null
 
 /**
+ * [AUDIT HT-037 fix] Cửa sổ đang gọi IPC có ĐÚNG là wizard không?
+ *
+ * Đây là DANH TÍNH, không phải suy đoán: so id của WebContents với chính cửa sổ ta tự tạo.
+ * Trả false khi wizard chưa mở hoặc đã đóng — tức là suốt thời gian web app chạy, không WebContents
+ * nào khớp được, kể cả khi ai đó lỡ gắn nhầm preload.
+ */
+export function isWizardWebContents(webContentsId: number): boolean {
+    if (!wizardWindow || wizardWindow.isDestroyed()) return false
+    return wizardWindow.webContents.id === webContentsId
+}
+
+/**
  * Show the first-run setup wizard and wait for the user to complete it.
  *
  * @returns Promise that resolves when the wizard is done (env vars saved).
@@ -28,7 +40,9 @@ export function showSetupWizard(): Promise<void> {
             icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
             show: false,
             webPreferences: {
-                preload: path.join(__dirname, 'preload.js'),
+                // [AUDIT HT-037 fix] Preload RIÊNG. Wizard là cửa sổ DUY NHẤT được chạm cấu hình;
+                // cửa sổ ứng dụng chính (window-manager.ts) giữ `preload.js` đã bị thu hồi quyền đó.
+                preload: path.join(__dirname, 'wizard-preload.js'),
                 nodeIntegration: false,
                 contextIsolation: true,
                 sandbox: false, // need node for pg test connection via IPC

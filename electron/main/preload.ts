@@ -14,11 +14,17 @@ contextBridge.exposeInMainWorld('hustly', {
     isDesktop: true,
 
     // ---------------------------------------------------------------------------
-    // Environment / settings
+    // Environment / settings — ĐÃ GỠ
     // ---------------------------------------------------------------------------
-    getEnvVars: (): Promise<Record<string, string>> =>
-        ipcRenderer.invoke('env:get-all'),
-
+    // [AUDIT HT-037 fix] `getEnvVars` từng trả về NGUYÊN object secret hạ tầng (DATABASE_URL,
+    // JWT_SECRET, CRON_SECRET, RESEND_API_KEY, UPSTASH token…) cho renderer — mà renderer ở đây
+    // là toàn bộ web app Next.js. Bất kỳ XSS hay một dependency bị nhiễm nào cũng chỉ cần gọi
+    // `await window.hustly.getEnvVars()` là leo từ "chạy được script trong tab" lên "chiếm toàn bộ
+    // backend": JWT_SECRET ký được phiên của bất kỳ admin nào, DATABASE_URL mở thẳng Postgres prod.
+    // Web app KHÔNG hề dùng cầu nối này (grep `window.hustly` trong src/ = 0 kết quả), nên gỡ đi
+    // không mất chức năng nào. Wizard — nơi thật sự cần — nay dùng `wizard-preload.ts` riêng.
+    // ⚠️ ĐỪNG thêm lại vào đây. Nếu về sau cần màn Cài đặt trong app, hãy trả về danh sách key
+    // KHÔNG nhạy cảm qua một kênh riêng, đừng mở lại cả object.
     setEnvVar: (key: string, value: string): Promise<void> =>
         ipcRenderer.invoke('env:set', key, value),
 
@@ -56,13 +62,16 @@ contextBridge.exposeInMainWorld('hustly', {
     // ---------------------------------------------------------------------------
     invoke: (channel: string, ...args: unknown[]): Promise<unknown> => {
         // Whitelist channels to prevent arbitrary IPC from the renderer
+        // [AUDIT HT-037 fix] Gỡ 'env:get-all' khỏi đây NỮA. Chỉ xoá hàm `getEnvVars` ở trên là
+        // chưa đủ: cửa hậu này nhận tên kênh dạng chuỗi, nên `window.hustly.invoke('env:get-all')`
+        // vẫn lấy được toàn bộ secret. Đúng kiểu bẫy "vá một đường, để hở đường kia".
+        // Cùng lý do, 'wizard:*' cũng chuyển sang wizard-preload: 'wizard:test-db' cho phép người
+        // gọi bắt tiến trình chính kết nối tới MỘT máy chủ Postgres BẤT KỲ do họ chỉ định — không
+        // có việc gì để web app chạm tới nó.
         const allowedChannels = [
-            'env:get-all',
             'env:set',
             'app:version',
             'cron:status',
-            'wizard:complete',
-            'wizard:test-db',
         ]
         if (allowedChannels.includes(channel)) {
             return ipcRenderer.invoke(channel, ...args)

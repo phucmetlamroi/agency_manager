@@ -63,41 +63,14 @@ const store = new Store<EnvSchema>({
 // ---------------------------------------------------------------------------
 
 /**
- * Get all env vars as a flat Record suitable for `process.env` injection.
- * Only includes non-empty values.
- */
-export function getStoredEnvVars(): Record<string, string> {
-    const allVars = store.store // full object
-    const result: Record<string, string> = {}
-
-    for (const [key, value] of Object.entries(allVars)) {
-        if (typeof value === 'string' && value.length > 0) {
-            result[key] = value
-        }
-    }
-
-    return result
-}
-
-/**
- * Get every env var including empty ones (for settings UI).
- */
-export function getAllEnvVars(): EnvSchema {
-    return { ...store.store }
-}
-
-/**
- * [AUDIT HT-038 fix] Danh sách CHO PHÉP GHI — không phải danh sách cấm.
+ * [AUDIT N11 fix] Danh sách CHO PHÉP — dùng chung cho CẢ chiều ghi lẫn chiều đọc.
  *
  * electron-store 8.x biên dịch schema thành `{type:'object', properties:{…}}` và KHÔNG đặt
- * `additionalProperties: false`, nên `store.set('<khoá bất kỳ>', v)` vẫn qua được kiểm tra, rồi
- * `getStoredEnvVars()` trả nó về nguyên vẹn và `next-server.ts` trải thẳng vào `env` của tiến
- * trình Next.js con. Tức là ghi được khoá tuỳ ý = tiêm được biến môi trường vào một tiến trình
- * Node: NODE_OPTIONS (`--require` nhận cả đường dẫn UNC trên Windows),
- * NODE_TLS_REJECT_UNAUTHORIZED=0, NODE_EXTRA_CA_CERTS…
+ * `additionalProperties: false`, nên một khoá lạ lọt được vào file store vẫn đọc ra bình thường.
  *
  * Cố ý KHÔNG suy ra tự động từ `EnvSchema`: thêm trường mới vào schema thì trường đó MẶC ĐỊNH
- * KHÔNG ghi được cho tới khi có người thêm vào đây một cách có chủ đích. Fail-closed.
+ * không ghi được VÀ không được tiêm vào tiến trình con, cho tới khi có người thêm vào đây một
+ * cách có chủ đích. Fail-closed.
  */
 const WRITABLE_ENV_KEYS: readonly (keyof EnvSchema)[] = [
     'DATABASE_URL',
@@ -112,6 +85,43 @@ const WRITABLE_ENV_KEYS: readonly (keyof EnvSchema)[] = [
 
 export function isWritableEnvKey(key: unknown): key is keyof EnvSchema {
     return typeof key === 'string' && (WRITABLE_ENV_KEYS as readonly string[]).includes(key)
+}
+
+/**
+ * Get all env vars as a flat Record suitable for `process.env` injection.
+ * Only includes non-empty values.
+ *
+ * [AUDIT N11 fix] LỌC KHOÁ Ở ĐÂY NỮA, không chỉ ở `setEnvVar`.
+ *
+ * HT-038 dựng danh sách cho phép cho chiều GHI, nhưng để chiều ĐỌC không lọc gì — mà chiều đọc
+ * mới là chiều có hiệu lực: `index.ts` lấy kết quả hàm này và `next-server.ts` trải THẲNG vào
+ * `env` của tiến trình Next.js con. Nghĩa là bất kỳ khoá nào lọt vào file store bằng đường khác
+ * (file store chỉ được che bằng một `encryptionKey` hằng số nằm ngay trong mã, nên nó là lớp
+ * làm rối, không phải lớp bảo vệ) đều trở thành biến môi trường của một tiến trình Node:
+ * NODE_OPTIONS (`--require` nhận cả đường dẫn UNC trên Windows), NODE_TLS_REJECT_UNAUTHORIZED=0,
+ * NODE_EXTRA_CA_CERTS.
+ *
+ * Một hàng rào chỉ chắn một chiều thì không phải hàng rào. Nay hai chiều dùng chung một danh sách.
+ */
+export function getStoredEnvVars(): Record<string, string> {
+    const allVars = store.store // full object
+    const result: Record<string, string> = {}
+
+    for (const [key, value] of Object.entries(allVars)) {
+        if (!isWritableEnvKey(key)) continue
+        if (typeof value === 'string' && value.length > 0) {
+            result[key] = value
+        }
+    }
+
+    return result
+}
+
+/**
+ * Get every env var including empty ones (for settings UI).
+ */
+export function getAllEnvVars(): EnvSchema {
+    return { ...store.store }
 }
 
 /** Giá trị dài tối đa — không biến nào ở đây gần ngưỡng này; cốt để chặn ghi rác vào store. */

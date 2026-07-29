@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { headers } from 'next/headers'
+import { getRequestIpOrNull } from '@/lib/request-ip'
 
 /**
  * Audit log helper for security-sensitive workspace events.
@@ -155,15 +156,20 @@ export async function audit(opts: AuditOpts): Promise<void> {
         // Best-effort capture of request metadata.
         let ip = opts.ipAddress ?? null
         let ua = opts.userAgent ?? null
-        if (ip === undefined || ua === undefined) {
+        // [AUDIT HT-002 fix] This guard used to read `=== undefined`, but the two lines above
+        // already collapse undefined → null, so it was never true and the whole capture block
+        // below was dead: audit rows only ever got an IP when a caller passed one explicitly.
+        // Compare against null so the fallback actually runs.
+        if (ip === null || ua === null) {
             try {
-                const h = await headers()
-                if (ip === null || ip === undefined) {
-                    ip = h.get('x-forwarded-for')?.split(',')[0]?.trim()
-                        ?? h.get('x-real-ip')
-                        ?? null
+                if (ip === null) {
+                    // [AUDIT HT-002 fix] Was x-forwarded-for[0], which the caller controls — a
+                    // forged header wrote an attacker-chosen IP into the audit trail and could
+                    // pin activity on an innocent address.
+                    ip = await getRequestIpOrNull()
                 }
-                if (ua === null || ua === undefined) {
+                if (ua === null) {
+                    const h = await headers()
                     ua = h.get('user-agent') ?? null
                 }
             } catch {

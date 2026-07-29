@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { rateLimit } from '@/lib/rate-limit'
 import { checkLoginIp } from '@/lib/rate-limit-upstash'
+import { getRequestIpFromHeaders } from '@/lib/request-ip'
 import { UserRole } from '@prisma/client'
 import { randomInt } from 'crypto'
 
@@ -189,18 +190,10 @@ export async function loginAction(prevState: any, formData: FormData) {
     let userAgent: string | null = null
     try {
         const headersList = await headers()
-        // [AUDIT HT-002 fix] The LEFT tokens of a client-supplied x-forwarded-for are
-        // attacker-chosen — keying the per-IP login throttle on xff[0] lets a caller rotate the
-        // header to defeat it. Trust the platform headers Vercel sets to the TRUE client IP
-        // first, and only fall back to the RIGHT-most x-forwarded-for hop (closest trusted
-        // proxy), never the left-most one. Mirrors review getClientIp (rate-limit-db.ts).
-        const realIp = headersList.get('x-real-ip')?.trim()
-        const vercelFwd = headersList.get('x-vercel-forwarded-for')?.split(',').pop()?.trim()
-        const xffParts = headersList.get('x-forwarded-for')?.split(',').map((s) => s.trim()).filter(Boolean)
-        ip = realIp
-            || vercelFwd
-            || (xffParts && xffParts.length ? xffParts[xffParts.length - 1] : '')
-            || 'unknown-ip'
+        // [AUDIT HT-002 fix] Was a hand-copied version of the trusted-header order. Re-typing that
+        // logic is exactly how five other call sites ended up with the broken `xff[0]` variant, so
+        // it now lives in one place — see the note in @/lib/request-ip.
+        ip = await getRequestIpFromHeaders()
         userAgent = headersList.get('user-agent')
     } catch { /* edge runtime */ }
 

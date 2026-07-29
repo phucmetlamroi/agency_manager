@@ -2,6 +2,7 @@ import { getSession, logout } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { headers } from 'next/headers'
+import { getRequestIpOrNull } from '@/lib/request-ip'
 
 /**
  * GET /api/auth/logout
@@ -21,7 +22,9 @@ export async function GET() {
             let ua: string | null = null
             try {
                 const h = await headers()
-                ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || null
+                // [AUDIT HT-002 fix] Was x-forwarded-for[0] — caller-controlled, so the logout
+                // audit row recorded whatever IP the caller typed.
+                ip = await getRequestIpOrNull()
                 ua = h.get('user-agent')
             } catch { /* edge */ }
 

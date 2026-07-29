@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db'
 import { cookies, headers } from 'next/headers'
+import { getRequestIpOrNull } from '@/lib/request-ip'
 import { getSession } from '@/lib/auth'
 
 // Type definition for micro-events
@@ -118,7 +119,10 @@ export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' | 'BUSY' | 'OFFLIN
         const trackingId = cookieStore.get('tracking_session_id')?.value
         if (trackingId) {
             const h = await headers()
-            const ip = h.get('x-client-ip') || 'Unknown'
+            // [AUDIT HT-002 fix] `x-client-ip` không phải header của nền tảng nào — không ai đặt
+            // và không ai ghi đè nó, nên nó hoàn toàn do người gọi tự khai. Giá trị đó chảy thẳng
+            // vào Session.ipAddress, tức bảng dùng để truy vết lại về sau.
+            const ip = (await getRequestIpOrNull()) ?? 'Unknown'
             const country = h.get('x-client-country') || 'Unknown'
             const city = h.get('x-client-city') || 'Unknown'
 

@@ -394,20 +394,9 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
 }
 
-export async function logoutAction() {
-    // [AUDIT HT-018 fix] Bump sessionVersion so every OTHER outstanding JWT for this user
-    // (another device, or a copied token) is revoked at the DAL — clearing the cookie alone
-    // leaves a stolen token valid until its exp. Same mechanism as password-reset / email-migration.
-    try {
-        const session = await getSession()
-        const userId = (session?.user as any)?.id as string | undefined
-        if (userId) {
-            await prisma.user.update({
-                where: { id: userId },
-                data: { sessionVersion: { increment: 1 } },
-            })
-        }
-    } catch { /* best-effort — never block logout on a DB hiccup */ }
-    await logout()
-    redirect('/login')
-}
+// [AUDIT HT-018 fix] `logoutAction` ĐÃ BỊ XOÁ.
+//
+// Nó từng là bản cài đặt đăng xuất THỨ BA, có sẵn đoạn thu hồi token viết đàng hoàng — nhưng
+// KHÔNG AI GỌI. Lỗ hổng HT-018 sống được chính vì bản vá nằm trong code chết, trong khi hai
+// đường thật (route GET và ba layout) thì không có gì. Ba bản cài đặt là ba cơ hội để lệch nhau.
+// Nay chỉ còn MỘT: GET /api/auth/logout.

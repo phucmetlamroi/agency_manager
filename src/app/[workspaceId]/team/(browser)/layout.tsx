@@ -45,8 +45,12 @@ export default async function TeamBrowserLayout({
 
     const handleLogout = async () => {
         'use server'
-        await logout()
-        redirect('/login')
+        // [AUDIT HT-018 fix] Trước đây ba layout này gọi thẳng `logout()` — chỉ xoá cookie.
+        // Đây KHÔNG phải đường "đá ra ngoài": nó là nút "Đăng xuất" trong AccountSheet, tức
+        // đường đăng xuất của người dùng TRÊN DI ĐỘNG. Nên bấm nút đó trên điện thoại không thu
+        // hồi gì, còn bấm đúng nút đó trên máy tính thì có — cùng một nhãn, hai kết cục bảo mật.
+        // Nay dồn về đúng một đường /api/auth/logout (ghi nhật ký → thu hồi token → xoá cookie).
+        redirect('/api/auth/logout')
     }
 
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.

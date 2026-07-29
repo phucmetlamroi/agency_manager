@@ -3,11 +3,26 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 
+/**
+ * [AUDIT HT-033 fix] Chốt liveness đặt Ở ĐÂY, không rải ra từng action.
+ *
+ * getSession() chỉ giải mã JWT (cố ý không chạm DB để rẻ ở Edge), nên nó không thấy được tài
+ * khoản đã bị KHOÁ hay phiên đã bị thu hồi qua sessionVersion ("đăng xuất mọi thiết bị", đặt lại
+ * mật khẩu, đổi email). Cookie thì sống 7 ngày.
+ *
+ * Cả 8 hàm trong file này — đọc lẫn ghi — đều đi qua đúng hàm này, nên đặt chốt tại đây phủ được
+ * cả sendContactRequest/respondToContactRequest/blockContact/unblockContact (các đường GHI mà
+ * finding liệt kê) LẪN searchContacts (đường liệt kê email/tên toàn hệ thống). Quan trọng hơn:
+ * hàm thứ 9 viết sau này cũng được phủ mà người viết không phải nhớ gì — đúng bài học lặp lại
+ * của chiến dịch này (HT-035: 8/9 template quên escape vì mỗi nơi phải tự nhớ).
+ */
 async function getAuthSession(): Promise<{ userId: string; profileId: string } | null> {
     const session = await getSession()
     if (!session?.user?.id) return null
     const profileId = (session.user as any)?.sessionProfileId
     if (!profileId) return null
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return null
     return { userId: session.user.id, profileId }
 }
 

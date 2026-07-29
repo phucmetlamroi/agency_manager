@@ -11,6 +11,12 @@ import { audit } from '@/lib/audit-log'
 export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
+    // [AUDIT HT-033 fix] Đổi mật khẩu bằng token của một phiên ĐÃ BỊ THU HỒI là đúng thứ mà việc
+    // thu hồi phiên sinh ra để chặn: admin bấm "đăng xuất mọi thiết bị" hoặc đặt lại mật khẩu cho
+    // một tài khoản nghi bị chiếm, thao tác đó bump sessionVersion — nhưng getSession() không đọc
+    // DB nên cookie cũ vẫn qua, và kẻ đang giữ cookie đó đặt lại mật khẩu trước chủ tài khoản.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
     // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the
     // session principal is the impersonated victim, so this would silently plant a

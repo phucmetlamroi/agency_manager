@@ -98,6 +98,12 @@ export async function pingHeartbeat(status: 'ONLINE' | 'AWAY' | 'BUSY' | 'OFFLIN
         const session = await getSession()
         const currentUserId = session?.user?.id
         if (!currentUserId) return { success: false, reason: 'Unauthenticated' }
+        // [AUDIT HT-033 fix] getSession() không đọc DB, nên nhịp tim của một tài khoản ĐÃ BỊ KHOÁ
+        // vẫn ghi được UserPresence + Session. Hệ quả không chỉ là một dòng thừa: bảng hiện diện
+        // là thứ admin nhìn để biết ai đang online, nên người vừa bị khoá vẫn hiện "đang hoạt
+        // động" — vừa sai sự thật, vừa che mất chính việc lệnh khoá đã có hiệu lực hay chưa.
+        const { isSessionLive } = await import('@/lib/profile-permissions')
+        if (!(await isSessionLive(session))) return { success: false, reason: 'Unauthenticated' }
 
         await prisma.userPresence.upsert({
             where: { userId: currentUserId },

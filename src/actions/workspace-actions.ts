@@ -23,7 +23,16 @@ export async function createWorkspaceAction(formData: FormData) {
     }
 
     // [Sprint Z] RBAC gate — Owner hoặc Admin role mới được tạo workspace.
-    const { canCreateWorkspace } = await import('@/lib/profile-permissions')
+    const { canCreateWorkspace, isSessionLive } = await import('@/lib/profile-permissions')
+    // [AUDIT HT-033 fix] NỬA SAU CỦA ĐƯỜNG NÉ LỆNH KHOÁ. canCreateWorkspace chỉ đọc
+    // ProfileAccess.role — nó KHÔNG BAO GIỜ đọc User.role hay User.sessionVersion. Nên một tài
+    // khoản đã bị khoá vẫn "có quyền" theo nghĩa của vị từ đó, và nếu nó vừa tự tạo Profile ở
+    // createProfileForUser thì nó chính là OWNER của profile mới → qua cổng dễ dàng.
+    // Vị từ phân quyền trả lời "vai trò này được làm gì"; nó không trả lời "tài khoản này còn
+    // sống không". Phải hỏi cả hai.
+    if (!(await isSessionLive(session))) {
+        return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
+    }
     if (!(await canCreateWorkspace(session.user.id, profileId))) {
         return { error: 'Bạn không có quyền tạo Workspace trong Profile này. Chỉ Owner và Admin mới được tạo.' }
     }

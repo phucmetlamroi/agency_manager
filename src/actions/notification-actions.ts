@@ -8,9 +8,26 @@ import { maybeSendNotificationEmail } from '@/lib/notification-email'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { sendWebPushToUser } from '@/lib/web-push'
 
+/**
+ * [AUDIT HT-033 fix] Chốt liveness đặt Ở ĐÂY, không rải ra từng action.
+ *
+ * getSession() chỉ giải mã JWT (cố ý không chạm DB), nên nó không thấy tài khoản đã bị KHOÁ hay
+ * phiên đã bị thu hồi qua sessionVersion. Cả 8 nơi gọi hàm này trong file đều là thao tác NHÂN
+ * DANH CHÍNH NGƯỜI ĐANG ĐĂNG NHẬP (đánh dấu đã đọc, lưu trữ, đổi tuỳ chọn thông báo, đọc danh
+ * sách của mình), nên chốt đặt tại đây phủ đủ và phủ luôn hàm viết sau này.
+ *
+ * ⚠️ CỐ Ý KHÔNG đụng tới createNotificationInternal / createBulkNotificationsInternal /
+ * createAndBroadcastNotifications: chúng chạy phía máy chủ để tạo thông báo cho NGƯỜI KHÁC, nhận
+ * userId qua tham số và KHÔNG gọi hàm này. Gác chúng theo phiên người gọi sẽ làm hỏng toàn bộ
+ * fan-out thông báo — đã kiểm bằng cách liệt kê từng nơi gọi getAuthUserId (8 chỗ, không có 3
+ * hàm đó).
+ */
 async function getAuthUserId(): Promise<string | null> {
     const session = await getSession()
-    return session?.user?.id || null
+    if (!session?.user?.id) return null
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return null
+    return session.user.id
 }
 
 const GROUPING_WINDOW_MS = 5 * 60 * 1000  // 5 minutes

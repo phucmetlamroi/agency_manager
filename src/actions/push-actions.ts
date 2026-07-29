@@ -24,6 +24,11 @@ export async function savePushSubscription(sub: {
     const session = await getSession()
     const userId = session?.user?.id
     if (!userId) return { error: 'Bạn cần đăng nhập.' }
+    // [AUDIT HT-033 fix] getSession() không đọc DB nên không thấy tài khoản đã bị khoá / phiên đã
+    // thu hồi. Đăng ký push là đường GHI tạo một kênh đẩy BỀN tới thiết bị: nếu không chặn, người
+    // vừa bị khoá vẫn tự cắm thêm thiết bị nhận thông báo và tiếp tục nhận nội dung nội bộ.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
     const endpoint = (sub?.endpoint || '').trim()
     const p256dh = (sub?.keys?.p256dh || '').trim()
@@ -46,6 +51,15 @@ export async function savePushSubscription(sub: {
     return { success: true }
 }
 
+/**
+ * [AUDIT HT-033 fix — CỐ Ý KHÔNG GÁC LIVENESS Ở ĐÂY]
+ *
+ * Finding liệt kê cả hàm này, nhưng gác nó lại làm hệ thống KÉM an toàn hơn: đây là đường GỠ một
+ * kênh đẩy thông báo. Chặn tài khoản đã bị khoá gỡ đăng ký nghĩa là thiết bị của họ vẫn tiếp tục
+ * nhận thông báo nội bộ được đẩy tới. Xoá vốn đã bị giới hạn theo `userId` của chính người gọi
+ * (không gỡ được của người khác), nên chiều tấn công duy nhất là tự gỡ của mình — vô hại.
+ * Nguyên tắc: chốt liveness gác đường TẠO/MỞ RỘNG quyền, không gác đường THU HẸP quyền.
+ */
 export async function deletePushSubscription(endpoint: string): Promise<{ success?: boolean }> {
     const session = await getSession()
     const userId = session?.user?.id

@@ -193,6 +193,11 @@ export async function updateProfile(userId: string, data: {
         // own account; the client-supplied userId is ignored.
         const session = await getSession()
         if (!session?.user?.id) return { error: 'Unauthorized' }
+        // [AUDIT HT-033 fix] getSession() chỉ giải mã JWT — không chạm DB, nên không thấy được
+        // tài khoản đã bị KHÓA hay phiên đã bị thu hồi (sessionVersion). Cùng chốt với
+        // updateProfileSettings/deleteProfileAction ngay trong file này.
+        const { isSessionLive } = await import('@/lib/profile-permissions')
+        if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
         const targetId = session.user.id
 
         await prisma.user.update({
@@ -234,6 +239,14 @@ export async function createProfileForUser(name: string) {
     if (!session?.user?.id) {
         return { error: 'Bạn cần đăng nhập' }
     }
+    // [AUDIT HT-033 fix] ĐÂY LÀ NỬA ĐẦU CỦA ĐƯỜNG NÉ LỆNH KHOÁ, và là lý do finding này tồn tại.
+    // Admin đặt role=LOCKED cho X, nhưng cookie JWT của X còn hiệu lực tới 7 ngày và getSession()
+    // không hề đọc DB. X gọi thẳng action này (nó nằm trong action manifest vì được client
+    // component tham chiếu, tức gọi được từ bên ngoài) → tạo Profile mới → tự thành OWNER qua
+    // ProfileAccess → gọi createWorkspaceAction (nửa sau) → có workspace hoạt động bình thường.
+    // Lệnh khoá tài khoản bị vô hiệu hoàn toàn mà không cần khai thác gì thêm.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
     const trimmed = name?.trim()
     if (!trimmed) return { error: 'Tên profile không được để trống' }
@@ -512,6 +525,11 @@ export async function changePassword(userId: string, currentPass: string, newPas
         // account; the client-supplied userId is ignored.
         const session = await getSession()
         if (!session?.user?.id) return { error: 'Unauthorized' }
+        // [AUDIT HT-033 fix] Đổi mật khẩu là đường ghi thông tin đăng nhập. Tài khoản đã bị khoá
+        // hoặc phiên đã bị thu hồi (chính "đăng xuất mọi thiết bị" / đặt lại mật khẩu bump
+        // sessionVersion) không được phép đặt lại mật khẩu bằng token cũ.
+        const { isSessionLive } = await import('@/lib/profile-permissions')
+        if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
         const targetId = session.user.id
 
         // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the

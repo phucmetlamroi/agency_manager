@@ -76,6 +76,12 @@ export async function completeUsernameMigration(
     try {
         const session = await getSession()
         if (!session?.user?.id) return { error: 'Chưa đăng nhập.' }
+        // [AUDIT HT-033 fix] getSession() không đọc DB nên không thấy tài khoản đã bị khoá / phiên
+        // đã thu hồi. Username là ĐỊNH DANH hiển thị khắp hệ thống (nhắc tên, danh sách mời, nhật
+        // ký), nên để một tài khoản đã bị khoá đổi nó là để họ đổi cách mình xuất hiện trong dữ
+        // liệu của người khác sau khi đã bị cấm.
+        const { isSessionLive } = await import('@/lib/profile-permissions')
+        if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
         const username = (newUsername ?? '').trim()
         const validation = validateUsername(username)

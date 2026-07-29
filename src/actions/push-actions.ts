@@ -58,7 +58,13 @@ export async function savePushSubscription(sub: {
  * kênh đẩy thông báo. Chặn tài khoản đã bị khoá gỡ đăng ký nghĩa là thiết bị của họ vẫn tiếp tục
  * nhận thông báo nội bộ được đẩy tới. Xoá vốn đã bị giới hạn theo `userId` của chính người gọi
  * (không gỡ được của người khác), nên chiều tấn công duy nhất là tự gỡ của mình — vô hại.
- * Nguyên tắc: chốt liveness gác đường TẠO/MỞ RỘNG quyền, không gác đường THU HẸP quyền.
+ * Nguyên tắc rút ra: chốt liveness gác đường TẠO/MỞ RỘNG quyền; với đường CHỈ thu hẹp quyền của
+ * chính mình thì gác lại phản tác dụng.
+ * ⚠️ "CHỈ thu hẹp" là điều kiện chặt, không phải khẩu hiệu. `updateMyNotificationPreferences`
+ * trông giống trường hợp này (tắt được email) nhưng nó BẬT được nữa, nên vẫn phải gác — người
+ * phản biện đã chỉ đúng rằng tôi phát biểu nguyên tắc rộng hơn cái mã thực sự làm. Hệ quả chấp
+ * nhận: tài khoản bị khoá không tự tắt được email thông báo. Ghi ra để người sau không lấy dòng
+ * này làm cớ mở thêm ngoại lệ.
  */
 export async function deletePushSubscription(endpoint: string): Promise<{ success?: boolean }> {
     const session = await getSession()

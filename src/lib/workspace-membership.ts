@@ -22,7 +22,8 @@ import { prisma } from '@/lib/db'
 /**
  * [AUDIT R14 — fix] True if `userId` already belongs to the workspace's PROFILE — a
  * native member (User.profileId), a ProfileAccess holder, or a WorkspaceMember row.
- * Gate assigneeId on this BEFORE createTask/assignTask provisions it via
+ * Gate assigneeId on this BEFORE createTask/createTasksFromBatch/bulkAssignTasks/updateTaskManager
+ * provisions it via
  * ensureWorkspaceMembership (which upserts a ProfileAccess for any global userId, an
  * unsanctioned cross-tenant member-injection primitive). A user with NO profile
  * affiliation at all is also rejected — net-new people must come through the gated

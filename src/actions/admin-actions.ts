@@ -358,7 +358,7 @@ export async function updateTaskManager(taskId: string, managerId: string, works
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const profileId = await resolveWorkspaceProfileId(workspaceId)
         if (!profileId || typeof profileId !== 'string') {
-            return { error: 'Lỗi nội bộ: profileId thiếu.' }
+            return { error: 'Workspace này chưa gắn Profile — không thể đổi Người quản lý. Báo quản trị viên.' }
         }
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

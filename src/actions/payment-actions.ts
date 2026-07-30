@@ -63,9 +63,19 @@ export async function recordPayment(input: RecordPaymentInput, workspaceId: stri
         if (!Number.isInteger(clientId)) return { success: false as const, error: 'Khách hàng không hợp lệ.' }
 
         // Anti cross-tenant: the client must be ACTIVE and in this workspace's profile.
+        // [PHẢN BIỆN vòng 3 · BP-3] Chốt này TỰ TAN khi `ws.profileId` là NULL: `...( ? : {})` bỏ
+        // luôn điều kiện, biến truy vấn thành tra `Client` theo id TOÀN CỤC — không hàng rào tenant
+        // nào (Client nằm trong bypassModels). Chú thích CS-C4 ở helper `access()` khẳng định chốt
+        // này "cross-tenant-safe" là SAI đúng ở tình huống mà nhánh lùi về claim tồn tại để phục vụ.
+        // Nay FAIL CLOSED: không xác định được profile thì từ chối ghi tiền, không đoán.
+        // ⚠️ `ws` cũng chính là hàng mà `access()` vừa đọc — giữ hai lần đọc ở đây là cố ý: hàm này
+        // cần `ws.profileId` THÔ (không qua nhánh lùi claim) để chốt không bị nhánh lùi làm mềm đi.
         const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        if (!ws?.profileId) {
+            return { success: false as const, error: 'Workspace chưa gắn Profile — không thể ghi nhận thanh toán.' }
+        }
         const client = await prisma.client.findFirst({
-            where: { id: clientId, status: 'ACTIVE', ...(ws?.profileId ? { profileId: ws.profileId } : {}) },
+            where: { id: clientId, status: 'ACTIVE', profileId: ws.profileId },
             select: { id: true, name: true },
         })
         if (!client) return { success: false as const, error: 'Khách hàng không tồn tại trong workspace này.' }
@@ -112,7 +122,9 @@ export async function recordPayment(input: RecordPaymentInput, workspaceId: stri
             data: {
                 clientId,
                 workspaceId,
-                profileId: profileId ?? ws?.profileId ?? null,
+                // [PHẢN BIỆN vòng 3 · BP-5] `?? ws?.profileId` là nhánh CHẾT: helper `access()` đã ưu tiên
+                // `ws.profileId` rồi, nên nếu nó null thì biểu thức này cũng null. Bỏ cho khỏi đánh lừa.
+                profileId: profileId ?? null,
                 amount,
                 paidAt,
                 method: clean(input.method, 60),

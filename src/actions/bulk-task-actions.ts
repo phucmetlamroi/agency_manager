@@ -299,12 +299,26 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         // miền HustlyTasker. Hàng Task mang assigneeId của nạn nhân còn lọt vào truy vấn lương của
         // workspace lạ.
         //
-        // Dùng nguyên khuôn của `bulkAssignTasks` trong chính file này (~:810), đặt TRƯỚC transaction.
+        // Dùng khuôn của `bulkAssignTasks` trong chính file này, đặt TRƯỚC transaction.
+        //
+        // ⚠️ [PHẢN BIỆN vòng 3 · CS4-R1] Lần vá đầu chép THIẾU MỘT NỬA khuôn đó rồi chú thích lại
+        // ghi là "nguyên khuôn" — thiếu chốt THẺ ĐỎ (Rank D). Hệ quả: đây thành cửa gán việc DUY
+        // NHẤT không chặn nhân sự đang bị phạt, tức lặp lại đúng lỗi R7-1 vừa vá cho MCP
+        // (`claim_task` là cửa thứ 5 đi vòng chốt thẻ đỏ) — chỉ khác là ở web.
         if ('assigneeId' in data && data.assigneeId) {
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
             const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId)
             if (!assigneeAllowed) {
                 return { error: 'Editor được chọn không thuộc workspace/profile này.' }
+            }
+            // Chốt thẻ đỏ — vị ngữ chép đúng `bulkAssignTasks` để hai cửa không trả lời khác nhau
+            // về cùng một người.
+            const latestRank = await prisma.monthlyRank.findFirst({
+                where: { userId: data.assigneeId, workspaceId },
+                orderBy: { createdAt: 'desc' },
+            })
+            if (latestRank && latestRank.rank === 'D') {
+                return { error: 'Không thể giao Task: Nhân sự đang bị Cảnh cáo Đỏ (Rank D).' }
             }
         }
 

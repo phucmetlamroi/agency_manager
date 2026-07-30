@@ -81,13 +81,31 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
             nickname: true,
             role: true,
             email: true,
+            // [AUDIT N12 fix] `sessionVersion` PHẢI có mặt. `createImpersonationSession` trải
+            // `...targetUser` vào JWT, nên thiếu trường này thì token mang `undefined`, và mọi
+            // chốt liveness đọc nó bằng `?? 0` — tức phiên đóng vai luôn mang phiên bản 0.
+            // Hệ quả: đóng vai BẤT KỲ AI từng "đăng xuất mọi thiết bị", đặt lại mật khẩu hay
+            // đổi email (đều bump sessionVersion ≥ 1) sẽ CHẾT NGAY: verifyActiveSession
+            // (security.ts) và getCurrentUser (auth-guard.ts) so `token < db` rồi từ chối, mà
+            // verifyActiveSession chạy ở layout admin/dashboard/team nên admin bị đá ra trước
+            // khi kịp làm gì. Đây là BUG CHỨC NĂNG có sẵn, không phải lỗ hổng — và nó âm thầm,
+            // vì trông như "impersonation không hoạt động" chứ không báo nguyên nhân.
+            sessionVersion: true,
         } // Only passing essential info
     })
 
     if (!targetUser) throw new Error('User not found')
     if (targetUser.role === 'ADMIN') throw new Error('Không thể đóng vai tài khoản quản trị.')
 
-    await createImpersonationSession(session.user, targetUser)
+    await createImpersonationSession(session.user, {
+        ...targetUser,
+        // [AUDIT N12 fix] Phiên đăng nhập thường luôn có `sessionProfileId`
+        // (auth.ts:37 `loginWithProfile`), phiên đóng vai thì không — nên những chỗ đọc thẳng
+        // claim đó (contact-actions.getAuthSession, crm-actions, …) coi như chưa chọn profile và
+        // trả rỗng. Đóng vai được giới hạn trong ĐÚNG workspace này, nên profile đang hoạt động
+        // chính là profile sở hữu workspace đó.
+        sessionProfileId: currentProfileId,
+    })
 
     // AUDIT: impersonation is a privileged op — always log.
     await audit({

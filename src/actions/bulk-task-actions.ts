@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
@@ -66,8 +67,12 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
 
         // Get current profile ID for isolation
         const { user } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-        // Authorization checked above
-        const currentProfileId = (user as any)?.sessionProfileId
+        // [PHẢN BIỆN 2026-07-30 · CS-4] Phạm vi dữ liệu lấy từ profile CỦA WORKSPACE — cùng nguồn
+        // cổng vừa chấm — chứ KHÔNG từ claim `sessionProfileId`. Với claim, hàm này ghi được N hàng
+        // Task đóng dấu profile của tenant khác, và bắn `createNotificationInternal` một lần MỖI
+        // tiêu đề (do kẻ tấn công soạn) vào chuông của editor thuộc tenant đó. Guard `!currentProfileId`
+        // ngay dưới đã fail-closed sẵn — chỉ đầu vào của nó là sai.
+        const currentProfileId = await resolveWorkspaceProfileId(workspaceId)
 
         // [Sprint T] GUARD: workspaceId + profileId BẮT BUỘC phải có để tránh
         // orphan tasks (root cause của bug "task bị ẩn khỏi admin workspace").
@@ -96,7 +101,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             // [AUDIT R14 — fix] The assignee must belong to THIS workspace's profile —
             // don't let an admin glue a batch of tasks to a foreign-tenant user.
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
-            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId, currentProfileId)
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId)
             if (!assigneeAllowed) {
                 return { error: 'Editor được chọn không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
             }

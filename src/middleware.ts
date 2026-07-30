@@ -155,7 +155,7 @@ export async function middleware(request: NextRequest) {
                 maxAge: SESSION_MAX_AGE,
                 httpOnly: true,
                 // Khớp secure của auth.ts (Electron desktop chạy http → không đặt secure).
-                secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+                secure: process.env.NODE_ENV === 'production',
                 sameSite: 'lax',
                 path: '/',
             })

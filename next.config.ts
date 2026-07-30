@@ -22,14 +22,12 @@ const nextConfig: NextConfig = {
       }
     ],
   },
-  // [F6 standalone trace fix] `output: 'standalone'` is required for the
-  // Electron desktop wrapper (it packages the .next/standalone tree into the
-  // app bundle), but it does NOT belong on Vercel — Vercel handles output file
-  // tracing for serverless functions itself, and combining standalone +
-  // Turbopack 16 + the next-intl wrapper produced a runtime
-  // `Error: Failed to load external "..."` on every route. Only enable
-  // standalone in the Electron build.
-  ...(process.env.ELECTRON_DESKTOP ? { output: 'standalone' as const } : {}),
+  // [Desktop retired 2026-07] `output: 'standalone'` đã được GỠ cùng với bản desktop Electron.
+  // Nó tồn tại chỉ để đóng gói cây .next/standalone vào app bundle, và chính nó là NGUYÊN NHÂN
+  // GỐC của HT-029 (High): standalone chép NGUYÊN cây thư mục dự án, kéo theo cả file `.env`
+  // thật vào bản cài đặt. Nó cũng chưa bao giờ được dùng trên Vercel (Vercel tự lo output file
+  // tracing; standalone + Turbopack 16 + next-intl từng gây `Failed to load external "..."` ở
+  // mọi route). ⚠️ ĐỪNG thêm lại nếu chưa đọc `scripts/assert-no-env-in-standalone.mjs`.
   serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "youtube-dl-exec", "@sparticuz/chromium"],
   async redirects() {
     return [
@@ -52,7 +50,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: process.env.ELECTRON_DESKTOP
+            value:
               // NOTE (review-module): Mux HLS is NOT only stream.mux.com — the signed master
               // playlist returns rendition/segment URLs on the Mux CDN edge hosts
               // (e.g. manifest-*.fastly.mux.com / chunk-*.fastly.mux.com), so connect-src and
@@ -100,8 +98,7 @@ const nextConfig: NextConfig = {
               // socket retrying in an unbounded loop. The wildcard matches the img-src / remotePatterns
               // stance ([Hosting-portable]) and grants nothing new — img-src already trusts this host,
               // so an injected script could already exfiltrate via <img> to any *.supabase.co.
-              ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://lh3.googleusercontent.com https://avatar.vercel.sh https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' http://localhost:* *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud wss://*.supabase.co https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com;"
-              : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://lh3.googleusercontent.com https://avatar.vercel.sh https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud wss://*.supabase.co https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com; upgrade-insecure-requests;"
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: *.vercel-storage.com public.blob.vercel-storage.com *.supabase.co images.unsplash.com https://lh3.googleusercontent.com https://avatar.vercel.sh https://*.mux.com https://*.r2.cloudflarestorage.com; font-src 'self' data:; connect-src 'self' *.vercel-storage.com wss://*.livekit.cloud https://*.livekit.cloud wss://*.supabase.co https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.mux.com; media-src 'self' blob: https://*.mux.com; frame-src 'self' *.frame.io https://*.r2.cloudflarestorage.com; upgrade-insecure-requests;"
           },
           {
             key: 'X-Content-Type-Options',
@@ -165,12 +162,11 @@ const nextConfig: NextConfig = {
 // withBotId là outermost wrapper per Vercel docs — inject rewrites + bundler
 // aliases tại Next config level, cần thấy fully-resolved config (bao gồm
 // next-intl webpack alias).
-// [Electron] BotId relies on Vercel Edge — disable in desktop builds.
 const resolvedConfig = withNextIntl(nextConfig) as NextConfig;
 // [Hosting-portable] BotId relies on Vercel Edge — only wrap when actually ON Vercel
-// (process.env.VERCEL is set there). On Railway / self-host / Electron, ship the plain
-// config; the signup path's checkBotId() safely returns isBot=false off-Vercel (the
-// existing rate-limit + disposable-email guards still apply).
-export default (process.env.ELECTRON_DESKTOP || !process.env.VERCEL)
+// (process.env.VERCEL is set there). On Railway / self-host, ship the plain config; the
+// signup path's checkBotId() safely returns isBot=false off-Vercel (the existing
+// rate-limit + disposable-email guards still apply).
+export default !process.env.VERCEL
   ? resolvedConfig
   : withBotId(resolvedConfig);

@@ -23,7 +23,7 @@ export async function login(userData: any, opts?: { rememberMe?: boolean }) {
     cookieStore.set('session', session, {
         expires,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
     })
@@ -42,7 +42,7 @@ export async function loginWithProfile(userData: any, profileId: string, opts?: 
     cookieStore.set('session', session, {
         expires,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
     })
@@ -148,7 +148,7 @@ export async function createImpersonationSession(originalUser: any, targetUser: 
     cookieStore.set('admin_session', originalSessionStr, {
         expires,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
     })
@@ -157,7 +157,7 @@ export async function createImpersonationSession(originalUser: any, targetUser: 
     cookieStore.set('session', impersonatedSessionStr, {
         expires,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
     })
@@ -174,7 +174,7 @@ export async function stopImpersonationSession() {
         cookieStore.set('session', storedAdminSession, {
             expires,
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+            secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
         })

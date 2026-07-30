@@ -42,12 +42,11 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# nested node_modules (electron/, mcp-server/) — root /node_modules above is anchored to root only
+# nested node_modules (mcp-server/) — root /node_modules above is anchored to root only
 **/node_modules/
 
-# desktop (Electron) + MCP server build artifacts (keep source, drop builds)
-/electron/dist/
-/electron/release/
+# MCP server build artifacts (keep source, drop builds)
+# [Desktop retired 2026-07] /electron/dist/ + /electron/release/ đã gỡ cùng bản desktop.
 /mcp-server/dist/
 /mcp-server/build/
 

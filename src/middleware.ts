@@ -2,6 +2,22 @@ import { NextResponse, userAgent } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { decrypt, encrypt, SESSION_MAX_AGE, SESSION_ABSOLUTE_MAX_AGE } from '@/lib/jwt'
 
+/**
+ * [AUDIT SWEEP-2026-07-30 fix · NEW-middleware-protected-prefix-never-matches]
+ *
+ * Vị từ cũ là `['/admin','/dashboard'].some(p => pathname.startsWith(p))` — và nó KHÔNG BAO GIỜ KHỚP,
+ * vì mọi route thật đều có dạng `/{workspaceId}/admin|dashboard`. Tức cổng "chưa đăng nhập thì đá về
+ * /login" của middleware chưa từng chạy cho đúng những trang nó định bảo vệ.
+ *
+ * Hệ quả chỉ là PHÒNG THỦ CHIỀU SÂU (đúng mức Low): layout vẫn gác việc render và mọi server action
+ * thật đều tự gác — nên đây là một lớp lưới rách, không phải cửa mở.
+ *
+ * Đã kiểm các path KHÔNG được khớp để không tạo vòng lặp redirect: `/login`, `/signup`, `/welcome`,
+ * `/account`, `/legal`, `/forgot-password`, `/portal-notify`, `/diagnostic` đều là một đoạn, hoặc
+ * đoạn thứ hai không thuộc nhóm. `/share` và `/r/` đã return sớm ở trên.
+ */
+const PROTECTED_SEG = /^\/[^/]+\/(admin|dashboard|team|mc)(\/|$)/
+
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
@@ -69,8 +85,8 @@ export async function middleware(request: NextRequest) {
 
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
-        const protectedPaths = ['/admin', '/dashboard']
-        if (protectedPaths.some(p => pathname.startsWith(p))) {
+        const protectedPaths = PROTECTED_SEG
+        if (protectedPaths.test(pathname)) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
@@ -91,6 +107,12 @@ export async function middleware(request: NextRequest) {
 
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
             // If they are trying to access a workspace or admin panel but haven't selected a profile
+            // ⚠️ [AUDIT SWEEP-2026-07-30] VỊ TỪ NÀY CŨNG KHÔNG BAO GIỜ KHỚP — VÀ CỐ Ý ĐỂ NGUYÊN.
+            // Sửa nó cho "khớp thật" sẽ HỒI SINH một lỗi UX đã bị xoá có chủ đích: `layout.tsx`
+            // ([Z+1.fix3]) ghi rõ hành vi "sessionProfileId null → redirect /login" từng làm sập
+            // trải nghiệm của người dùng cũ, và đã được thay bằng backfill profileId từ ProfileAccess
+            // đầu tiên. Middleware chạy ở Edge, KHÔNG có DB để backfill — nên làm nó khớp thật là đá
+            // mọi phiên legacy về /login vĩnh viễn. Chỉ vá hai nhánh cổng đăng nhập (:72, :111).
             const requiresProfilePaths = ['/admin', '/dashboard'];
             if (requiresProfilePaths.some(p => pathname.startsWith(p))) {
                 if (!session.user.sessionProfileId) {
@@ -108,8 +130,8 @@ export async function middleware(request: NextRequest) {
             const transient = name === 'JWSSignatureVerificationFailed'
             // Trang KHÔNG bảo vệ (vd /login, /signup) phải được render — chỉ dọn cookie hỏng
             // rồi next(), KHÔNG redirect (redirect /login khi đang ở /login = loop).
-            const protectedPaths = ['/admin', '/dashboard']
-            if (!protectedPaths.some(p => pathname.startsWith(p))) {
+            const protectedPaths = PROTECTED_SEG
+            if (!protectedPaths.test(pathname)) {
                 const res = NextResponse.next()
                 if (!transient) res.cookies.delete('session')
                 return res

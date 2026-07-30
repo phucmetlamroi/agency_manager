@@ -26,7 +26,19 @@ const TASK_INCLUDE = {
         },
     },
     assignedBy: { select: { id: true, username: true, displayName: true, nickname: true } },
-    client: { include: { parent: true } },
+    // [AUDIT SWEEP-2026-07-30 fix · NEW-nested-client-full-row-to-editors]
+    // `client: { include: { parent: true } }` trả NGUYÊN hàng Client vào RSC payload của trình duyệt
+    // nhân viên non-admin: `depositBalance`, `tier`, `aiScore`, `frictionIndex`, `paymentRating`,
+    // `inputQuality` của khách VÀ khách mẹ. Không cần dò id — mở tab Network đọc RSC flight, hoặc
+    // React DevTools xem props, là thấy.
+    //
+    // Thu hẹp AN TOÀN VỀ KIỂU: `src/types/admin.ts` vốn đã khai báo
+    // `client?: { id; name; parent?: { name } | null }` — hợp đồng type ĐÃ hẹp sẵn, runtime chỉ đang
+    // trả thừa. Đã grep: không consumer nào đọc trường khác ngoài `name` / `parent.name`.
+    // ⚠️ TASK_INCLUDE là hằng CHUNG cho cả admin lẫn non-admin, nên thu hẹp ở đây áp cho cả hai —
+    // đúng ý muốn. Nhưng ĐỪNG thu hẹp thêm `assignee`/`assignedBy`: `mc-task-drawer-data.ts` còn đọc
+    // `rank` từ đó.
+    client: { select: { id: true, name: true, parentId: true, parent: { select: { name: true } } } },
     taskTags: { include: { tagCategory: { select: { id: true, name: true } } } },
     rawFootage: { select: { displayType: true } },
 } as const

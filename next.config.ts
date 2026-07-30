@@ -105,6 +105,19 @@ const nextConfig: NextConfig = {
             value: 'nosniff'
           },
           {
+            // [AUDIT SWEEP-2026-07-30 fix · P1-032] HSTS.
+            // `upgrade-insecure-requests` trong CSP chỉ nâng cấp SUBRESOURCE của một trang ĐÃ tải —
+            // nó không bảo vệ request TÀI LIỆU đầu tiên. Không có HSTS thì lần điều hướng HTTP đầu
+            // (gõ tay tên miền, link cũ, QR in ra giấy) vẫn bị SSL-strip/hạ cấp, và cookie phiên đi
+            // qua đó trước khi kịp redirect.
+            // ⚠️ `preload` CỐ Ý KHÔNG BẬT: gửi tên miền vào danh sách preload của trình duyệt là
+            // thao tác GẦN NHƯ KHÔNG GỠ ĐƯỢC (mất nhiều tháng để rút), và nó ép HTTPS cho MỌI
+            // subdomain — kể cả subdomain nội bộ chưa có chứng chỉ. Muốn preload thì đó là quyết
+            // định riêng của chủ dự án, không phải hệ quả của một bản vá bảo mật.
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains'
+          },
+          {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
           },

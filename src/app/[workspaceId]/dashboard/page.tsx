@@ -112,7 +112,7 @@ export default async function UserDashboard({ params, searchParams }: {
     const rawTasks = await (workspacePrisma as any).task.findMany({
         where: { assigneeId: userId, isArchived: false },
         include: {
-            client: { include: { parent: true } },
+            client: { select: { id: true, name: true, parentId: true, parent: { select: { name: true } } } }, // [AUDIT SWEEP fix] thu hẹp: xem chú thích ở task-detail-loader.ts
             assignee: {
                 select: {
                     id: true,

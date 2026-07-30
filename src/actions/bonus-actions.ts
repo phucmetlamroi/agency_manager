@@ -37,6 +37,11 @@ const toSafeNumber = (value: unknown): number => {
 
 export async function getPayrollLockStatus(workspaceId: string) {
     try {
+        // [AUDIT SWEEP fix · P1-023] Hàm này TRƯỚC ĐÂY không có cổng nào: một POST tới action id của
+        // nó (id nằm trong chunk công khai) đọc được bit "kỳ lương đã chốt chưa" của workspaceId BẤT
+        // KỲ. Rò một bit, không phải lỗ tiền — nhưng nó là bit về trạng thái nội bộ của tenant khác.
+        // Đặt cổng TRONG `try` là fail-closed sẵn: SECURITY_VIOLATION rơi vào catch → { isLocked: false }.
+        await verifyWorkspaceAccess(workspaceId, 'MEMBER')
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         // Lấy workspace name → extract month/year thực
         const workspace = await workspacePrisma.workspace.findUnique({
@@ -60,10 +65,33 @@ export async function getPayrollLockStatus(workspaceId: string) {
     }
 }
 
-export async function revertMonthlyBonus(workspaceId: string) {
+/**
+ * [AUDIT SWEEP-2026-07-30 fix] MỞ LẠI MỘT KỲ LƯƠNG ĐÃ TRẢ.
+ *
+ * Trước đây hàm này xoá `PayrollLock` của kỳ với ĐÚNG MỘT cổng ADMIN — không kiểm có hàng Payroll
+ * nào đã `PAID` chưa, không transaction, không advisory lock, và nhật ký ghi theo kiểu best-effort
+ * (`try/catch` rỗng) nên có thể mở khoá thành công mà KHÔNG để lại vết. Tệ hơn: `beforeData` ghi
+ * cứng `isLocked: true` bất kể trạng thái thật.
+ * Tài liệu chống gian lận trong repo mô tả một chốt "super admin + cờ xác nhận" KHÔNG tồn tại trong mã.
+ *
+ * Quyết định của chủ dự án (2026-07-30): CHO mở lại, nhưng có ma sát —
+ *   · siết cổng lên OWNER theo vị ngữ KÉP `workspaceRole === 'OWNER' || profileRole === 'OWNER'`
+ *     (khuôn security.ts). KHÔNG dùng riêng profileRole: cách đó khoá oan OWNER-theo-WorkspaceMember
+ *     của các workspace cũ.
+ *   · nếu kỳ CÓ hàng Payroll đã PAID thì bắt buộc cờ xác nhận tường minh.
+ *   · ghi AuditLog kèm SỐ hàng PAID và TỔNG TIỀN bị mở, và ghi CHẶN (không best-effort) — mất vết
+ *     trên một thao tác mở kỳ đã trả tiền thì bản thân việc mở khoá không nên xảy ra.
+ */
+export async function revertMonthlyBonus(
+    workspaceId: string,
+    opts?: { confirmUnlockPaid?: boolean },
+) {
     try {
-        // SECURITY: workspace-scoped admin check (was global ADMIN/Treasurer only).
-        await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const access = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        const isOwner = access.workspaceRole === 'OWNER' || access.profileRole === 'OWNER'
+        if (!isOwner) {
+            return { success: false, error: 'Chỉ chủ sở hữu (Owner) mới được hoàn tác và mở khoá kỳ lương.' }
+        }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId)
         const workspace = await workspacePrisma.workspace.findUnique({
@@ -75,30 +103,59 @@ export async function revertMonthlyBonus(workspaceId: string) {
         // Extract month/year từ workspace name (vd "04 / 2026") thay vì hardcode 0
         const { month: currentMonth, year: currentYear } = extractPayrollCycle(workspace.name)
 
-        await workspacePrisma.monthlyBonus.deleteMany({
-            where: { workspaceId, month: currentMonth, year: currentYear }
+        // Kỳ này đã trả tiền cho bao nhiêu người, tổng bao nhiêu — cần cho cả cổng xác nhận lẫn nhật ký.
+        const paidRows = await workspacePrisma.payroll.findMany({
+            where: { workspaceId, month: currentMonth, year: currentYear, status: 'PAID' },
+            select: { userId: true, totalAmount: true },
         })
-        await workspacePrisma.monthlyRank.deleteMany({
-            where: { workspaceId, month: currentMonth, year: currentYear }
-        })
-        await workspacePrisma.payrollLock.deleteMany({
-            where: { workspaceId, month: currentMonth, year: currentYear }
-        })
+        const paidTotal = paidRows.reduce((s: number, r: any) => s + toSafeNumber(r.totalAmount), 0)
+        if (paidRows.length > 0 && !opts?.confirmUnlockPaid) {
+            return {
+                success: false,
+                requiresConfirmation: true as const,
+                paidCount: paidRows.length,
+                paidTotal,
+                error:
+                    `Kỳ ${String(currentMonth).padStart(2, '0')}/${currentYear} đã TRẢ LƯƠNG cho ` +
+                    `${paidRows.length} người (tổng ${paidTotal.toLocaleString('vi-VN')}đ). ` +
+                    `Mở lại kỳ này cần xác nhận tường minh.`,
+            }
+        }
 
-        // Audit log: revert bonus là action quan trọng cần trace
-        try {
-            await prisma.auditLog.create({
+        const actorUserId = (await getSession())?.user?.id ?? null
+
+        // Ba lần xoá + nhật ký đi CHUNG một transaction, dưới advisory lock theo kỳ — cùng khuôn
+        // voidInvoice dùng (invoice-actions.ts). Trước đây ba lệnh xoá rời nhau: một lỗi giữa đường
+        // để lại kỳ đã mất bonus/rank mà vẫn còn khoá, hoặc ngược lại.
+        await workspacePrisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payroll:${workspaceId}:${currentYear}-${currentMonth}`}, 0))`
+
+            await tx.monthlyBonus.deleteMany({
+                where: { workspaceId, month: currentMonth, year: currentYear }
+            })
+            await tx.monthlyRank.deleteMany({
+                where: { workspaceId, month: currentMonth, year: currentYear }
+            })
+            const { count: locksRemoved } = await tx.payrollLock.deleteMany({
+                where: { workspaceId, month: currentMonth, year: currentYear }
+            })
+
+            await tx.auditLog.create({
                 data: {
                     workspaceId,
-                    actorUserId: (await getSession())?.user?.id ?? null,
+                    actorUserId,
                     action: 'payroll.bonus_reverted',
                     targetType: 'PayrollLock',
                     targetId: `${currentMonth}-${currentYear}`,
-                    beforeData: { month: currentMonth, year: currentYear, isLocked: true },
-                    afterData: { unlocked: true },
+                    // Ghi trạng thái THẬT, không ghi cứng isLocked:true như bản cũ.
+                    beforeData: {
+                        month: currentMonth, year: currentYear,
+                        locksRemoved, paidCount: paidRows.length, paidTotal,
+                    },
+                    afterData: { unlocked: true, confirmedUnlockPaid: opts?.confirmUnlockPaid === true },
                 }
             })
-        } catch { /* non-blocking */ }
+        })
 
         revalidatePath(`/${workspaceId}/admin/payroll`)
         return { success: true, message: 'Da hoan tac va mo khoa ky luong.' }

@@ -395,12 +395,18 @@ export async function createInvoiceRecord(data: {
                 data: {
                     invoiceNumber: data.invoiceNumber,
                     clientId: data.clientId,
-                    // [Invoice visibility fix 2026-06] The getWorkspacePrisma middleware
-                    // does NOT inject workspaceId/profileId into writes performed inside an
-                    // interactive `$transaction(tx => ...)`, so invoices were being created
-                    // with workspaceId=NULL. getClientInvoices is workspace-scoped → those
-                    // invoices vanished from the client's history tab (looked "never billed",
-                    // inviting double-billing). Set both EXPLICITLY here.
+                    // [Invoice visibility fix 2026-06] Set workspaceId/profileId EXPLICITLY here —
+                    // invoices từng bị tạo với workspaceId=NULL nên biến mất khỏi tab lịch sử của
+                    // khách (trông như "chưa từng xuất hoá đơn", mời gọi xuất trùng).
+                    //
+                    // ⚠️ [AUDIT SWEEP-2026-07-30 · ĐÍNH CHÍNH] Chú thích cũ ở đây giải thích nguyên
+                    // nhân là "middleware getWorkspacePrisma KHÔNG chèn workspaceId/profileId vào
+                    // các phép ghi bên trong interactive $transaction". ĐIỀU ĐÓ SAI — đã đo trực
+                    // tiếp trên đúng Prisma 5.22.0 của repo: lớp chèn CÓ chạy trong interactive
+                    // transaction, cho cả `create` lẫn `updateMany`.
+                    // Việc gán tường minh vẫn GIỮ (nó đúng và rõ ràng), nhưng đừng dựa vào lời giải
+                    // thích cũ để suy ra "trong transaction thì không có lớp chèn tenancy" — suy
+                    // luận đó sẽ dẫn tới bỏ sót bộ lọc ở chỗ khác.
                     workspaceId,
                     profileId: profileId ?? null,
                     createdBy: access.userId,
@@ -457,6 +463,14 @@ export async function createInvoiceRecord(data: {
             // so a stale/oversized client-deposit amount can't drive depositBalance
             // negative. Read inside the tx for isolation.
             if (data.clientDepositDeducted && data.clientDepositDeducted > 0) {
+                // [AUDIT SWEEP-2026-07-30 fix] Đọc-rồi-trừ số dư cọc mà không có lock: hai hoá đơn
+                // xuất song song cho cùng khách đều đọc cùng `available` rồi mỗi bên trừ trọn số dư
+                // → khách được ghi có hai lần từ một lần cọc, số dư có thể âm.
+                // ⚠️ MỨC ĐỘ THẬT: nhánh này hiện BẤT ĐỘNG — không một dòng nào trong repo làm TĂNG
+                // `client.depositBalance`, nên `available` luôn 0 và `deduct` bị clamp về 0. Vá vì
+                // ngày nào có đường nạp cọc thì đây là lỗi tiền thật, không phải vì đang chảy máu.
+                // Dùng đúng khuôn advisory lock mà `voidInvoice` trong CHÍNH file này đã dùng.
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`client-deposit:${data.clientId}`}, 0))`
                 const client = await tx.client.findUnique({
                     where: { id: data.clientId },
                     select: { depositBalance: true }

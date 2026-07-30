@@ -253,19 +253,30 @@ export async function createProfileForUser(name: string) {
     if (trimmed.length > 50) return { error: 'Tên profile không được quá 50 ký tự' }
     if (trimmed.length < 2) return { error: 'Tên profile phải có ít nhất 2 ký tự' }
 
-    // Rate limit — max 5 profiles per user
-    const ownedAccessCount = await prisma.profileAccess.count({
-        where: { userId: session.user.id },
-    })
-    const ownedDirectCount = await prisma.profile.count({
-        where: { users: { some: { id: session.user.id } } },
-    })
-    if (ownedAccessCount + ownedDirectCount >= 5) {
-        return { error: 'Đã đạt giới hạn 5 profile/user. Hãy xoá profile cũ trước.' }
-    }
-
     try {
         const newProfile = await prisma.$transaction(async (tx) => {
+            // [AUDIT SWEEP-2026-07-30 fix] HAI KHIẾM KHUYẾT TRONG CÙNG BỘ ĐẾM.
+            //
+            // (1) TOCTOU: trần 5 profile/user trước đây đếm NGOÀI transaction rồi tạo bên trong mà
+            //     không đếm lại — N request song song của cùng một người đều đọc 4 và đều tạo.
+            //     Khuôn đúng đã có trong repo: advisory lock + RE-COUNT trong transaction
+            //     (src/lib/review/guest-subscribe.ts, cap MAX_REVIEWERS_PER_SHARE).
+            // (2) Bộ đếm SAI BẢN CHẤT: nó đếm MỌI hàng ProfileAccess bất kể vai, nên bị MỜI vào 5
+            //     team là hết quyền tự tạo team của mình — trong khi chú thích của chính hàm ghi
+            //     "max 5 profiles CREATED per user". Nay chỉ đếm vai OWNER (= profile do mình tạo),
+            //     theo quyết định của chủ dự án.
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`profile-quota:${session.user.id}`}, 0))`
+            const ownedAccessCount = await tx.profileAccess.count({
+                where: { userId: session.user.id, role: 'OWNER' },
+            })
+            // Quan hệ legacy `User.profileId` — giữ lại để không nới trần cho dữ liệu cũ.
+            const ownedDirectCount = await tx.profile.count({
+                where: { users: { some: { id: session.user.id } } },
+            })
+            if (ownedAccessCount + ownedDirectCount >= 5) {
+                throw new Error('PROFILE_QUOTA_REACHED')
+            }
+
             const profile = await tx.profile.create({
                 data: { name: trimmed },
             })
@@ -281,6 +292,9 @@ export async function createProfileForUser(name: string) {
         revalidatePath('/', 'layout')
         return { success: true, profile: { id: newProfile.id, name: newProfile.name } }
     } catch (e: any) {
+        if (e?.message === 'PROFILE_QUOTA_REACHED') {
+            return { error: 'Đã đạt giới hạn 5 profile/user. Hãy xoá profile cũ trước.' }
+        }
         console.error('createProfileForUser error:', e)
         return { error: 'Không thể tạo profile. Vui lòng thử lại.' }
     }

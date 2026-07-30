@@ -108,14 +108,31 @@ export function BulkEditTaskModal({ isOpen, onClose, selectedTaskIds, workspaceI
 
             // Aggregate counts for toast
             const statusResult = results.find((r: any) => 'rejectedCount' in (r || {})) as any
-            let msg = `Đã cập nhật ${dirtyCount} field × ${selectedTaskIds.length} task`
+            // [AUDIT SWEEP fix] Task thuộc kỳ lương đã đóng bị BỎ QUA thay vì huỷ cả lô — nên phải
+            // nói ra, kèm TÊN task. Im lặng ở đây nghĩa là người dùng tin là đã sửa xong trong khi
+            // một phần số tiền không đổi; đó là cách một chốt đúng vẫn dẫn tới quyết định sai.
+            const detailsResult = results.find((r: any) => 'skippedPayrollLocked' in (r || {})) as any
+            const skipped: string[] = detailsResult?.skippedPayrollLocked ?? []
+            const appliedCount = selectedTaskIds.length - skipped.length
+            let msg = `Đã cập nhật ${dirtyCount} field × ${appliedCount} task`
             if (statusResult?.rejectedCount > 0) {
                 msg += ` — ${statusResult.rejectedCount} task bị reject (status không hợp lệ)`
+            }
+            if (statusResult?.staleCount > 0) {
+                msg += ` — ${statusResult.staleCount} task bị người khác đổi trạng thái trước đó (bỏ qua)`
             }
             if (statusResult?.emailsSent > 0) {
                 msg += ` · ${statusResult.emailsSent} email digest đã gửi`
             }
             toast.success(msg)
+            if (skipped.length > 0) {
+                toast.warning(
+                    `${skipped.length} task KHÔNG đổi được số tiền vì kỳ lương đã đóng: ` +
+                    skipped.slice(0, 5).join(', ') +
+                    (skipped.length > 5 ? `… (+${skipped.length - 5})` : ''),
+                    { duration: 8000 },
+                )
+            }
 
             // Reset draft + close
             setDraft({})

@@ -8,6 +8,7 @@ import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { enforceAssigneeStatusInvariant, enforceStatusDeadlineInvariant, STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
+import { resolvePayrollCycle, getPaidAssigneeIds } from '@/lib/payroll-lock'
 
 type BatchTaskInput = {
     titles: string[]
@@ -278,10 +279,59 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
             return { error: 'Không có field nào được chỉnh' }
         }
 
+        // ─────────────────────────────────────────────────────────────────────────────────────
+        // [AUDIT SWEEP-2026-07-30 fix] SỬA TIỀN HÀNG LOẠT — HAI KHIẾM KHUYẾT CÙNG CHỖ.
+        //
+        // (1) Đường một-task (update-task-details.ts) có chốt "kỳ lương đã đóng"; đường này KHÔNG
+        //     có một truy vấn Payroll nào. Cùng một nút bấm trên giao diện, chỉ khác số dòng được
+        //     tick, mà một đường bị chặn còn đường kia ghi thẳng vào kỳ đã trả lương.
+        // (2) Nó ghi `value` nhưng KHÔNG ghi `wageVND`/`profitVND`, trong khi đường một-task đồng bộ
+        //     cả ba (`wageVND = value`, profit tính lại). Bảng Tài chính đọc `wageVND ?? value` nên
+        //     chi phí/lợi nhuận đứng ở số CŨ vĩnh viễn, còn bảng lương đã dùng số MỚI. Hai cột tiền
+        //     lệch nhau ngay sau một lần sửa lô — và `wageVND` được ghi ngay lúc TẠO task nên
+        //     chênh lệch là chắc chắn, không phải giả định.
+        //
+        // Quyết định của chủ dự án (2026-07-30): BỎ QUA task thuộc kỳ đã đóng, ghi phần còn lại, và
+        // trả về danh sách bị bỏ để giao diện nói rõ. Không huỷ cả lô — biến chốt thành vật cản là
+        // cách người ta đi tìm đường lách.
+        const touchesMoney = 'jobPriceUSD' in data || 'value' in data
+        const cycle = touchesMoney ? await resolvePayrollCycle(workspaceId) : null
+        const paidAssigneeIds =
+            touchesMoney && cycle && !cycle.isLocked
+                ? await getPaidAssigneeIds(workspaceId, cycle.month, cycle.year)
+                : new Set<string>()
+        const skippedTitles: string[] = []
+
         // Bump version + commit in transaction
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 let taskUpdateData = { ...updateData }
+
+                if (touchesMoney && cycle) {
+                    const money = await tx.task.findUnique({
+                        where: { id, workspaceId },
+                        select: {
+                            assigneeId: true, title: true,
+                            jobPriceUSD: true, value: true, exchangeRate: true,
+                        },
+                    })
+                    if (!money) continue
+                    const blocked =
+                        cycle.isLocked ||
+                        (money.assigneeId ? paidAssigneeIds.has(money.assigneeId) : false)
+                    if (blocked) {
+                        skippedTitles.push(money.title)
+                        continue
+                    }
+                    // Đồng bộ y hệt đường một-task để hai cột tiền không lệch.
+                    const newJobPriceUSD =
+                        'jobPriceUSD' in data ? data.jobPriceUSD : (money.jobPriceUSD || 0)
+                    const newValue = 'value' in data ? data.value : (money.value || 0)
+                    const rate = money.exchangeRate || 26300
+                    taskUpdateData.wageVND = newValue
+                    taskUpdateData.profitVND =
+                        (Number(newJobPriceUSD) * Number(rate)) - Number(newValue)
+                }
 
                 // [Z+1.fix8] Enforce assigneeId ↔ status invariant per-task.
                 // Chỉ fetch current task khi assigneeId thay đổi (zero overhead cho edit thường).
@@ -333,7 +383,14 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
-        return { success: true, count: taskIds.length }
+        // [AUDIT SWEEP fix] `count` nay là số task THẬT SỰ được ghi, không phải số task được tick —
+        // nếu vẫn trả taskIds.length thì người dùng được báo "đã sửa 20 task" trong khi 3 task bị
+        // chốt kỳ lương chặn, tức giao diện nói dối về một thao tác chạm tiền.
+        return {
+            success: true,
+            count: taskIds.length - skippedTitles.length,
+            skippedPayrollLocked: skippedTitles,
+        }
     } catch (error: any) {
         console.error("Bulk Update Error:", error)
         if (error?.message?.startsWith('SECURITY_VIOLATION')) {
@@ -488,7 +545,7 @@ export async function bulkUpdateTaskStatus(
     newStatus: string,
     workspaceId: string,
 ): Promise<
-    | { success: true; count: number; rejectedCount: number; emailsSent: number }
+    | { success: true; count: number; rejectedCount: number; emailsSent: number; staleCount: number }
     | { error: string }
 > {
     if (!taskIds || taskIds.length === 0) return { error: 'No tasks selected' }
@@ -551,10 +608,47 @@ export async function bulkUpdateTaskStatus(
             updateData.isArchived = true
         }
 
-        await prisma.task.updateMany({
-            where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },
-            data: updateData,
+        // [AUDIT SWEEP-2026-07-30 fix] GHI ĐÈ MÙ. Trước đây hàm đọc `t.status` của từng task, kiểm
+        // FSM trên giá trị đó, rồi ghi bằng MỘT `updateMany` KHÔNG mang theo điều kiện nào về status
+        // đã đọc. Bất kỳ thay đổi xảy ra giữa lúc đọc và lúc ghi đều bị xoá âm thầm — và 'Hoàn tất'
+        // là status tính lương, nên "âm thầm" ở đây đụng tiền.
+        //
+        // Vá bằng so-sánh-rồi-đặt (compare-and-set) trên chính trường đang đổi, KHÔNG dùng
+        // `version` predicate: đường một-task cũng không bật lock (tham số opt-in, đa số nơi gọi bỏ
+        // trống), nên siết `version` chỉ ở đây sẽ làm hai đường lệch hành vi. Gom theo status đã đọc
+        // để vẫn chỉ vài truy vấn thay vì N.
+        const idsByReadStatus = new Map<string, string[]>()
+        for (const t of validTasks) {
+            const arr = idsByReadStatus.get(t.status) ?? []
+            arr.push(t.id)
+            idsByReadStatus.set(t.status, arr)
+        }
+        for (const [fromStatus, ids] of idsByReadStatus) {
+            await prisma.task.updateMany({
+                where: { id: { in: ids }, workspaceId, status: fromStatus },
+                data: updateData,
+            })
+        }
+
+        // Chỉ những task ĐÃ ghi được mới đi vào nhật ký + email. Nếu vẫn dùng `validTasks` thì hệ
+        // thống gửi email "task đã đổi trạng thái" cho một thay đổi không hề xảy ra.
+        const appliedRows = await prisma.task.findMany({
+            where: { id: { in: validTasks.map((t) => t.id) }, workspaceId, status: newStatus },
+            select: { id: true },
         })
+        const appliedIds = new Set(appliedRows.map((r) => r.id))
+        const staleCount = validTasks.length - appliedIds.size
+        // Lọc TẠI CHỖ có chủ đích: mọi đoạn phía dưới (audit, digest email, số trả về) đều đọc
+        // `validTasks`, nên lọc ở đây là cách duy nhất đảm bảo không sót một nơi nào.
+        const applied = validTasks.filter((t) => appliedIds.has(t.id))
+        validTasks.length = 0
+        validTasks.push(...applied)
+
+        if (validTasks.length === 0) {
+            return {
+                error: `Không task nào được cập nhật — ${staleCount} task đã bị người khác đổi trạng thái trong lúc bạn đang chọn. Hãy tải lại và thử lại.`,
+            }
+        }
 
         // Audit log per-task (forensics) + 1 entry tổng
         try {
@@ -656,6 +750,8 @@ export async function bulkUpdateTaskStatus(
             count: validTasks.length,
             rejectedCount: rejectedIds.length,
             emailsSent,
+            // [AUDIT SWEEP fix] Số task bị người khác đổi trạng thái giữa lúc đọc và lúc ghi.
+            staleCount,
         }
     } catch (error: any) {
         console.error('Bulk Update Status Error:', error)

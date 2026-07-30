@@ -50,13 +50,6 @@ export async function createWorkspaceAction(formData: FormData) {
         return { error: 'Mô tả không được quá 200 ký tự' }
     }
 
-    // Rate limit: max 10 workspaces owned per user to prevent abuse.
-    const ownedCount = await prisma.workspaceMember.count({
-        where: { userId: session.user.id, role: 'OWNER' },
-    })
-    if (ownedCount >= 10) {
-        return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
-    }
 
     // [Sprint B] Subscription gating removed — tất cả user đều có quyền tạo workspace.
     // Rate limit 10/user vẫn còn để chống abuse.
@@ -64,6 +57,19 @@ export async function createWorkspaceAction(formData: FormData) {
     try {
         let newWorkspaceId = ''
         await prisma.$transaction(async (tx) => {
+            // [AUDIT SWEEP-2026-07-30 fix] Trần 10 workspace/user trước đây đếm NGOÀI transaction
+            // rồi tạo bên trong mà không đếm lại (check-then-act): N request song song của cùng một
+            // người đều đọc 9 và đều tạo. Không có ràng buộc DB nào cưỡng chế trần này.
+            // Khuôn đúng đã có trong repo: advisory lock theo user + RE-COUNT bên trong transaction
+            // (src/lib/review/guest-subscribe.ts).
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ws-quota:${session.user.id}`}, 0))`
+            const ownedCount = await tx.workspaceMember.count({
+                where: { userId: session.user.id, role: 'OWNER' },
+            })
+            if (ownedCount >= 10) {
+                throw new Error('WORKSPACE_QUOTA_REACHED')
+            }
+
             const workspace = await tx.workspace.create({
                 data: {
                     name: name.trim(),
@@ -94,6 +100,9 @@ export async function createWorkspaceAction(formData: FormData) {
         revalidatePath('/workspace')
         return { success: true, workspaceId: newWorkspaceId }
     } catch (e: any) {
+        if (e?.message === 'WORKSPACE_QUOTA_REACHED') {
+            return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
+        }
         console.error(e)
         return { error: 'Lỗi khởi tạo Workspace' }
     }

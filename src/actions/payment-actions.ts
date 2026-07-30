@@ -71,6 +71,31 @@ export async function recordPayment(input: RecordPaymentInput, workspaceId: stri
             if (inv) linkedInvoiceId = inv.id
         }
 
+        // [AUDIT SWEEP-2026-07-30 fix] CHỐNG GHI TRÙNG. `recordPayment` không có idempotency và
+        // bảng Payment không có ràng buộc unique nào, nên một lần double-click / retry mạng tạo HAI
+        // dòng: tổng "đã thu" của khách phồng lên đúng số đó và "còn lại" tụt xuống tương ứng — sai
+        // số tiền báo cho khách.
+        // Quyết định của chủ dự án: cửa sổ thời gian, KHÔNG đổi schema (thêm cột idempotency là
+        // migration, ngoài phạm vi vòng vá này). 60 giây đủ chặn double-click và retry, mà vẫn cho
+        // ghi hai khoản thu thật trùng số nếu cách nhau hơn một phút.
+        const DEDUP_WINDOW_MS = 60_000
+        const duplicate = await prisma.payment.findFirst({
+            where: {
+                workspaceId,
+                clientId,
+                amount,
+                invoiceId: linkedInvoiceId,
+                createdAt: { gte: new Date(Date.now() - DEDUP_WINDOW_MS) },
+            },
+            select: { id: true },
+        })
+        if (duplicate) {
+            return {
+                success: false as const,
+                error: 'Khoản thu giống hệt vừa được ghi cách đây dưới một phút. Kiểm tra lại danh sách trước khi ghi thêm.',
+            }
+        }
+
         const payment = await prisma.payment.create({
             data: {
                 clientId,

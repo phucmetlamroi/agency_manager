@@ -1273,3 +1273,32 @@ HT-037/038: xoá hàm nhưng để lại tên kênh. → Vá ở ĐIỂM NGHẼN
 - **SAU KHI PHÁT HÀNH HT-026**: các truy vấn đo mức độ đã lộ, ghi trong commit `f8133f8`.
 - **TRƯỚC KHI PHÁT HÀNH HT-023**: truy vấn đếm quyền cũ, ghi trong commit `305d376`.
 - ~~**Quyết N10 và N11**~~ → chủ dự án đã duyệt và cả hai ĐÃ VÁ (`7747cd4`, `b252760`).
+
+## Đính chính sau vòng phản biện N10 + N11 (cả hai APPROVE)
+
+- **N15 tôi liệt kê THIẾU một mục, và đó là mục đáng kể nhất.**
+  `notification-emails/templates/taskClientSubmitted.ts:21` đặt `params.rawLink` vào `href`, và
+  giá trị đó đến từ MỘT Ô FORM KHÁCH TỰ ĐIỀN (`CreateTaskPanel.tsx:137` →
+  `share-portal-actions.ts:1278` → metadata → `notification-email.ts:264`). Đây là URL do người
+  dùng cung cấp DUY NHẤT trong toàn bộ cây email; mọi `href` thô còn lại đều dựng từ
+  `NEXT_PUBLIC_APP_URL` hoặc token trong DB.
+  Yếu hơn lỗ N10 đã vá: giá trị CÓ escapeHtml nên không thoát được thuộc tính, chỉ scheme là
+  không kiểm ở sink — và phía ghi có gác thật bằng `looksLikeUrl` (`/^https?:\/\/\S+$/i`,
+  share-portal-actions.ts:1208). Nên không phải lỗ hổng đang mở, nhưng cùng HÌNH DẠNG mà N10
+  dành cả đoạn để nói: bất biến nằm ở nơi ghi, sink không có gì nhắc.
+- **"4 template auth" trong commit N10 phải là 3** — thư mục `templates/auth/` có 4 file nhưng
+  `password-reset-otp.ts` không chứa `href` thô nào.
+- **Hàng rào hồi quy chưa được cắm vào CI.** `scripts/assert-email-avatar-escaping.ts` (và cả
+  `assert-r2-presign-contract.mjs` của HT-020) không được `package.json` gọi ở bất kỳ script nào —
+  hiện chỉ chạy tay. Người phản biện đã kiểm nó KHÔNG rỗng: dựng lại hàm `avatar()` bản trước khi
+  vá thì 12/13 assertion FAIL, tức nó thật sự bắt được hồi quy. Không tự cắm vào build vì đổi
+  pipeline build có bán kính ảnh hưởng rộng — để chủ dự án quyết.
+- **N10: `avatarUrl` có hai NHÁNH LƯU TRỮ, không chỉ Vercel Blob.** `upload-actions.ts:165` gọi
+  `uploadPublicImage` (`storage.ts:37`) và nhánh Supabase `getPublicUrl()` cũng trả URL tuyệt đối
+  https. Kết luận không đổi (cả hai đều đạt `^https?://`), nhưng commit chỉ kể một nhánh.
+- **N11: đã đóng nốt đường đọc thứ hai** (`getAllEnvVars`) trong `e257dd8`. Xem commit đó.
+- **N11 — phạm vi thật, nói cho đúng:** bộ lọc chặn bước leo thang `NODE_OPTIONS --require` → RCE,
+  nhưng KHÔNG làm giảm thiệt hại của kẻ đã ghi được file store: `DATABASE_URL` và `JWT_SECRET` đều
+  nằm trong danh sách cho phép, và cả hai đủ để chiếm hệ thống. Trên Windows file store nằm ở
+  `%APPDATA%` (người dùng ghi được) còn app nằm ở Program Files (không), nên ghi file store vẫn dễ
+  hơn sửa mã app — bộ lọc thu hẹp, không đóng.

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { verifyWorkspaceAccess, verifyFinanceAccess } from '@/lib/security'
 
 // Helper to safely convert Decimal/Number/String to Number
@@ -363,7 +363,16 @@ export async function createInvoiceRecord(data: {
             return { error: 'Unauthorized' }
         }
         const { session } = access
-        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        // [PHẢN BIỆN 2026-07-30 · CS-5] Profile CỦA WORKSPACE, không phải claim JWT.
+        // `Client` nằm trong bypassModels ⇒ `profileId` là bộ lọc tenant DUY NHẤT của nó. Với claim,
+        // khối transaction bên dưới chạy `tx.client.findUnique/update` với `where {id, profileId: A}`
+        // — trúng khách của TENANT KHÁC — và trừ `depositBalance` của họ, trong khi hoá đơn giải
+        // thích khoản trừ đó lại nằm ở workspace của kẻ tấn công. Ghi xuyên tenant vào sổ tiền.
+        // Khuôn đúng đã có sẵn ở dòng 146-147 của chính file này; đây là chỗ sót.
+        // ⚠️ CHỈ sửa ở đây. Ba chỗ đọc claim còn lại trong file (getUnbilledTasks, getClientInvoices,
+        // voidInvoice) đã được che bởi lớp chèn `workspaceId` vì chúng chỉ chạm Invoice/Task —
+        // đổi thêm là mở rộng phạm vi không có lý do, và có thể làm hỏng workspace legacy.
+        const profileId = (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
 
         // [AUDIT R7] verifyFinanceAccess replaced getCurrentUser — fetch the actor's
         // contact fields (createdBy + notification email) explicitly, since the JWT

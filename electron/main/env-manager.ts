@@ -101,7 +101,8 @@ export function isWritableEnvKey(key: unknown): key is keyof EnvSchema {
  * NODE_OPTIONS (`--require` nhận cả đường dẫn UNC trên Windows), NODE_TLS_REJECT_UNAUTHORIZED=0,
  * NODE_EXTRA_CA_CERTS.
  *
- * Một hàng rào chỉ chắn một chiều thì không phải hàng rào. Nay hai chiều dùng chung một danh sách.
+ * Một hàng rào chỉ chắn một chiều thì không phải hàng rào. Nay MỌI đường đọc lẫn ghi đều đi qua
+ * cùng một danh sách — xem `getAllEnvVars` bên dưới cho đường đọc thứ hai.
  */
 export function getStoredEnvVars(): Record<string, string> {
     const allVars = store.store // full object
@@ -119,9 +120,32 @@ export function getStoredEnvVars(): Record<string, string> {
 
 /**
  * Get every env var including empty ones (for settings UI).
+ *
+ * [AUDIT N11 fix — vòng 2] ĐƯỜNG ĐỌC THỨ HAI, và vòng trước tôi để hở nó.
+ *
+ * Tôi vá `getStoredEnvVars` rồi viết trong commit rằng "cả hai chiều nay dùng chung một danh
+ * sách". Câu đó KHÔNG ĐÚNG: có HAI hàm đọc, và hàm này vẫn trả `{...store.store}` nguyên vẹn.
+ * Đúng cái bẫy "vá một đường, để hở đường kia" mà tôi tự ghi hai lần trong `preload.ts`.
+ *
+ * Chưa khai thác được: kênh `env:get-all` bị gác theo DANH TÍNH cửa sổ cấu hình (HT-037), và
+ * trang wizard chỉ đọc đúng 8 khoá trong `ENV_KEYS` của nó nên một khoá lạ bị bỏ qua, không
+ * bao giờ tới được env của tiến trình nào. Nhưng "không khai thác được" là tính chất của NƠI
+ * GỌI, còn danh sách cho phép là tính chất của NƠI ĐỌC — và đó mới là thứ giữ được khi có
+ * người thêm nơi gọi thứ hai.
+ *
+ * Lặp theo DANH SÁCH CHO PHÉP, không lặp theo nội dung store: như vậy một khoá lạ không có
+ * đường nào xuất hiện trong kết quả (không phụ thuộc vào việc lọc đúng hay sai), và cả 8 khoá
+ * của schema luôn hiện diện — rỗng nếu thiếu, đúng như tên hàm hứa. Prefill của wizard không
+ * đổi một chữ, vì nó vốn chỉ đọc đúng 8 khoá đó.
  */
 export function getAllEnvVars(): EnvSchema {
-    return { ...store.store }
+    const stored = store.store as unknown as Record<string, unknown>
+    const out = {} as EnvSchema
+    for (const key of WRITABLE_ENV_KEYS) {
+        const v = stored[key]
+        out[key] = typeof v === 'string' ? v : ''
+    }
+    return out
 }
 
 /** Giá trị dài tối đa — không biến nào ở đây gần ngưỡng này; cốt để chặn ghi rác vào store. */

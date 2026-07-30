@@ -1179,7 +1179,7 @@ hình thức; lần nào cũng kèm đường khai thác hoặc hồi quy cụ t
 | N4 | `mission-control/McTaskDrawer.tsx:266` render `productLink` thô — vùng đóng băng | ✅ vá ở tầng dữ liệu `mc-task-drawer-data.ts` |
 | N5 | `audit-log.ts` — khối đọc header chưa bao giờ chạy (`=== undefined` luôn false) | ✅ vá trong `9dfbd06` |
 | N6 | `POST /api/profile/select` nhận JWT từ **body** rồi ký lại cookie → giặt token đã thu hồi | ✅ vá trong `3755000` |
-| N7 | ~20 server action/route xác thực CHỈ bằng `getSession()`, không kiểm `sessionVersion` — gồm `deleteProfile` (xoá cả tenant) và `searchContacts` (liệt kê email toàn hệ thống) | chưa vá — thuộc phạm vi HT-033 |
+| N7 | ~20 server action/route xác thực CHỈ bằng `getSession()`, không kiểm `sessionVersion` — gồm `deleteProfile` (xoá cả tenant) và `searchContacts` (liệt kê email toàn hệ thống) | ✅ **vá qua HT-033** (`dec04ce` + `718adfe`) — gồm cả `deleteProfile`. Xem đính chính ở Phần III |
 | N8 | `middleware.ts:145-162` rolling-refresh chép nguyên `sessionVersion` cũ vào cookie 30 ngày mới → token cũ gần như bất tử ở các cửa thuộc N7 | chưa vá |
 
 ## Việc của chủ dự án, code không làm thay được

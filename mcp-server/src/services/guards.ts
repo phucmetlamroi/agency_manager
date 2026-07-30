@@ -34,10 +34,16 @@ export async function assertWorkspaceMember(wsId: string, userId: string): Promi
  * Vị ngữ chép NGUYÊN từ web (bản ghi MonthlyRank mới nhất theo (userId, workspaceId), rank === 'D')
  * để hai đường không bao giờ trả lời khác nhau về cùng một người.
  *
- * ⚠️ CỐ Ý KHÔNG gọi trong `claimTask` / marketplace: web hiện cũng KHÔNG chặn đường tự-nhận-việc.
- * Thêm ở MCP mà không thêm ở web sẽ tạo ra lệch chốt MỚI theo chiều ngược lại — đúng loại bất đối
- * xứng mà bản vá này đang gỡ. Quyết định của chủ dự án (2026-07-30): chỉ đưa MCP về NGANG web; việc
- * có chặn cả đường tự-nhận hay không là quyết định sản phẩm, làm riêng ở cả hai bên cùng lúc.
+ * ⚠️ ĐÍNH CHÍNH [PHẢN BIỆN 2026-07-30 · R7-1] — chú thích cũ ở đây nói KHÔNG gọi trong `claimTask`
+ * vì "web cũng không chặn đường tự-nhận-việc". Tiền đề đó SAI, và vì tin nó mà chốt trên bị đi vòng
+ * hoàn toàn: web `claimTask` lấy userId TỪ PHIÊN (`src/actions/claim-actions.ts` — `access.userId`),
+ * còn tool MCP `claim_task` nhận `userId` như một THAM SỐ tuỳ ý ("for a specific user"). Cùng tên,
+ * khác bản chất — bên web là TỰ NHẬN, bên MCP là GIAO CHO NGƯỜI KHÁC. Nay `marketplace-service.ts`
+ * ĐÃ gọi guard này, và đó KHÔNG phải lệch chốt với web: web không có đường nào giao việc cho người
+ * khác qua marketplace.
+ *
+ * Quyết định của chủ dự án (2026-07-30) vẫn nguyên: chỉ đưa MCP về NGANG web. Việc có chặn cả đường
+ * TỰ-nhận-việc hay không vẫn là quyết định sản phẩm, phải làm ở cả hai bên cùng lúc.
  */
 export async function assertNotRedCarded(wsId: string, userId: string): Promise<void> {
     if (!userId) return

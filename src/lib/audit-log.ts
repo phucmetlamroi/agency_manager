@@ -56,6 +56,8 @@ export type AuditAction =
     | 'auth.password_changed'
     | 'payroll.bonus_calculated'
     | 'payroll.bonus_reverted'
+    // [AUDIT SWEEP-2026-07-30 · N13] Một kênh đẩy thông báo đổi chủ (xem push-actions.ts).
+    | 'push.subscription_rebound'
     | 'payroll.locked'
     | 'payroll.unlocked'
     | 'bonus_config.updated'

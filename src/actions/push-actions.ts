@@ -38,6 +38,21 @@ export async function savePushSubscription(sub: {
 
     // Upsert on the unique endpoint — re-subscribing on the same browser (or a
     // subscription that moved to another user) rebinds cleanly.
+    //
+    // [AUDIT SWEEP-2026-07-30 fix · N13/PUSH-REBIND] Việc rebind này ĐỔI CHỦ của một kênh đẩy: ai
+    // biết `endpoint` của người khác thì gọi hàm này là kênh đó trỏ về mình, và thông báo nội bộ của
+    // nạn nhân đi sang thiết bị mình.
+    //
+    // ⚠️ KHÔNG vá bằng cách bỏ `userId` khỏi nhánh update — như vậy CÒN TỆ HƠN, và đây là lý do
+    // chính nhánh này tồn tại: máy dùng chung, A đăng xuất rồi B bật thông báo trên CÙNG trình duyệt
+    // ⇒ endpoint không đổi, dòng cũ vẫn trỏ về A ⇒ thông báo nội bộ của A đẩy sang thiết bị B đang
+    // dùng. Đó là rò chéo người dùng THẬT, nặng hơn kịch bản cần-biết-endpoint (endpoint là chuỗi bí
+    // mật do trình duyệt sinh, không liệt kê được).
+    // Vá tối thiểu: GIỮ rebind, nhưng làm nó CÓ VẾT — đọc chủ cũ trước, và ghi audit khi đổi chủ.
+    const previousOwner = await prisma.pushSubscription
+        .findUnique({ where: { endpoint }, select: { userId: true } })
+        .catch(() => null)
+
     try {
         await prisma.pushSubscription.upsert({
             where: { endpoint },
@@ -48,6 +63,26 @@ export async function savePushSubscription(sub: {
         console.error('[push] save failed', e)
         return { error: 'Không lưu được đăng ký thông báo.' }
     }
+
+    // [AUDIT SWEEP-2026-07-30 fix · N13] Đổi chủ kênh đẩy phải để lại vết. Không chặn (xem lý do ở
+    // trên), nhưng nếu về sau có tranh chấp "vì sao thông báo của tôi sang máy người khác" thì phải
+    // có bản ghi để đối chiếu. Cắt `endpoint` xuống 120 ký tự — nó là chuỗi bí mật, không ghi trọn
+    // vào nhật ký. `workspaceId: null` vì đăng ký push là cấp tài khoản, không thuộc workspace nào.
+    if (previousOwner && previousOwner.userId !== userId) {
+        try {
+            const { audit } = await import('@/lib/audit-log')
+            await audit({
+                workspaceId: null,
+                actorUserId: userId,
+                action: 'push.subscription_rebound',
+                targetType: 'PushSubscription',
+                targetId: endpoint.slice(0, 120),
+                before: { userId: previousOwner.userId },
+                after: { userId },
+            })
+        } catch { /* best-effort — không chặn việc đăng ký vì nhật ký lỗi */ }
+    }
+
     return { success: true }
 }
 

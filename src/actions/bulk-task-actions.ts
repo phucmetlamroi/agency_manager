@@ -302,19 +302,31 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
                 : new Set<string>()
         const skippedTitles: string[] = []
 
+        // [AUDIT SWEEP-2026-07-30 — TỰ SỬA BẢN VÁ CỦA CHÍNH TÔI] Vòng vá tiền trước đó đặt một
+        // `tx.task.findUnique` cho TỪNG task BÊN TRONG `prisma.$transaction`. `src/lib/db.ts` KHÔNG
+        // set `transactionOptions`, nên Prisma dùng mặc định timeout 5s / maxWait 2s: một lô lớn =
+        // N round-trip tuần tự trong đúng 5 giây đó, và khi vượt thì P2028 làm rollback TOÀN BỘ lô —
+        // người dùng thấy "sửa hàng loạt thất bại" mà không biết vì sao. Đó chính là rủi ro sổ kiểm
+        // toán đã cảnh báo cho mục BULK-WAGE-DESYNC, và tôi vẫn dựng lại nó.
+        // Nay nạp MỘT lần trước transaction; trong transaction chỉ tra Map trong bộ nhớ.
+        const moneyRows = touchesMoney
+            ? await prisma.task.findMany({
+                  where: { id: { in: taskIds }, workspaceId },
+                  select: {
+                      id: true, assigneeId: true, title: true,
+                      jobPriceUSD: true, value: true, exchangeRate: true,
+                  },
+              })
+            : []
+        const moneyById = new Map(moneyRows.map((r) => [r.id, r]))
+
         // Bump version + commit in transaction
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 let taskUpdateData = { ...updateData }
 
                 if (touchesMoney && cycle) {
-                    const money = await tx.task.findUnique({
-                        where: { id, workspaceId },
-                        select: {
-                            assigneeId: true, title: true,
-                            jobPriceUSD: true, value: true, exchangeRate: true,
-                        },
-                    })
+                    const money = moneyById.get(id)
                     if (!money) continue
                     const blocked =
                         cycle.isLocked ||

@@ -12,10 +12,16 @@
  *                                          VeloxScanResult into `veloxMap`
  *
  * Auth model
- *   - Workspace MEMBER role required (read + write). We don't tighten
- *     further at this layer because the editor is already inside Add Task,
- *     which has its own role gate (ADMIN/OWNER) at the route level.
- *   - CLIENT users never reach Add Task → no extra check needed here.
+ *   - ĐỌC (`getRawFootageMap`, `getHookGraph`): workspace MEMBER là đủ.
+ *   - GHI (`setRawFootageDisplayType`, `saveRawFootageMap`, `saveHookGraph`): ADMIN/OWNER workspace
+ *     HOẶC người được giao chính task đó — xem `assertCanWriteRawFootage`.
+ *
+ * ⚠️ [AUDIT SWEEP-2026-07-30 · ĐÍNH CHÍNH] Chú thích cũ ở đây viết: "We don't tighten further at this
+ * layer because the editor is already inside Add Task, which has its own role gate (ADMIN/OWNER) at
+ * the route level." ĐIỀU ĐÓ SAI, và chính nó là lý do lỗ hổng tồn tại: cổng ở tầng ROUTE chỉ bảo vệ
+ * việc RENDER trang. Server action là POST endpoint độc lập — gọi được trực tiếp bằng header
+ * `Next-Action`, không đi qua trang nào. Nên "đã có gate ở route" KHÔNG BAO GIỜ là lý do để bỏ chốt
+ * trong action. Đừng dùng lập luận đó ở bất cứ đâu khác trong repo.
  *
  * Validation
  *   - The JSON map is validated against a Zod schema before write so a
@@ -124,19 +130,48 @@ async function loadTaskOrFail(taskId: string) {
     if (!idCheck.success) return { error: 'taskId không hợp lệ.' as const }
     const task = await prisma.task.findUnique({
         where: { id: idCheck.data },
-        select: { id: true, workspaceId: true, profileId: true, title: true },
+        // [AUDIT SWEEP-2026-07-30 fix · P1-021] `assigneeId` thêm vào để dựng được chốt ghi bên dưới.
+        select: { id: true, workspaceId: true, profileId: true, title: true, assigneeId: true },
     })
     if (!task) return { error: 'Task không tồn tại.' as const }
     if (!task.workspaceId) return { error: 'Task chưa thuộc workspace nào.' as const }
+    let workspaceRole: string | null = null
     try {
-        await verifyWorkspaceAccess(task.workspaceId, 'MEMBER')
+        // [AUDIT SWEEP fix · P1-021] Giá trị trả về TRƯỚC ĐÂY BỊ BỎ. Cần `workspaceRole` để phân biệt
+        // đường đọc (MEMBER là đủ) với đường ghi (phải là admin HOẶC người được giao task).
+        const access = await verifyWorkspaceAccess(task.workspaceId, 'MEMBER')
+        workspaceRole = access.workspaceRole ?? null
     } catch (err: any) {
         if (err?.message?.startsWith('SECURITY_VIOLATION')) {
             return { error: 'Bạn không có quyền truy cập task này.' as const }
         }
         throw err
     }
-    return { ok: true as const, session, task }
+    return { ok: true as const, session, task, workspaceRole }
+}
+
+/**
+ * [AUDIT SWEEP-2026-07-30 fix · P1-021] CHỐT CHO CÁC ĐƯỜNG GHI.
+ *
+ * Trước đây cả 3 đường ghi (`setRawFootageDisplayType`, `saveRawFootageMap`, `saveHookGraph`) chỉ đòi
+ * MEMBER. Nghĩa là bất kỳ nhân sự nội bộ nào của tenant — không cần được giao task, không cần admin —
+ * lấy `taskId` từ URL/board rồi POST là XOÁ SẠCH được sơ đồ dựng (Multi-Hook Map) và `veloxMap` của
+ * task người khác: `upsert` ghi `manualGraph` rỗng và ép `displayType`. Có `audit()` nên truy được ai
+ * làm, nhưng nội dung đã mất.
+ *
+ * Quyết định của chủ dự án: ADMIN/OWNER **hoặc** người được giao task đó. Đây KHÔNG phải luật mới —
+ * đúng bằng luật repo đã chốt cho `updateTask` (task-management-actions.ts) và `update-task-details.ts`,
+ * nên không sinh thêm một mô hình quyền thứ hai. Editor được giao vẫn tự cập nhật sơ đồ khi dựng.
+ */
+function assertCanWriteRawFootage(r: {
+    session: { user?: { id?: string } } | null
+    task: { assigneeId: string | null }
+    workspaceRole: string | null
+}): { error: string } | null {
+    const isWorkspaceAdmin = r.workspaceRole === 'OWNER' || r.workspaceRole === 'ADMIN'
+    if (isWorkspaceAdmin) return null
+    if (r.task.assigneeId && r.task.assigneeId === r.session?.user?.id) return null
+    return { error: 'Chỉ quản lý hoặc người được giao task này mới sửa được sơ đồ dựng.' }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -171,6 +206,10 @@ export async function setRawFootageDisplayType(
     const r = await loadTaskOrFail(taskId)
     if ('error' in r) return r
     const { session, task } = r
+    // [AUDIT SWEEP-2026-07-30 fix · P1-021] Đường GHI: admin HOẶC người được giao. Hai đường ĐỌC
+    // (getRawFootageMap, getHookGraph) cố ý GIỮ ở mức MEMBER — cả tenant vẫn xem được sơ đồ.
+    const denied = assertCanWriteRawFootage(r)
+    if (denied) return denied
 
     const existing = await prisma.taskRawFootage.findUnique({ where: { taskId } })
     const before = existing?.displayType ?? 'PER_LINK'
@@ -219,6 +258,10 @@ export async function saveRawFootageMap(
     const r = await loadTaskOrFail(taskId)
     if ('error' in r) return r
     const { session, task } = r
+    // [AUDIT SWEEP-2026-07-30 fix · P1-021] Đường GHI: admin HOẶC người được giao. Hai đường ĐỌC
+    // (getRawFootageMap, getHookGraph) cố ý GIỮ ở mức MEMBER — cả tenant vẫn xem được sơ đồ.
+    const denied = assertCanWriteRawFootage(r)
+    if (denied) return denied
 
     const parsed = veloxScanResultSchema.safeParse(args.veloxMap)
     if (!parsed.success) {
@@ -352,6 +395,10 @@ export async function saveHookGraph(taskId: string, graph: unknown) {
     const r = await loadTaskOrFail(taskId)
     if ('error' in r) return r
     const { session, task } = r
+    // [AUDIT SWEEP-2026-07-30 fix · P1-021] Đường GHI: admin HOẶC người được giao. Hai đường ĐỌC
+    // (getRawFootageMap, getHookGraph) cố ý GIỮ ở mức MEMBER — cả tenant vẫn xem được sơ đồ.
+    const denied = assertCanWriteRawFootage(r)
+    if (denied) return denied
 
     const parsed = hookGraphSchema.safeParse(graph)
     if (!parsed.success) {

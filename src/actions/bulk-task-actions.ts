@@ -83,8 +83,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             return { error: 'Lỗi nội bộ: workspaceId thiếu — task không thể tạo orphan.' }
         }
         if (!currentProfileId || typeof currentProfileId !== 'string') {
-            console.error('[createBatchTasks] BLOCK: profileId missing from session', { workspaceId, userId: (user as any)?.id })
-            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
+            console.error('[createBatchTasks] BLOCK: workspace chưa gắn profileId', { workspaceId, userId: (user as any)?.id })
+            return { error: 'Workspace này chưa gắn Profile — không thể tạo task. Báo quản trị viên.' }
         }
 
         // [QA R2 fix] Pre-validate the (single, shared) assignee exists so a stale id
@@ -282,6 +282,30 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
 
         if (Object.keys(updateData).length === 0) {
             return { error: 'Không có field nào được chỉnh' }
+        }
+
+        // [PHẢN BIỆN CS 2026-07-31 · CS4-1] CỬA GÁN VIỆC THỨ TƯ — TRƯỚC ĐÂY KHÔNG CÓ CHỐT R14.
+        //
+        // Hàm này ghi thẳng `assigneeId` từ tham số mà không hỏi người đó có thuộc profile của
+        // workspace không, trong khi 3 đường còn lại (createTask, createTasksFromBatch,
+        // bulkAssignTasks) đều có chốt. Đợt vá CS-4 sửa nguồn profileId ngay trong file này mà
+        // không thấy cửa này — đúng lỗi lặp lại của cả chiến dịch: vá chỗ mình đang nhìn, không rà
+        // hết các cửa cùng loại.
+        //
+        // Khai thác không cần lỗ hổng nào khác: kẻ tấn công tự tạo profile B + workspace W_B (hợp
+        // lệ, hắn là OWNER), tạo lô task với tiêu đề do hắn soạn, gán cho userId của nạn nhân ở
+        // tenant khác, rồi đẩy status sang 'Hoàn tất'. Hệ thống gửi email digest tới ĐỊA CHỈ THẬT
+        // của nạn nhân, xưng đúng tên họ, nội dung là chuỗi tiêu đề của kẻ tấn công, gửi từ tên
+        // miền HustlyTasker. Hàng Task mang assigneeId của nạn nhân còn lọt vào truy vấn lương của
+        // workspace lạ.
+        //
+        // Dùng nguyên khuôn của `bulkAssignTasks` trong chính file này (~:810), đặt TRƯỚC transaction.
+        if ('assigneeId' in data && data.assigneeId) {
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId)
+            if (!assigneeAllowed) {
+                return { error: 'Editor được chọn không thuộc workspace/profile này.' }
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────────────────────

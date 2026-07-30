@@ -28,7 +28,19 @@ const clean = (s: string | undefined | null, cap = 300): string | null => {
 async function access(workspaceId: string) {
     const a = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
     const userId = (a as any)?.userId ?? (a as any)?.user?.id ?? null
-    const profileId = (a as any)?.user?.sessionProfileId ?? null
+    // [PHẢN BIỆN CS 2026-07-31 · CS-C4] profileId đóng dấu lên hàng Payment phải là profile CỦA
+    // WORKSPACE, không phải claim JWT. Trước đây lấy thẳng claim: kẻ tấn công là OWNER của W_B trỏ
+    // claim về profile nạn nhân A rồi ghi nhận thanh toán trong W_B ⇒ hàng Payment mang
+    // `profileId = A`, tức sổ tiền của W_B bị đóng dấu tenant khác. Chốt Client ở recordPayment
+    // dùng `ws.profileId` nên KHÔNG chạm được khách của A (đó là lý do đây chỉ là dữ liệu sai nhãn,
+    // chưa rò đọc) — nhưng đúng lớp lỗi mà CS-4 vừa vá cho Task, và bất kỳ báo cáo theo profile nào
+    // thêm sau này đều thừa hưởng nguyên nó.
+    // Giữ nhánh lùi về claim CHỈ khi workspace chưa gắn profile (dữ liệu legacy), không đảo lại.
+    const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    const profileId = ws?.profileId ?? (a as any)?.user?.sessionProfileId ?? null
     return { userId, profileId }
 }
 

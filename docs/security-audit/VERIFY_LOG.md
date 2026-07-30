@@ -1302,3 +1302,62 @@ HT-037/038: xoá hàm nhưng để lại tên kênh. → Vá ở ĐIỂM NGHẼN
   nằm trong danh sách cho phép, và cả hai đủ để chiếm hệ thống. Trên Windows file store nằm ở
   `%APPDATA%` (người dùng ghi được) còn app nằm ở Program Files (không), nên ghi file store vẫn dễ
   hơn sửa mã app — bộ lọc thu hẹp, không đóng.
+
+---
+
+# BẢN DESKTOP ĐÃ ĐƯỢC GỠ BỎ (2026-07-30, quyết định của chủ dự án)
+
+Commit `4e2ec4d`. Gỡ `electron/` + 3 script build + các nhánh `ELECTRON_DESKTOP` trong
+`next.config.ts` + 7 cổng cookie. **Giữ `mcp-server/`** — nó là Phase 1 của dự án desktop nhưng
+chạy độc lập và đang được dùng thật; `electron/main/*.ts` không tham chiếu nó một dòng nào.
+
+## Bốn ID + N11 nay KHÔNG CÒN TỒN TẠI, thay vì "đã vá"
+
+| ID | Trạng thái mới |
+|---|---|
+| HT-029 (High) | không còn bề mặt — `output: 'standalone'` (nguyên nhân GỐC) đã gỡ |
+| HT-037 | không còn renderer nào để rò secret |
+| HT-038 | không còn renderer nào để ghi cấu hình |
+| HT-039 | không còn nút "Test DB" |
+| N11 | không còn tiến trình con nào được tiêm biến môi trường từ store |
+
+Các commit vá chúng KHÔNG bị revert: nếu sau này dựng lại desktop thì phải bắt đầu TỪ bản đã
+vá. Lịch sử git giữ nguyên `electron/` để tra cứu.
+
+## ĐÍNH CHÍNH: "đổi toàn bộ secret trong .env" là TÔI NÓI QUÁ
+
+Tài liệu kiểm toán viết *"Rotate ALL **listed** secrets"* — tức 10 key nó **đã kiểm và thấy**
+trong artifact. Tôi tóm lại thành "toàn bộ `.env`" (38 key). Bằng chứng số cho thấy file bị bắt
+là bản **cũ và nhỏ hơn nhiều**: artifact HT-029 = **2.733 byte**, `.env` hiện tại = **10.588
+byte**. Nên Mux / LiveKit / Dropbox / Google / Cloudflare / Inngest / VAPID rất có thể chưa từng
+nằm trong bản rò.
+
+**Thực tế cần đổi 6 key** (4 key còn lại trong danh sách 10 không phải secret):
+`DATABASE_URL` · `JWT_SECRET` · `CRON_SECRET` · `RESEND_API_KEY` ·
+`UPSTASH_REDIS_REST_TOKEN` · `TURNSTILE_SECRET_KEY`
+Không cần đổi: `ADMIN_EMAIL` (chỉ là email), `NEXT_PUBLIC_SUPABASE_URL` +
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` (tiền tố `NEXT_PUBLIC_` ⇒ vốn đã được gửi xuống trình duyệt
+trong mọi trang, chưa bao giờ là secret), `UPSTASH_REDIS_REST_URL` (chỉ là URL; đổi token là đủ).
+
+⚠️ **Gỡ bản desktop KHÔNG thay việc đổi secret.** Nó chặn rò về sau, không rút lại được thứ đã
+phát ra. Câu quyết định mức độ gấp: **installer đó đã từng đưa cho ai chưa?** Chưa đưa ai (chỉ
+nằm trên máy chủ dự án) → mức thấp, đổi 6 key là vệ sinh. Đã gửi editor/khách hoặc đẩy qua
+auto-update → đổi ngay, ưu tiên `JWT_SECRET` + `DATABASE_URL`.
+Nếu thư mục `electron/release` còn trên máy: mở đúng file `.env` bên trong và đổi CHÍNH XÁC
+những key có trong đó — chính xác hơn danh sách 10 của tài liệu.
+
+## Nợ do chính việc gỡ tạo ra
+
+- `cross-env` thành devDependency mồ côi. KHÔNG gỡ khỏi `package.json` vì gỡ dependency phải
+  chạy `npm install`, mà `postinstall` gọi `prisma db push` vào database thật.
+- `scripts/assert-no-env-in-standalone.mjs` nay KHÔNG còn script nào gọi (`build:desktop` là nơi
+  duy nhất từng gọi). Giữ file lại làm hồ sơ sự cố + chốt chặn nếu ai thêm `output: 'standalone'`
+  trở lại; `next.config.ts` có chú thích trỏ tới nó.
+- 7 cổng cookie nay là `secure: NODE_ENV === 'production'` không điều kiện. Nếu về sau tự host
+  trên HTTP không TLS thì đăng nhập gãy — đúng như vậy là an toàn, chỉ cần biết trước.
+
+## Việc của chủ dự án
+
+- **Xoá thư mục `electron/release` trên máy** nếu còn (nó chứa `.env` thật). Tôi không tự xoá file
+  ngoài worktree.
+- **Gỡ cài đặt bản app desktop** trên mọi máy đã cài.

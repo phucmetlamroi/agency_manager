@@ -157,8 +157,8 @@ export async function createTask(formData: FormData, workspaceId: string) {
             return { error: 'Lỗi nội bộ: workspaceId thiếu.' }
         }
         if (!profileId || typeof profileId !== 'string') {
-            console.error('[createTask] BLOCK: profileId missing from session', { workspaceId, userId: session?.user?.id })
-            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
+            console.error('[createTask] BLOCK: workspace chưa gắn profileId', { workspaceId, userId: session?.user?.id })
+            return { error: 'Workspace này chưa gắn Profile — không thể tạo task. Báo quản trị viên.' }
         }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)

@@ -37,7 +37,7 @@ import { prisma } from '@/lib/db'
  *
  * Hệ quả đã dựng lại được: kẻ tấn công giữ MỘT hàng ProfileAccess bất kỳ trên profile A (ghế USER,
  * hoặc cả ghế CLIENT — /api/profile/select chỉ kiểm hàng đó TỒN TẠI, không đọc vai) tự tạo profile
- * B + workspace W_B, trỏ claim về A, rồi gọi createTask/createTasksFromBatch/createBatchTasks với
+ * B + workspace W_B, trỏ claim về A, rồi gọi createTask/createTasksFromBatch với
  * workspaceId = W_B. Chốt này gật đầu ⇒ `ensureWorkspaceMembership` chạy vô điều kiện ngay sau đó,
  * GHI `WorkspaceMember(nạn nhân, W_B)` + `ProfileAccess(nạn nhân, B, 'USER')`. Có hai hàng đó rồi
  * thì `deactivateUser(nạn nhân, W_B)` qua được mọi chốt và đặt `role='LOCKED'` + bump

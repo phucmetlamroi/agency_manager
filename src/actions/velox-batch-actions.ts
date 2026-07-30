@@ -148,7 +148,7 @@ export async function createTasksFromBatch(
             return { error: 'Lỗi nội bộ: workspaceId thiếu.' }
         }
         if (!profileId || typeof profileId !== 'string') {
-            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile.' }
+            return { error: 'Workspace này chưa gắn Profile — không thể tạo task. Báo quản trị viên.' }
         }
 
         // [Trial P0] The Manager (picked in the form), else the creator.

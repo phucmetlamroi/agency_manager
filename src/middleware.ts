@@ -177,20 +177,31 @@ export async function middleware(request: NextRequest) {
         const sessionAge = Date.now() - (sessionPayload.user.authAt ?? 0)
         const withinAbsoluteWindow = sessionAge < SESSION_ABSOLUTE_MAX_AGE * 1000
         if (msLeft > 0 && msLeft < (SESSION_MAX_AGE * 1000) / 2 && withinAbsoluteWindow) {
-            // Giữ parity với login(): kèm claim `expires` (consumer /api/profile/select đọc nó)
-            // + copy nguyên `user` (role/sessionVersion/sessionProfileId… đều còn).
-            const fresh = await encrypt(
-                { user: sessionPayload.user, expires: new Date(Date.now() + SESSION_MAX_AGE * 1000) },
-                `${SESSION_MAX_AGE}s`,
+            // [PHẢN BIỆN 2026-07-30 · R4-2] KẸP HẠN THEO NGÂN SÁCH TUYỆT ĐỐI CÒN LẠI.
+            // `withinAbsoluteWindow` ở trên chỉ là ĐIỀU KIỆN VÀO. Nếu vẫn cấp trọn SESSION_MAX_AGE
+            // thì một token gia hạn ở ngày thứ 89 sống tới ngày ~119 — trần thật là 120 ngày, không
+            // phải 90 như hằng số và commit ghi. Người vận hành đọc con số đó để lập kế hoạch ứng
+            // cứu, nên lệch 30 ngày là lệch thật, không phải chi tiết văn bản.
+            const absRemainingSec = Math.floor(
+                ((sessionPayload.user.authAt ?? 0) + SESSION_ABSOLUTE_MAX_AGE * 1000 - Date.now()) / 1000,
             )
-            finalResponse.cookies.set('session', fresh, {
-                maxAge: SESSION_MAX_AGE,
-                httpOnly: true,
-                // Khớp secure của auth.ts (Electron desktop chạy http → không đặt secure).
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                path: '/',
-            })
+            const ttlSec = Math.min(SESSION_MAX_AGE, absRemainingSec)
+            if (ttlSec > 0) {
+                // Giữ parity với login(): kèm claim `expires` (consumer /api/profile/select đọc nó)
+                // + copy nguyên `user` (role/sessionVersion/sessionProfileId… đều còn).
+                const fresh = await encrypt(
+                    { user: sessionPayload.user, expires: new Date(Date.now() + ttlSec * 1000) },
+                    `${ttlSec}s`,
+                )
+                finalResponse.cookies.set('session', fresh, {
+                    maxAge: ttlSec,
+                    httpOnly: true,
+                    // Khớp secure của auth.ts (Electron desktop chạy http → không đặt secure).
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    path: '/',
+                })
+            }
         }
     }
 

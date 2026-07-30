@@ -17,7 +17,7 @@ export function registerBulkOpsTools(server: McpServer) {
         'Update details (type, assignee, deadline, pricing, notes, etc.) for multiple tasks at once. All tasks must belong to the same workspace. The assigneeId/status invariant is enforced per task. Returns per-task results including individual successes and failures.',
         {
             workspaceId: z.string().describe('ID of the workspace all tasks belong to'),
-            taskIds: z.array(z.string()).min(1).describe('Array of task IDs to update'),
+            taskIds: z.array(z.string()).min(1).max(50).describe('Array of task IDs to update (tối đa 50 — xem chú thích trần bulk)'),
             updates: z.object({
                 type: z.enum(['Short', 'Long', 'Trial']).optional().describe('New task type'),
                 assigneeId: z.string().nullable().optional().describe('New assignee user ID, or null to unassign'),
@@ -68,7 +68,7 @@ export function registerBulkOpsTools(server: McpServer) {
         `Transition multiple tasks to the same new status in one operation. All tasks must belong to the same workspace. Valid statuses: ${VALID_TASK_STATUSES.join(', ')}. The assigneeId/status invariant is enforced per task. Returns per-task results.`,
         {
             workspaceId: z.string().describe('ID of the workspace all tasks belong to'),
-            taskIds: z.array(z.string()).min(1).describe('Array of task IDs to update'),
+            taskIds: z.array(z.string()).min(1).max(50).describe('Array of task IDs to update (tối đa 50 — xem chú thích trần bulk)'),
             newStatus: z.string().describe(
                 `New status for all tasks. Must be one of: ${VALID_TASK_STATUSES.join(', ')}`,
             ),

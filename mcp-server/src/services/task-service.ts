@@ -8,7 +8,7 @@ import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
 import { isValidStatus, type TaskStatus } from './statuses.js'
-import { assertWorkspaceMember, assertClientInProfile } from './guards.js'
+import { assertWorkspaceMember, assertClientInProfile, assertNotRedCarded } from './guards.js'
 import { sanitizeExternalUrl } from '../safe-url.js'
 import { writeMcpAudit } from './audit.js'
 
@@ -68,6 +68,9 @@ export async function createTask(
     // [AUDIT HT-036 fix] If an assignee is given, they must be a member of this workspace.
     if (data.assigneeId) {
         await assertWorkspaceMember(wsId, data.assigneeId)
+        // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Cửa phụ cùng lớp: gán assigneeId qua create_task /
+        // update_task_details cũng phải qua chốt thẻ đỏ, không chỉ assign_task.
+        await assertNotRedCarded(wsId, data.assigneeId)
     }
 
     const createData: Record<string, any> = {
@@ -261,7 +264,9 @@ export async function updateTaskDetails(
     taskId: string,
     data: UpdateTaskDetailsInput,
 ) {
-    await validateWorkspaceAccess(wsId)
+    // [AUDIT SWEEP fix · MCP-PAID] Giữ giá trị trả về — `ws.name` là nguồn suy chu kỳ lương, và
+    // `validateWorkspaceAccess` đã select `name` sẵn nên KHÔNG cần truy vấn thêm.
+    const ws = await validateWorkspaceAccess(wsId)
     const wsPrisma = getWorkspacePrisma(wsId, profileId)
 
     const currentTask = await wsPrisma.task.findUnique({
@@ -297,6 +302,16 @@ export async function updateTaskDetails(
 
     // Financial fields with profit recalculation
     if (data.jobPriceUSD !== undefined || data.value !== undefined) {
+        // [AUDIT SWEEP-2026-07-30 fix · MCP-PAID] CHỐT KỲ LƯƠNG ĐÃ ĐÓNG.
+        // Web có chốt này (src/lib/payroll-lock.ts); MCP trước đây KHÔNG có một truy vấn Payroll nào,
+        // nên ghi được jobPriceUSD/value/wageVND/profitVND của kỳ ĐÃ TRẢ — và vì ba cột được ghi đồng
+        // bộ nên số đổi "gọn gàng", không để lại dấu lệch cột như đường bulk của web từng có.
+        // reachable=false (stdio cục bộ, service-account của chính chủ profile) nên đây là parity +
+        // chống bẫy tương lai, không phải lỗ đang mở. Quyết định của chủ dự án: vẫn làm.
+        // Chỉ kiểm khi THẬT SỰ đụng tiền — đặt trong đúng nhánh này, không gác cả hàm.
+        const { assertPayrollCycleOpen } = await import('./payroll-cycle.js')
+        await assertPayrollCycleOpen(wsId, ws.name, currentTask.assigneeId ?? null)
+
         const newJobPriceUSD = data.jobPriceUSD !== undefined
             ? (data.jobPriceUSD ?? 0)
             : Number(currentTask.jobPriceUSD ?? 0)
@@ -316,6 +331,9 @@ export async function updateTaskDetails(
         // [AUDIT HT-036 fix] A newly-set assignee must be a member of this workspace.
         if (data.assigneeId) {
             await assertWorkspaceMember(wsId, data.assigneeId)
+        // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Cửa phụ cùng lớp: gán assigneeId qua create_task /
+        // update_task_details cũng phải qua chốt thẻ đỏ, không chỉ assign_task.
+        await assertNotRedCarded(wsId, data.assigneeId)
         }
         updateData.assigneeId = data.assigneeId || null
         enforceAssigneeStatusInvariant(updateData, currentTask)
@@ -327,7 +345,7 @@ export async function updateTaskDetails(
     const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.task.update({
             where: { id: taskId, workspaceId: wsId, profileId },
-            data: updateData,
+            data: { ...updateData, version: { increment: 1 } }, // [AUDIT SWEEP · P6-SWEEP-2]
             include: {
                 client: { select: { id: true, name: true } },
                 assignee: { select: { id: true, username: true, displayName: true } },

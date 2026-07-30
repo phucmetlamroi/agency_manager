@@ -7,7 +7,7 @@ import { prisma } from '../prisma-client.js'
 import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
-import { assertWorkspaceMember } from './guards.js'
+import { assertWorkspaceMember, assertNotRedCarded } from './guards.js'
 import { writeMcpAudit } from './audit.js'
 
 // ---------------------------------------------------------------------------
@@ -29,6 +29,8 @@ export async function assignTask(
     // [AUDIT HT-036 fix] The assignee must be a member of THIS workspace — otherwise a caller
     // could assign a task to a user from another workspace/tenant within the profile.
     await assertWorkspaceMember(wsId, assigneeId)
+    // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Web chặn giao task cho nhân sự Rank D; MCP thì không.
+    await assertNotRedCarded(wsId, assigneeId)
 
     // Verify task exists
     const task = await wsPrisma.task.findUnique({
@@ -55,7 +57,7 @@ export async function assignTask(
     const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.task.update({
             where: { id: taskId, workspaceId: wsId, profileId },
-            data: updateData,
+            data: { ...updateData, version: { increment: 1 } }, // [AUDIT SWEEP · P6-SWEEP-2]
             select: {
                 id: true,
                 status: true,
@@ -139,7 +141,7 @@ export async function unassignTask(
     const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.task.update({
             where: { id: taskId, workspaceId: wsId, profileId },
-            data: updateData,
+            data: { ...updateData, version: { increment: 1 } }, // [AUDIT SWEEP · P6-SWEEP-2]
             select: {
                 id: true,
                 status: true,
@@ -187,6 +189,8 @@ export async function bulkAssignTasks(
     }
     // [AUDIT HT-036 fix] Verify the assignee belongs to this workspace once, up front.
     await assertWorkspaceMember(wsId, assigneeId)
+    // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Web chặn giao task cho nhân sự Rank D; MCP thì không.
+    await assertNotRedCarded(wsId, assigneeId)
     if (!taskIds || taskIds.length === 0) {
         throw new Error('taskIds array must not be empty')
     }
@@ -237,7 +241,7 @@ export async function bulkAssignTasks(
 
             const updated = await tx.task.update({
                 where: { id: taskId },
-                data: { ...updateData, profileId },
+                data: { ...updateData, profileId, version: { increment: 1 } }, // [AUDIT SWEEP · P6-SWEEP-2]
                 select: { id: true, status: true, assigneeId: true },
             })
 

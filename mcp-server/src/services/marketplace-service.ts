@@ -241,7 +241,7 @@ export async function returnTask(
     const updated = await prisma.$transaction(async (tx) => {
         const row = await tx.task.update({
             where: { id: taskId, workspaceId: wsId, profileId },
-            data: updateData,
+            data: { ...updateData, version: { increment: 1 } }, // [AUDIT SWEEP · P6-SWEEP-2 — sổ bỏ sót đường này]
             select: {
                 id: true,
                 status: true,

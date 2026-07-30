@@ -17,7 +17,9 @@ export async function login(userData: any, opts?: { rememberMe?: boolean }) {
     const days = opts?.rememberMe ? REMEMBER_ME_DAYS : DEFAULT_SESSION_DAYS
     const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
     const ttl = `${days} days`
-    const session = await encrypt({ user: userData, expires }, ttl)
+    // [AUDIT SWEEP-2026-07-30 · N8] `authAt` = mốc ĐĂNG NHẬP THẬT, không bị rolling-refresh dịch đi.
+    // middleware dùng nó để từ chối gia hạn quá SESSION_ABSOLUTE_MAX_AGE (xem lib/jwt.ts).
+    const session = await encrypt({ user: { ...userData, authAt: Date.now() }, expires }, ttl)
 
     const cookieStore = await cookies()
     cookieStore.set('session', session, {
@@ -34,7 +36,8 @@ export async function loginWithProfile(userData: any, profileId: string, opts?: 
     const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
     const ttl = `${days} days`
     const session = await encrypt({
-        user: { ...userData, sessionProfileId: profileId },
+        // [AUDIT SWEEP-2026-07-30 · N8] `authAt` — xem chú thích ở login() và lib/jwt.ts.
+        user: { ...userData, sessionProfileId: profileId, authAt: Date.now() },
         expires,
     }, ttl)
 

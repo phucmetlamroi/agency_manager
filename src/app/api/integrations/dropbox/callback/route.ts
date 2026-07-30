@@ -65,6 +65,13 @@ export async function GET(req: Request) {
       { status: 401 },
     )
   }
+  // [AUDIT SWEEP-2026-07-30 fix · N8(c)] So khớp id với `state` KHÔNG chứng minh phiên còn sống —
+  // getSession() chỉ giải mã JWT. Callback này LƯU token nhà cung cấp vào DB, tức nó tạo quyền truy
+  // cập lâu dài; một tài khoản vừa bị khoá không được phép hoàn tất bước này.
+  const { isSessionLive } = await import('@/lib/profile-permissions')
+  if (!(await isSessionLive(session))) {
+    return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
+  }
 
   // ---------------------------------------------------------------------------
   // 4–8. Token exchange, encryption, DB upsert, and redirect

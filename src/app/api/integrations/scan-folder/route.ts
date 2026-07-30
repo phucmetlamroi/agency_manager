@@ -66,6 +66,16 @@ export async function POST(req: Request) {
             { status: 401 },
         )
     }
+    // [AUDIT SWEEP-2026-07-30 fix · N8(c)] Route này chạy quét đệ quy tốn tiền (maxDuration dài,
+    // gọi API Dropbox/Drive) nên phải chặn tài khoản đã bị khoá / phiên đã thu hồi — getSession()
+    // một mình không thấy hai điều đó vì nó không đọc DB.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) {
+        return NextResponse.json(
+            { error: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.' },
+            { status: 401 },
+        )
+    }
 
     // ---------------------------------------------------------------------------
     // 2. Parse and validate request body

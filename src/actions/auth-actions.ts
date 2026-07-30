@@ -8,6 +8,7 @@ import { cookies, headers } from 'next/headers'
 import { rateLimit } from '@/lib/rate-limit'
 import { checkLoginIp } from '@/lib/rate-limit-upstash'
 import { getRequestIpFromHeaders } from '@/lib/request-ip'
+import { safeNextPath } from '@/lib/safe-next-path'
 import { UserRole } from '@prisma/client'
 import { randomInt } from 'crypto'
 
@@ -158,13 +159,10 @@ async function resetLockoutOnSuccess(userId: string, ip: string) {
  * '//', no backslash trick, no scheme, and not /api or /login itself. Returns the
  * safe path or null (→ caller falls back to the default destination).
  */
-function safeNextPath(raw: unknown): string | null {
-    if (typeof raw !== 'string' || !raw) return null
-    if (!raw.startsWith('/')) return null
-    if (raw.startsWith('//') || raw.startsWith('/\\') || raw.includes('\\')) return null
-    if (raw.startsWith('/api') || raw.startsWith('/login')) return null
-    return raw
-}
+// [AUDIT SWEEP-2026-07-30 fix] `safeNextPath` đã chuyển sang `@/lib/safe-next-path` (xem import ở
+// đầu file). Lý do tách: file này là `'use server'`, nên export hàm ra để viết hàng rào hồi quy sẽ
+// biến nó thành một server action công khai. Bản vá thật (chuẩn hoá ký tự điều khiển trước khi so
+// khớp) + giải thích đầy đủ nằm trong module đó, kèm test ở scripts/assert-safe-next-path.ts.
 
 export async function loginAction(prevState: any, formData: FormData) {
     // Backward compat: chấp nhận cả 'username' field cũ và 'emailOrUsername' field mới
@@ -214,7 +212,20 @@ export async function loginAction(prevState: any, formData: FormData) {
             await paddingDelay()
             return { error: `Quá nhiều yêu cầu. Vui lòng thử lại sau ${rl.retryAfter ?? 60} giây.` }
         }
-    } catch { /* skip nếu Upstash unreachable — fail-open ở dev */ }
+    } catch {
+        // [AUDIT SWEEP-2026-07-30 fix · P1-043] TRƯỚC ĐÂY FAIL-OPEN Ở CẢ PRODUCTION.
+        // `catch {}` rỗng nuốt trọn ngoại lệ của Upstash, nên chỉ cần một sự cố mạng tới
+        // UPSTASH_REDIS_REST_URL là trần 10 login/phút/IP biến mất hoàn toàn. Tuyến còn lại (khoá
+        // theo tài khoản, 5 lần sai/15 phút) chỉ khoá TỪNG tài khoản nên không cản kiểu rải mật khẩu:
+        // một mật khẩu phổ biến thử qua N tài khoản, mỗi tài khoản 4 lần, không giới hạn tốc độ từ
+        // một IP. Và chính tầng dưới (lib/rate-limit-upstash.ts) đã CHỌN fail-closed ở production —
+        // quyết định đó bị nơi gọi này vô hiệu hoá. Các luồng auth khác (signup, OTP) để lỗi nổ.
+        if (process.env.NODE_ENV === 'production') {
+            await paddingDelay()
+            return { error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 60 giây.' }
+        }
+        /* dev: vẫn cho qua để không cần Upstash khi chạy máy cá nhân */
+    }
 
     let userRole: string = 'USER'
 

@@ -1,6 +1,6 @@
 import { NextResponse, userAgent } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { decrypt, encrypt, SESSION_MAX_AGE } from '@/lib/jwt'
+import { decrypt, encrypt, SESSION_MAX_AGE, SESSION_ABSOLUTE_MAX_AGE } from '@/lib/jwt'
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
@@ -144,7 +144,17 @@ export async function middleware(request: NextRequest) {
     // so sessionVersion(JWT) vs DB ở tầng DAL — refresh chỉ gia hạn cookie, DAL vẫn chặn data.
     if (sessionPayload?.user && !sessionPayload.user.isImpersonating) {
         const msLeft = ((sessionPayload.exp ?? 0) * 1000) - Date.now()
-        if (msLeft > 0 && msLeft < (SESSION_MAX_AGE * 1000) / 2) {
+        // [AUDIT SWEEP-2026-07-30 fix · N8] HẠN TUYỆT ĐỐI. Vòng gia hạn ở đây trước kia KHÔNG có
+        // điểm dừng: nó chép nguyên `sessionPayload.user` (gồm cả sessionVersion CŨ) vào cookie 30
+        // ngày mới, và không đọc DB được vì đây là Edge. Nên một chuỗi JWT bị đánh cắp chỉ cần được
+        // dùng GET một trang không-API mỗi <15 ngày là sống mãi — kể cả sau khi nạn nhân đã bấm
+        // "đăng xuất mọi thiết bị" (thao tác đó bump sessionVersion, và cổng đó chỉ chặn DỮ LIỆU ở
+        // tầng DAL, không chặn việc cookie tự gia hạn).
+        // Nay chặn theo `authAt` — mốc đăng nhập thật. Token cũ chưa có claim này ⇒ `?? 0` ⇒ hiệu số
+        // rất lớn ⇒ không gia hạn ⇒ tự rụng trong ≤30 ngày. Đó là hành vi MONG MUỐN, không phải lỗi.
+        const sessionAge = Date.now() - (sessionPayload.user.authAt ?? 0)
+        const withinAbsoluteWindow = sessionAge < SESSION_ABSOLUTE_MAX_AGE * 1000
+        if (msLeft > 0 && msLeft < (SESSION_MAX_AGE * 1000) / 2 && withinAbsoluteWindow) {
             // Giữ parity với login(): kèm claim `expires` (consumer /api/profile/select đọc nó)
             // + copy nguyên `user` (role/sessionVersion/sessionProfileId… đều còn).
             const fresh = await encrypt(

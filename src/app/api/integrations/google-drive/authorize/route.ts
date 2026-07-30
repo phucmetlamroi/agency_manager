@@ -7,6 +7,11 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  // [AUDIT SWEEP-2026-07-30 fix · N8(c)] Xem chú thích cùng mã ở dropbox/authorize.
+  const { isSessionLive } = await import('@/lib/profile-permissions')
+  if (!(await isSessionLive(session))) {
+    return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
+  }
 
   const { searchParams } = new URL(req.url)
   const workspaceId = searchParams.get('workspaceId')

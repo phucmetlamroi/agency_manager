@@ -64,6 +64,12 @@ export async function GET(req: Request) {
     if (!session?.user?.id || session.user.id !== userId) {
       return redirect(errorUrl)
     }
+    // [AUDIT SWEEP-2026-07-30 fix · N8(c)] Xem chú thích cùng mã ở dropbox/callback: callback lưu
+    // token nhà cung cấp nên phải hỏi liveness, không chỉ so id với state.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) {
+      return redirect(errorUrl)
+    }
 
     // -------------------------------------------------------------------------
     // 3. Exchange authorization code for tokens

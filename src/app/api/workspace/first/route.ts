@@ -14,6 +14,14 @@ export async function GET(req: Request) {
     if (!session?.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    // [AUDIT SWEEP-2026-07-30 fix · N8(c)] `getSession()` CHỈ giải mã JWT — không chạm database.
+    // Nên một cookie của tài khoản đã bị LOCKED, hoặc một token đã bị thu hồi qua "đăng xuất mọi
+    // thiết bị", vẫn đi qua chốt bên trên. Trước bản vá hạn-tuyệt-đối ở middleware, những token đó
+    // còn tự gia hạn vô hạn, nên các route chỉ-có-getSession là chỗ chúng vẫn dùng được.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) {
+        return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
+    }
 
     const profileId = new URL(req.url).searchParams.get('profileId')
     if (!profileId) {

@@ -408,7 +408,9 @@ export async function createInvoiceRecord(data: {
         const profileId =
             (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
         if (!profileId) {
-            return { error: 'Không xác định được Profile — vui lòng đăng nhập lại.' }
+            // [PHẢN BIỆN vòng 4 · INV-R3] Nhánh duy nhất chạm tới đây là workspace CHƯA GẮN PROFILE.
+            // Câu cũ bảo người dùng "đăng nhập lại" — họ đăng nhập bao nhiêu lần cũng không hết.
+            return { error: 'Workspace này chưa gắn Profile — không thể xuất hoá đơn. Báo quản trị viên.' }
         }
 
         // [AUDIT R7] verifyFinanceAccess replaced getCurrentUser — fetch the actor's
@@ -420,6 +422,34 @@ export async function createInvoiceRecord(data: {
         })
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+        // [PHẢN BIỆN vòng 4 · INV-R1 — HIGH] `data.clientId` TỪNG ĐI THẲNG VÀO `invoice.create`
+        // MÀ KHÔNG QUA MỘT PHÉP KIỂM SỞ HỮU NÀO.
+        //
+        // Bốn vòng vá trước chỉ siết NGUỒN profileId, tức chỉ đóng đường TIỀN (`tx.client.update`
+        // trừ `depositBalance`). Nhưng kẻ tấn công chỉ cần NÉ nhánh tiền: gửi
+        // `clientDepositDeducted: 0` và `taskIds: []` thì không khối nào chạm `Client`, không gì ném
+        // lỗi, và `tx.invoice.create` vẫn ghi một hàng Invoice trỏ `clientId` sang khách của TENANT
+        // KHÁC — khoá ngoại chỉ đòi hàng Client TỒN TẠI, không đòi cùng profile.
+        //
+        // Sink rò dữ liệu: `/api/invoices/[id]/download` đọc `invoice.client.name` qua
+        // `include: { client: true }` — QUAN HỆ LỒNG KHÔNG ĐƯỢC lớp chèn tenancy viết lại (chốt
+        // fail-closed của Client chỉ bắn khi model Ở TẦNG TRÊN là Client). `Client.id` là số tự
+        // tăng ⇒ dò 1..N là quét sạch danh bạ khách của MỌI tenant, kèm oracle tồn tại (id sai →
+        // P2003 → "Failed to save invoice record").
+        //
+        // Tiền đề rẻ nhất trong cả chiến dịch: chỉ cần ĐĂNG KÝ MỘT TÀI KHOẢN MỚI. signup tự tạo
+        // Profile + Workspace + ProfileAccess(OWNER), nên verifyFinanceAccess trên workspace của
+        // chính mình luôn qua. Không cần quan hệ nào với nạn nhân.
+        //
+        // `workspacePrisma` đã mang profileId nên phép kiểm này tự fail-closed.
+        const ownedClient = await workspacePrisma.client.findUnique({
+            where: { id: data.clientId },
+            select: { id: true },
+        })
+        if (!ownedClient) {
+            return { error: 'Khách hàng không thuộc workspace này.' }
+        }
 
         // 0. Verify Tasks are Unbilled (Prevent Double Billing) — fast-fail before tx.
         if (data.taskIds.length > 0) {

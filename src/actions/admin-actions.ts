@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { parseVietnamDate } from '@/lib/date-utils'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { getSession } from '@/lib/auth'
 import { createNotificationInternal } from './notification-actions'
@@ -18,7 +18,14 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         // Previously: any global ADMIN could change any user's role across all workspaces.
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const actorId = session.user.id
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [PHẢN BIỆN 2026-07-30 · CS-3] Profile CỦA WORKSPACE, không phải claim JWT — xem lý do đầy
+        // đủ ở `resolveWorkspaceProfileId` (lib/prisma-workspace.ts) và ở `isAssigneeInWorkspaceProfile`.
+        // FAIL CLOSED: `User` nằm trong bypassModels nên profileId là bộ lọc tenant duy nhất; thiếu
+        // nó thì `getWorkspacePrisma` bên dưới ghi vào User mà không có hàng rào tenant nào.
+        const profileId = await resolveWorkspaceProfileId(workspaceId)
+        if (!profileId) {
+            return { error: 'Workspace chưa gắn Profile — không thể đổi vai trò.' }
+        }
 
         // [AUDIT R2 — fix] Without these guards a workspace ADMIN could (a) escalate
         // anyone to the legacy global ADMIN (super-admin) role, (b) set an arbitrary/
@@ -139,7 +146,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
         // SECURITY: Verify caller is ADMIN of THIS workspace (workspace-scoped check).
         // Replaces previous global `session.user.role === 'ADMIN'` check that ignored workspace boundary.
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-        const profileId = (session?.user as any)?.sessionProfileId
+        const profileId = await resolveWorkspaceProfileId(workspaceId)
 
         // [Sprint T] GUARD against orphan tasks. workspacePrisma middleware
         // INJECTS workspaceId + profileId vào create payload, nhưng nếu các
@@ -196,7 +203,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
             // profile — otherwise an admin could pass a foreign-tenant userId, whom
             // ensureWorkspaceMembership below would silently provision into this profile.
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
-            const assigneeAllowed = await isAssigneeInWorkspaceProfile(assigneeId, workspaceId, profileId)
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(assigneeId, workspaceId)
             if (!assigneeAllowed) {
                 return { error: 'Editor được chọn không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
             }
@@ -206,7 +213,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
         // before letting it override the default creator.
         if (managerId) {
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
-            const managerAllowed = await isAssigneeInWorkspaceProfile(managerId, workspaceId, profileId)
+            const managerAllowed = await isAssigneeInWorkspaceProfile(managerId, workspaceId)
             if (!managerAllowed) {
                 return { error: 'Người quản lý được chọn không thuộc workspace/profile này.' }
             }
@@ -349,7 +356,7 @@ export async function createTask(formData: FormData, workspaceId: string) {
 export async function updateTaskManager(taskId: string, managerId: string, workspaceId: string) {
     try {
         const { session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-        const profileId = (session?.user as any)?.sessionProfileId
+        const profileId = await resolveWorkspaceProfileId(workspaceId)
         if (!profileId || typeof profileId !== 'string') {
             return { error: 'Lỗi nội bộ: profileId thiếu.' }
         }
@@ -362,7 +369,7 @@ export async function updateTaskManager(taskId: string, managerId: string, works
         const mgr = managerId?.trim() || ''
         if (mgr) {
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
-            const ok = await isAssigneeInWorkspaceProfile(mgr, workspaceId, profileId)
+            const ok = await isAssigneeInWorkspaceProfile(mgr, workspaceId)
             if (!ok) return { error: 'Người quản lý được chọn không thuộc workspace/profile này.' }
         }
 

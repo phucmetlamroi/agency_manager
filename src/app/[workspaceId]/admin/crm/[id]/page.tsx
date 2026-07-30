@@ -23,6 +23,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     if (!profileId) redirect('/login')
 
     // Fetch Client with Subsidiaries, Tasks, and Invoices
+    //
+    // [AUDIT N2 fix] MỌI QUAN HỆ LỒNG PHẢI TỰ KHOÁ `workspaceId`.
+    //
+    // `getWorkspacePrisma` CÓ chèn workspaceId/profileId vào `where` cho các phép đọc — nhưng chỉ
+    // ở TẦNG TRÊN (prisma-workspace.ts:138 chặn theo `operation`). Prisma client extension không
+    // viết lại các quan hệ đọc lồng trong `include`. Mà `Client` nay có phạm vi theo PROFILE (mọi
+    // workspace cùng profile thấy chung một tập khách canonical), nên `client.tasks` không lọc gì
+    // sẽ trả về task của MỌI workspace trong profile — kèm `notes_vi`, tức ghi chú nội bộ.
+    //
+    // `crm-actions.ts:32` (getClients) đã làm đúng việc này và ghi rõ lý do trong chú thích của nó;
+    // trang chi tiết là chỗ duy nhất quên. Đây là khuôn có sẵn, không phải thiết kế mới.
     const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
     const client = await workspacePrisma.client.findUnique({
         where: { id },
@@ -31,21 +42,24 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 where: { status: 'ACTIVE' },
                 include: {
                     tasks: {
+                        where: { workspaceId },
                         orderBy: { createdAt: 'desc' },
                         take: 5
                     }
                 }
             },
             tasks: {
+                where: { workspaceId },
                 orderBy: { createdAt: 'desc' },
                 take: 20,
                 include: { rating: true }
             },
             invoices: {
+                where: { workspaceId },
                 orderBy: { issueDate: 'desc' },
                 take: 20
             },
-            projects: true
+            projects: { where: { workspaceId } }
         }
     })
 

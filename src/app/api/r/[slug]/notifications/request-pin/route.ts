@@ -47,9 +47,12 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
     const email = bodyEmail || sessionEmail
     if (!email) return neutral()
 
-    // Skip-PIN / auto-subscribe is allowed ONLY for the guest's OWN session email; a body-supplied
-    // foreign email must always earn a fresh PIN (no force-subscribe of arbitrary addresses).
-    const isOwnEmail = !!sessionEmail && email === sessionEmail
+    // [AUDIT SWEEP-2026-07-30 fix · P1-025] `isOwnEmail` ĐÃ BỊ GỠ khỏi tham số.
+    // Nó chỉ so email trong body với email trong PHIÊN KHÁCH, mà email phiên là TỰ KHAI (đặt qua
+    // POST /identity với force:true) — nên "email của chính mình" ở đây không chứng minh sở hữu hộp
+    // thư, và nhánh bỏ-qua-PIN dựa vào nó gắn được địa chỉ người thứ ba làm người nhận thông báo.
+    // Nay truyền cả `guest` để `requestGuestPin` tự hỏi `emailVerifiedAt` — dấu chỉ verify-pin thật
+    // đóng được. Xem giải thích đầy đủ trong src/lib/review/guest-subscribe.ts.
 
     const ip = getClientIp(req)
     // Cooldown (60s) + burst (3/10min per email+share) + IP/day. On limit we silently skip the send
@@ -68,7 +71,7 @@ export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => 
         share,
         assetId: parsed.data.assetId,
         email,
-        isOwnEmail,
+        guest,
         guestSessionId: guest?.id ?? null,
         ip,
         alwaysSendCode: parsed.data.signoff === true,

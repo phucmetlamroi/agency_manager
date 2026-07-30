@@ -32,7 +32,9 @@ import {
 } from '@/lib/review/share-auth'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
-import { rateLimit } from '@/lib/rate-limit'
+// [AUDIT SWEEP-2026-07-30 · N9] `rateLimit` (in-memory) đã bị gỡ khỏi file này — cả 4 chốt của cổng
+// khách nay dùng `limitDb` (bền, trên Postgres) khoá theo NGƯỜI GỬI/NGƯỜI NHẬN, không theo link.
+// Thư viện `@/lib/rate-limit` vẫn còn cho các nơi gọi khác; đừng dùng lại nó cho bề mặt khách.
 import { limitDb, type RateLimitResult } from '@/lib/review/rate-limit-db'
 import { canonicalEmailKey } from '@/lib/review/email-key'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
@@ -1345,8 +1347,25 @@ export async function submitClientRequestViaToken(token: string, input: SubmitCl
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    const rl = await rateLimit(`client-submit-request:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    // [AUDIT SWEEP-2026-07-30 fix · N9] Chốt cũ là `rateLimit()` IN-MEMORY khoá theo shareLinkId.
+    // Trên serverless đó là chốt GIẢ: mỗi lambda mới lại cấp 20 lượt và Vercel rải request trên
+    // nhiều instance, nên trần thật chỉ còn 2000/phút/token của resolveShareToken. Mỗi lượt = 1
+    // ClientTaskRequest + 1 email THẬT cho MỖI OWNER/ADMIN của profile.
+    //
+    // KHÔNG chuyển sang `limitDb` mà GIỮ khoá shareLinkId — đó đúng là hình dạng đã bị bác ở HT-015:
+    // xô theo LINK là xô chung số phận, và bộ đếm BỀN thì không tự lành sau cold-start nữa, nên ai
+    // cầm link chuyển tiếp chỉ cần bắn hết quota là khách THẬT mất quyền gửi yêu cầu.
+    // Dùng đúng khuôn hai tầng của `requestPortalNotifyEmail` trong chính file này (:608-634):
+    // tầng NGƯỜI GỬI (IP) + tầng NGƯỜI NHẬN (profile — đích thật của email).
+    {
+        const ip = await getRequestIp()
+        if (ip !== 'unknown') {
+            const ipRl = await limitDb(`portal-req-ip:${ip}`, 10, 60 * 60, { failClosed: true })
+            if (!ipRl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+        }
+        const adminRl = await limitDb(`portal-req-profile:${scope.profileId}`, 20, 60 * 60, { failClosed: true })
+        if (!adminRl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    }
 
     // Fail-closed scope checks — client cannot inject another profile's ids.
     if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
@@ -1457,8 +1476,17 @@ export async function createSubClientViaToken(token: string, input: { name: stri
 
     // DB-backed, like every other portal write: the in-memory limiter resets on each cold start,
     // so on serverless it capped almost nothing.
-    const rl = await limitDb(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60)
-    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    //
+    // [AUDIT SWEEP-2026-07-30 fix · N9] NHƯNG khoá theo `shareLinkId` là XÔ CHUNG SỐ PHẬN, và ở đây
+    // bộ đếm lại BỀN — tổ hợp tệ nhất: ai cầm link chuyển tiếp bắn 10 lượt là khách THẬT không tạo
+    // được thương hiệu con nào trong cả giờ, và không tự lành sau cold-start. Chuyển sang khoá theo
+    // NGƯỜI GỬI (IP). Trần nghiệp vụ thật của tính năng này vẫn là `SUBCLIENT_CAP` (20 ACTIVE mỗi
+    // khách mẹ) + `MAX_SUBCLIENT_DEPTH` — hai chốt đó không bị xoay IP làm yếu đi.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const rl = await limitDb(`portal-subclient-ip:${ip}`, 10, 60 * 60, { failClosed: true })
+        if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    }
 
     if (!input || typeof input.parentId !== 'number') return { success: false, error: 'Missing information.' }
     if (!scope.clientIds.includes(input.parentId)) return { success: false, error: 'Invalid parent brand.' }
@@ -1698,11 +1726,30 @@ export async function postCommentViaToken(token: string, taskId: string, body: s
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    const rl = await rateLimit(`client-comment:${scope.shareLinkId}`, 30, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+    // [AUDIT SWEEP-2026-07-30 fix · N9] Xem giải thích đầy đủ ở `submitClientRequestViaToken`:
+    // bộ đếm in-memory theo shareLinkId là chốt giả trên serverless, và chuyển thẳng sang bộ đếm bền
+    // với cùng khoá theo LINK sẽ biến lỗi lạm dụng thành lỗi chặn dịch vụ đối với khách thật.
+    // Mỗi lượt ở đây = 1 hàng TaskComment (rác hiện trong UI staff) + 1 Notification + 1 email THẬT
+    // tới Manager của task.
+    //
+    // TẦNG NGƯỜI GỬI ĐẶT TRƯỚC `findScopedTask` CÓ CHỦ ĐÍCH: nó chặn luôn cả truy vấn tra task, nên
+    // kẻ tấn công không dùng được endpoint này làm máy đọc DB. Tầng NGƯỜI NHẬN phải đặt SAU, vì
+    // trước đó ta chưa biết Manager là ai.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`portal-comment-ip:${ip}`, 30, 60 * 60, { failClosed: true })
+        if (!ipRl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+    }
 
     const { task } = await findScopedTask(token, taskId, { id: true, clientId: true, workspaceId: true, assignedById: true, title: true })
     if (!task) return { success: false, error: 'This link is invalid or the item no longer exists.' }
+
+    // Tầng NGƯỜI NHẬN — chốt SẮC: trần theo Manager, tính chung trên MỌI link. Không có tầng này thì
+    // một botnet cầm nhiều link vẫn dồn thư về một Manager, mỗi link một hạn mức riêng.
+    if (task.assignedById) {
+        const mgrRl = await limitDb(`portal-comment-mgr:${task.assignedById}`, 60, 60 * 60, { failClosed: true })
+        if (!mgrRl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+    }
 
     const clean = sanitizeClientText(body || '', FEEDBACK_MAX_LEN)
     if (!clean) return { success: false, error: 'Please write a message.' }
@@ -1773,8 +1820,15 @@ export async function toggleReactionViaToken(token: string, commentId: string, e
     if (!scope) return { success: false, error: 'This link is invalid.' }
     if (!isValidReaction(emoji)) return { success: false, error: 'Unsupported reaction.' }
 
-    const rl = await rateLimit(`client-react:${scope.shareLinkId}`, 120, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many actions. Please try again later.' }
+    // [AUDIT SWEEP-2026-07-30 fix · N9] Bộ đếm in-memory theo link → bộ đếm bền theo NGƯỜI GỬI.
+    // Khác ba chốt kia: bấm cảm xúc KHÔNG gửi email nào, nên thiệt hại chỉ là hàng DB rác. Vì vậy
+    // chỉ có tầng IP, và ngưỡng để rộng (bấm/bỏ cảm xúc là hành vi tần suất cao của khách thật).
+    // Cố ý KHÔNG thêm tầng theo link — cùng lý do xô-chung-số-phận đã ghi ở hai hàm trên.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`portal-react-ip:${ip}`, 300, 60 * 60, { failClosed: true })
+        if (!ipRl.success) return { success: false, error: 'Too many actions. Please try again later.' }
+    }
 
     const comment = await prisma.taskComment.findFirst({
         where: { id: commentId, isDeleted: false, visibility: 'CLIENT' },

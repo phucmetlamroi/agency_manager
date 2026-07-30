@@ -13,6 +13,7 @@ import { requireReviewAccess } from './access'
 import { getFolderScope, assertVersionInScope } from './folder-scope'
 import { apiError } from './errors'
 import { presignPutObject, presignGetObject, headObject } from './r2'
+import { limitDb } from './rate-limit-db'
 import { canonicalAttachmentImageMime } from './media-constants'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { annotationSchema, toAnnotationEnvelope, readAnnotationShapes } from './annotation'
@@ -640,6 +641,15 @@ export async function initiateAttachment(input: {
     mimeType: string
 }): Promise<{ attachmentId: string; putUrl: string; expiresAt: string }> {
     const access = await requireReviewAccess()
+    // [AUDIT SWEEP-2026-07-30 fix · NEW-attach-presign-unbounded] Đường NỘI BỘ này trước đây KHÔNG
+    // có một chốt tần suất nào: bất kỳ tài khoản MEMBER còn cookie hợp lệ đều mint được URL PUT ký
+    // sẵn ở tốc độ HTTP, mỗi URL sống 1 giờ và cho PUT tới trần single-PUT của R2. Không tạo bình
+    // luận thì object nằm lại R2 vĩnh viễn, không hàng DB nào trỏ tới nên janitor không thấy.
+    // Khoá theo NGƯỜI GỬI (khuôn nguyên văn ở api/integrations/scan-folder/route.ts).
+    const rl = await limitDb(`attach-init:${access.userId}`, 10, 60, { failClosed: true })
+    if (!rl.success) {
+        throw apiError(429, 'RATE_LIMITED', 'Bạn đính kèm quá nhanh. Thử lại sau một phút.')
+    }
     // [AUDIT HT-020 fix] Vòng vá trước dùng "có tiền tố image/ VÀ không chứa chữ svg" — một danh
     // sách CẤM. Nay dùng ALLOWLIST dùng chung với luồng upload bản dựng: chỉ 6 định dạng raster mà
     // trình duyệt thật sự render trong <img>. Danh sách cấm chỉ chặn được cách viết ta nghĩ ra.

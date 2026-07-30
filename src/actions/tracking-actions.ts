@@ -53,38 +53,24 @@ async function flushEvents() {
     }
 }
 
-/**
- * Tracks a micro-interaction (button click, modal open, test finish)
+/*
+ * [AUDIT SWEEP-2026-07-30] `trackEvent` ĐÃ ĐƯỢC XOÁ (quyết định của chủ dự án: gỡ mã chết).
+ *
+ * Nó là server action KHÔNG có cổng xác thực nào, và là NƠI GHI DUY NHẤT vào `eventBuffer` — một
+ * biến cấp module dùng chung cho cả tiến trình. Không một component nào trong repo gọi nó, nên phễu
+ * đo lường này về mặt cơ chế CHƯA TỪNG hoạt động; nhưng nếu có ai cắm lại thì nó vừa nhận dữ liệu
+ * tuỳ ý từ người chưa đăng nhập, vừa có thể làm `createMany` của cả lô ném lỗi và mất luôn sự kiện
+ * của người dùng thật trong cùng instance.
+ *
+ * ⚠️ BỘ ĐỆM BÊN TRÊN ĐƯỢC GIỮ LẠI CÓ CHỦ ĐÍCH, đừng dọn theo:
+ * `forceFlush` vẫn có nơi gọi THẬT — `components/admin/analytics/EventLogTable.tsx:63` bấm nút là
+ * flush rồi đọc lại log. (Phản biện của đợt quét kết luận "cả đường ghi Event là mã chết" — đúng nửa
+ * đầu: không còn NƠI GHI, nhưng đường FLUSH thì vẫn nối vào giao diện đang chạy.)
+ * Hệ quả hôm nay: `eventBuffer` luôn rỗng nên `forceFlush` là no-op. Bảng `Event` không nhận thêm
+ * hàng nào — vốn đã như vậy từ trước, việc xoá này không đổi hành vi.
+ * Muốn bật lại đo lường thì phải viết đường ghi MỚI có cổng phiên + rate-limit theo IP (limitDb),
+ * chứ đừng phục hồi hàm cũ.
  */
-export async function trackEvent(payload: TrackingEventPayload) {
-    try {
-        const cookieStore = await cookies()
-        const sessionId = cookieStore.get('tracking_session_id')?.value
-
-        if (!sessionId) return { success: false, reason: 'No session' }
-
-        eventBuffer.push({
-            sessionId,
-            userId: null, 
-            eventType: payload.eventType,
-            featureName: payload.featureName,
-            metadata: payload.metadata ? JSON.stringify(payload.metadata) : null,
-            createdAt: new Date()
-        })
-
-        if (eventBuffer.length >= FLUSH_THRESHOLD) {
-            await flushEvents()
-        } else if (!flushTimeout) {
-            // Flush after 1 second in serverless to catch the tail end
-            flushTimeout = setTimeout(flushEvents, 1000)
-        }
-
-        return { success: true }
-    } catch (error) {
-        console.error('[Tracking Action Error]', error)
-        return { success: false }
-    }
-}
 
 /**
  * Pings the application with presence data (Heartbeat)

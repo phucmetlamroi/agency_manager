@@ -1239,103 +1239,31 @@ export async function getSubmitOptionsViaToken(token: string) {
     }
 }
 
-/**
- * Client creates a task from the portal. Token-authed (no session); every input
- * is re-validated against the link's scope server-side. The task lands UNASSIGNED
- * ('Đang đợi giao') with the Raw/B-roll links encoded in the pipe format the admin
- * TaskDetailModal parses; the requirement goes to notes_vi. Admin then triages.
+/*
+ * [AUDIT SWEEP-2026-07-30] `createTaskViaToken` ĐÃ ĐƯỢC XOÁ (quyết định của chủ dự án: gỡ mã chết).
+ *
+ * Đây là đường v1: khách bấm là TẠO THẲNG một Task. Nó đã bị luồng v2 bên dưới thay thế — cổng khách
+ * nay gọi `submitClientRequestViaToken` để tạo một ClientTaskRequest, rồi admin xét trong "Hộp thư
+ * yêu cầu" mới sinh Task thật. Chú thích cũ ở đây tự ghi "retained but unused".
+ *
+ * VÌ SAO XOÁ chứ không để đó: nó là bề mặt GHI (tạo Task, ghi notes_vi, ghi link) gọi được bằng token
+ * chia sẻ, không còn ai bảo trì và không nằm trong bất kỳ luồng nghiệp vụ nào — đúng loại bẫy chờ mà
+ * ai đó cắm lại sẽ bỏ qua các chốt v2 đã thêm sau này.
+ *
+ * ⚠️ `getSubmitOptionsViaToken` phía trên KHÔNG chết, đừng dọn theo: nó vẫn được
+ * `components/portal/share/SharePortalClient.tsx` gọi để nạp danh sách chọn cho wizard v2.
+ * (Bản kế hoạch đợt vá gộp hai hàm này thành một mục — sai; chỉ một trong hai là mã chết.)
  */
-export async function createTaskViaToken(
-    token: string,
-    input: { workspaceId: string; clientId: number; title: string; rawLink: string; brollLink?: string; notes?: string },
-) {
-    const scope = await resolveShareToken(token)
-    if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    // Per-link burst guard (best-effort; the 256-bit token is the real wall).
-    const rl = await rateLimit(`client-create-task:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
-    // [L18a] These errors surface to the (English) client portal via CreateTaskPanel → keep them EN
-    // to match line 493; only the internal staff UI is Vietnamese.
-    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
-
-    // Fail-closed scope checks — client cannot inject another profile's/client's id.
-    if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
-        return { success: false, error: 'Missing information.' }
-    }
-    if (!scope.workspaceIds.includes(input.workspaceId)) return { success: false, error: 'Invalid month.' }
-    if (!scope.clientIds.includes(input.clientId)) return { success: false, error: 'Invalid brand.' }
-
-    // The chosen month must still be ACTIVE.
-    const ws = await prisma.workspace.findFirst({
-        where: { id: input.workspaceId, status: 'ACTIVE' },
-        select: { id: true },
-    })
-    if (!ws) return { success: false, error: 'This month is no longer active.' }
-
-    // Validate + sanitize.
-    const title = sanitizeClientText(input.title || '', TITLE_MAX_LEN)
-    if (!title) return { success: false, error: 'Please enter a project / video name.' }
-    const rawLink = cleanLink(input.rawLink)
-    if (!looksLikeUrl(rawLink)) return { success: false, error: 'Invalid raw link (must start with http/https).' }
-    const brollLink = input.brollLink ? cleanLink(input.brollLink) : ''
-    if (brollLink && !looksLikeUrl(brollLink)) return { success: false, error: 'Invalid b-roll link.' }
-    const notes = input.notes ? sanitizeClientText(input.notes, FEEDBACK_MAX_LEN) : ''
-
-    // Encode to the format the admin TaskDetailModal parses (split('|') → RAW:/BROLL:).
-    const resources = `RAW: ${rawLink}` + (brollLink ? ` | BROLL: ${brollLink}` : '')
-
-    let task: { id: string; title: string }
-    try {
-        task = await prisma.task.create({
-            data: {
-                title,
-                resources,
-                notes_vi: notes || null,
-                clientId: input.clientId,
-                workspaceId: input.workspaceId,
-                profileId: scope.profileId,           // from scope, never client input
-                status: 'Đang đợi giao',              // unassigned pool, admin triages
-                assigneeId: null,
-                assignedById: null,
-                type: 'Khách gửi',                    // distinct label → admin spots client submissions
-                version: 0,
-                isArchived: false,
-            },
-            select: { id: true, title: true },
-        })
-    } catch (err) {
-        console.error('[createTaskViaToken] create failed', err)
-        return { success: false, error: 'Không tạo được task. Vui lòng thử lại.' }
-    }
-
-    await notifyProfileAdmins(
-        scope.profileId,
-        'Khách gửi yêu cầu mới',
-        `Khách hàng "${scope.clientName}" vừa gửi task: "${title}"`,
-        task.id,
-    )
-
-    void audit({
-        workspaceId: input.workspaceId, actorUserId: null, action: 'task.client_submitted',
-        targetType: 'Task', targetId: task.id,
-        after: { title, clientId: input.clientId, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
-    })
-
-    try {
-        revalidatePath(`/${input.workspaceId}/admin`)
-        revalidatePath(`/${input.workspaceId}/admin/queue`)
-        revalidatePath(`/${input.workspaceId}/dashboard`)
-    } catch { /* best-effort */ }
-
-    return { success: true, taskId: task.id }
-}
 
 /* ───────────────────────────────────────────────────────────────────────────
    Client Task Submission v2 — request INTAKE (ClientTaskRequest) + sub-brand
-   creation. Supersedes the v1 direct-to-Task path above: the portal wizard now
-   calls submitClientRequestViaToken, which creates a NEW ClientTaskRequest and
-   emails every profile OWNER/ADMIN. An admin later accepts it into a real Task
-   from the "Hộp thư yêu cầu" inbox. createTaskViaToken is retained but unused.
+   creation. Supersedes the v1 direct-to-Task path: the portal wizard calls
+   submitClientRequestViaToken, which creates a NEW ClientTaskRequest and emails
+   every profile OWNER/ADMIN. An admin later accepts it into a real Task from the
+   "Hộp thư yêu cầu" inbox.
+   [AUDIT SWEEP-2026-07-30] Đường v1 (createTaskViaToken) nay ĐÃ XOÁ — câu cũ ở đây
+   ghi "retained but unused", không còn đúng.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const DESIRED_TYPES = new Set(['Short form', 'Long form', 'Trial'])

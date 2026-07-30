@@ -101,7 +101,7 @@ export async function startImpersonation(targetUserId: string, workspaceId: stri
         ...targetUser,
         // [AUDIT N12 fix] Phiên đăng nhập thường luôn có `sessionProfileId`
         // (auth.ts:37 `loginWithProfile`), phiên đóng vai thì không — nên những chỗ đọc thẳng
-        // claim đó (contact-actions.getAuthSession, crm-actions, …) coi như chưa chọn profile và
+        // claim đó (crm-actions và các nơi đọc sessionProfileId khác) coi như chưa chọn profile và
         // trả rỗng. Đóng vai được giới hạn trong ĐÚNG workspace này, nên profile đang hoạt động
         // chính là profile sở hữu workspace đó.
         sessionProfileId: currentProfileId,

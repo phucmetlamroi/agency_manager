@@ -4,10 +4,31 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { verifyWorkspaceAccess, verifyFinanceAccess } from '@/lib/security'
 import { serializeDecimal } from '@/lib/serialization'
 import { audit } from '@/lib/audit-log'
+
+// [AUDIT SWEEP-2026-07-30 · H1 fix] MỘT NGUỒN profileId DUY NHẤT CHO CẢ FILE.
+//
+// Mọi hàm dưới đây chấm quyền bằng verifyWorkspaceAccess/verifyFinanceAccess, và hai cổng đó
+// chấm theo profile CỦA WORKSPACE trong URL (chúng tra `workspace.profileId` rồi tìm
+// ProfileAccess trên đúng profile ấy). Nhưng phạm vi DỮ LIỆU trước đây lại lấy từ claim
+// `sessionProfileId` trong JWT — hai nguồn khác nhau cho hai việc, trong cùng một hàm.
+//
+// Vì `Client` nằm trong `bypassModels` (prisma-workspace.ts), workspaceId KHÔNG được chèn vào
+// truy vấn Client ⇒ profileId là bộ lọc tenant DUY NHẤT của nó. Lệch nguồn nghĩa là: quyền chấm
+// trên profile B, dữ liệu lấy từ profile A. Ai cũng tự tạo được một profile riêng
+// (createProfileForUser, hạn mức 5/người) và tự thành OWNER ở đó, nên một nhân sự thường của
+// agency A chỉ cần tạo profile B + workspace của B, rồi mở CRM ở đó trong khi claim vẫn trỏ về A
+// → đọc trọn danh sách khách của A và xoá vĩnh viễn được cây khách hàng.
+//
+// `resolveActiveProfileId` là khuôn ĐÃ CÓ trong repo (`admin/crm/[id]/page.tsx` dùng đúng nó):
+// chuyển sang profile của workspace khi người gọi có ProfileAccess ở đó, và GIỮ claim cũ khi
+// `workspace.profileId` là NULL (workspace legacy) — nên không làm chết CRM trên dữ liệu cũ.
+//
+// ⚠️ ĐỪNG "sửa" bằng cách chặn khi `sessionProfileId !== workspace.profileId`: điều hướng
+// cross-profile là luồng HỢP LỆ mà `[workspaceId]/layout.tsx` cố ý hỗ trợ, chặn là gãy UX thật.
 
 // --- CLIENT ACTIONS ---
 
@@ -22,7 +43,13 @@ export async function getClients(workspaceId: string) {
         // (verifyProfileAdminAccess) uses, so every real CRM/task-picker caller still passes.
         await verifyFinanceAccess(workspaceId)
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // [Canonical Clients] The client LIST is profile-wide now (every
         // workspace sees the same canonical clients), but the task/project
@@ -115,7 +142,13 @@ export async function createClient(data: { name: string, parentId?: number }, wo
         // [AUDIT R1 — HIGH fix #15] Require workspace ADMIN to mutate CRM.
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         const parentId = data.parentId || null
         const created: { success: boolean; error?: string } = await withClientNameLock(workspacePrisma, profileId, workspaceId, async (tx) => {
@@ -146,7 +179,13 @@ export async function updateClient(id: number, data: { name: string }, workspace
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // Dup-guard on rename: same normalized name under the same parent. A rename REACHES a
         // name position exactly as a create does, so it takes the same lock — otherwise it is
@@ -173,7 +212,13 @@ export async function createProject(data: { name: string, clientId: number, code
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         // [AUDIT R14 — fix] Require a real session profile (consistent with the other
         // create paths) so the clientId profile-filter below can't degrade to an
         // unscoped `profileId: undefined` query.
@@ -261,7 +306,13 @@ export async function deleteClient(id: number, workspaceId: string) {
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const wp = getWorkspacePrisma(workspaceId, profileId)
         // Locked as well: mergeClientIntoParent validates its target parent and then writes, so
         // an unlocked soft-delete landing in that window leaves an ACTIVE child hanging under a
@@ -298,7 +349,13 @@ export async function restoreClient(id: number, workspaceId: string) {
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const wp = getWorkspacePrisma(workspaceId, profileId)
         // [Authz 2026-07 round 4] Restoring turns rows back to ACTIVE, which is a create as far
         // as the name-path scope is concerned. Round 3 checked only the SUBTREE ROOT, and review
@@ -385,7 +442,13 @@ export async function getTrashedClients(workspaceId: string) {
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const wp = getWorkspacePrisma(workspaceId, profileId)
         const clients = await wp.client.findMany({
             where: {
@@ -418,7 +481,13 @@ export async function permanentlyDeleteClient(id: number, workspaceId: string) {
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const wp = getWorkspacePrisma(workspaceId, profileId)
         const ids = await collectClientSubtreeIds(wp, id)
         // [Canonical Clients] Invoice guard must be GLOBAL: the canonical
@@ -433,7 +502,23 @@ export async function permanentlyDeleteClient(id: number, workspaceId: string) {
             }
         }
         // Delete the top node; child clients + projects cascade, tasks detach.
-        await wp.client.delete({ where: { id } })
+        //
+        // [AUDIT SWEEP H1 fix] Chỉ xoá được khách ĐÃ nằm trong Thùng rác. Giao diện chỉ mở nút này
+        // từ trang Thùng rác, nhưng action là POST endpoint gọi trực tiếp được, nên trước đây một
+        // `id` ACTIVE bất kỳ cũng xoá vĩnh viễn được (Client.id là Int tự tăng ⇒ dò tuần tự được),
+        // kéo theo cascade subsidiaries + Project. Không hoàn tác.
+        // Dùng `deleteMany` thay vì `delete` vì `delete` chỉ nhận khoá duy nhất, không nhận thêm
+        // điều kiện `status`. `deleteMany` NẰM TRONG danh sách được chèn phạm vi của
+        // prisma-workspace.ts:138 nên profileId vẫn được chèn — không mất lớp lọc tenant.
+        const { count: deleted } = await wp.client.deleteMany({
+            where: { id, status: 'SOFT_DELETED' },
+        })
+        if (deleted === 0) {
+            return {
+                success: false,
+                error: 'Chỉ xoá vĩnh viễn được khách đang nằm trong Thùng rác. Hãy xoá tạm trước.',
+            }
+        }
         void audit({
             workspaceId,
             actorUserId: session?.user?.id ?? null,
@@ -464,7 +549,13 @@ export async function mergeClientIntoParent(childId: number, parentId: number, w
         if (childId === parentId) return { success: false, error: 'Không thể gộp khách hàng vào chính nó.' }
 
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         // Safety: ensure both are root-level clients
@@ -523,7 +614,13 @@ export async function unmergeClient(clientId: number, workspaceId: string) {
     try {
         await verifyWorkspaceAccess(workspaceId, 'ADMIN')
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         // [Authz 2026-07] Detaching MOVES a client to root level, so it has to clear the same
@@ -576,7 +673,13 @@ export async function getClientDetail(clientId: number, workspaceId: string) {
         // is its only caller).
         await verifyFinanceAccess(workspaceId)
         const session = await getSession()
-        const profileId = (session?.user as any)?.sessionProfileId
+        // [AUDIT SWEEP H1 fix] Phạm vi dữ liệu phải theo profile CỦA WORKSPACE — xem chú thích
+        // đầu file. KHÔNG đổi lại thành `sessionProfileId`.
+        const profileId = (await resolveActiveProfileId(
+            session?.user?.id ?? '',
+            workspaceId,
+            (session?.user as any)?.sessionProfileId,
+        )) ?? undefined
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 
         // [Bug fix 2026-06] Scope tasks/invoices to the SELECTED workspace so the
@@ -600,7 +703,11 @@ export async function getClientDetail(clientId: number, workspaceId: string) {
                     include: { rating: true }
                 },
                 invoices: { where: { workspaceId }, orderBy: { issueDate: 'desc' } },
-                projects: true
+                // [AUDIT SWEEP fix] `projects` là quan hệ lồng DUY NHẤT ở đây bị bỏ sót — ba quan hệ
+                // trên đều đã lọc. Chú thích ngay phía trên nói đúng lý do (extension không chèn
+                // workspaceId vào include), chỉ dòng này quên áp. Không lọc ⇒ tên + mã dự án của
+                // MỌI workspace khác trong cùng profile đi kèm response về máy khách.
+                projects: { where: { workspaceId } }
             }
         })
 

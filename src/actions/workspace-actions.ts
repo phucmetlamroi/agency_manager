@@ -144,6 +144,33 @@ export async function getWorkspacesForProfile(profileId: string) {
     const session = await getSession()
     if (!session?.user?.id) return []
 
+    // [AUDIT SWEEP-2026-07-30 · H3 fix] `profileId` đến TỪ NGƯỜI GỌI và trước đây được dùng thẳng
+    // làm bộ lọc — cổng duy nhất là "có đăng nhập không". Tức bất kỳ ai đã đăng nhập cũng liệt kê
+    // được id/tên/mô tả TOÀN BỘ workspace của một tenant khác chỉ bằng cách truyền profileId lạ.
+    //
+    // Sổ kiểm toán cũ chấm mục này reachable=false vì "không file nào import hàm". ĐO CƠ CHẾ THÌ
+    // SAI: transform 'use server' của Next đăng ký MỌI export của module làm server reference, và
+    // các export cùng file (createWorkspaceAction, restoreWorkspaceAction…) ĐƯỢC Client Component
+    // import — nên cả module vào layer action-browser và hàm này CÓ id trong action manifest.
+    // "Không ai import" ≠ "không gọi được". Quy tắc reachable phải đo theo MODULE, không theo export.
+    //
+    // Gác bằng đúng vị từ mà getProfileMembers dùng: người gọi phải có ProfileAccess trên profile đó.
+    //
+    // ⚠️ KÈM NHÁNH LEGACY, CÓ LÝ DO CỤ THỂ: `getProfileRole` CHỈ đọc bảng `ProfileAccess`. Liên kết
+    // cũ `User.profileId` (cột vẫn còn trong schema) KHÔNG được nó xét, nên một tài khoản chỉ còn
+    // liên kết theo đường cũ sẽ nhận [] và **trình chuyển workspace trống trơn**. Đúng lớp sự cố đã
+    // xảy ra một lần trước đây ("mọi workspace biến mất trừ cái mới nhất") và lần đó nguyên nhân
+    // cũng là một bộ lọc thêm vào ĐÂY. Vì vậy chấp nhận cả hai đường liên kết: vẫn chặn profileId
+    // lạ (mục tiêu của bản vá), mà không cắt tài khoản legacy khỏi chính tenant của họ.
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const hasAccess =
+        (await getProfileRole(session.user.id, profileId)) !== null ||
+        (await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { profileId: true },
+        }))?.profileId === profileId
+    if (!hasAccess) return []
+
     // Hide soft-deleted workspaces from the switcher.
     // The `status` column may not exist pre-migration; in that case the where
     // clause silently degrades (Postgres treats unknown column as error so

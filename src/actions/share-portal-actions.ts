@@ -1357,14 +1357,17 @@ export async function submitClientRequestViaToken(token: string, input: SubmitCl
     // cầm link chuyển tiếp chỉ cần bắn hết quota là khách THẬT mất quyền gửi yêu cầu.
     // Dùng đúng khuôn hai tầng của `requestPortalNotifyEmail` trong chính file này (:608-634):
     // tầng NGƯỜI GỬI (IP) + tầng NGƯỜI NHẬN (profile — đích thật của email).
+    //
+    // [PHẢN BIỆN 2026-07-30 · R5-3] TẦNG "PROFILE" ĐÃ BỊ GỠ KHỎI ĐƯỜNG CHẶN GHI — xem lý do đầy đủ
+    // ngay trên `notifyProfileAdminsOfRequest` ở cuối hàm. Tóm tắt: bản vá N9 thay xô-theo-LINK bằng
+    // xô-theo-PROFILE, tức đổi một xô chung số phận lấy một xô chung số phận RỘNG HƠN — cấp tenant.
+    // Ở đây chỉ còn tầng NGƯỜI GỬI (IP), đúng nghĩa: nó tính trên chính người đang bắn.
     {
         const ip = await getRequestIp()
         if (ip !== 'unknown') {
             const ipRl = await limitDb(`portal-req-ip:${ip}`, 10, 60 * 60, { failClosed: true })
             if (!ipRl.success) return { success: false, error: 'Too many requests. Please try again later.' }
         }
-        const adminRl = await limitDb(`portal-req-profile:${scope.profileId}`, 20, 60 * 60, { failClosed: true })
-        if (!adminRl.success) return { success: false, error: 'Too many requests. Please try again later.' }
     }
 
     // Fail-closed scope checks — client cannot inject another profile's ids.
@@ -1445,11 +1448,32 @@ export async function submitClientRequestViaToken(token: string, input: SubmitCl
         return { success: false, error: 'Could not send your request. Please try again.' }
     }
 
-    await notifyProfileAdminsOfRequest(
-        scope,
-        { id: req.id, title, workspaceId: input.workspaceId, rawFootage, notes },
-        ws.name,
-    )
+    // [PHẢN BIỆN 2026-07-30 · R5-3] TRẦN THEO PROFILE CHỈ CÒN GÁC EMAIL, KHÔNG GÁC VIỆC GỬI YÊU CẦU.
+    //
+    // Bản vá N9 đặt `portal-req-profile:{profileId}` 20/giờ, BỀN, `failClosed`, và ĐẶT TRƯỚC cả
+    // validate input. Đó chính là hình dạng mà chính bản vá đó tuyên bố loại bỏ — xô chung số phận —
+    // chỉ khác là bán kính rộng gấp trăm lần: không phải một link, mà MỌI khách của MỌI workspace
+    // thuộc profile. Người cầm một link đã chuyển tiếp bắn 20 payload RÁC từ 2 IP là khoá cả tenant
+    // tới hết giờ; bộ đếm bền nên không tự lành sau cold-start; một cron mỗi đầu giờ = khoá vĩnh viễn
+    // với giá 20 request/giờ. Trước bản vá, chốt in-memory theo link không tạo nổi hiệu ứng này.
+    //
+    // Tài nguyên cần bảo vệ ở đây là HỘP THƯ ADMIN (mỗi lượt gửi 1 email cho MỖI OWNER/ADMIN), không
+    // phải quyền gửi yêu cầu của khách. Nên tầng này nay chỉ quyết định CÓ GỬI EMAIL HAY KHÔNG:
+    // `ClientTaskRequest` vẫn được tạo, vẫn hiện ở /admin/requests kèm badge chưa đọc. Kịch bản xấu
+    // nhất giờ là admin mất thông báo email trong một giờ — không còn là khách không gửi được việc.
+    // Hạn mức nới 20→60 vì nó không còn chặn đường ghi, và đặt SAU khi input đã hợp lệ nên payload
+    // rác không đốt quota nữa.
+    // `failClosed: true` giữ nguyên: DB hỏng ⇒ bỏ qua email, KHÔNG bỏ qua yêu cầu.
+    const emailBudget = await limitDb(`portal-req-profile-mail:${scope.profileId}`, 60, 60 * 60, { failClosed: true })
+    if (emailBudget.success) {
+        await notifyProfileAdminsOfRequest(
+            scope,
+            { id: req.id, title, workspaceId: input.workspaceId, rawFootage, notes },
+            ws.name,
+        )
+    } else {
+        console.warn('[submitClientRequestViaToken] email fan-out throttled for profile', scope.profileId, '— request', req.id, 'vẫn được tạo')
+    }
 
     void audit({
         workspaceId: input.workspaceId, actorUserId: null, action: 'request.client_submitted',

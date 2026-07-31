@@ -133,9 +133,8 @@ export async function revertMonthlyBonus(
             await tx.monthlyBonus.deleteMany({
                 where: { workspaceId, month: currentMonth, year: currentYear }
             })
-            await tx.monthlyRank.deleteMany({
-                where: { workspaceId, month: currentMonth, year: currentYear }
-            })
+            // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ dòng xoá MonthlyRank: hàm tính thưởng không còn
+            // ghi bảng đó nữa, nên hoàn tác cũng không có gì để dọn.
             const { count: locksRemoved } = await tx.payrollLock.deleteMany({
                 where: { workspaceId, month: currentMonth, year: currentYear }
             })
@@ -166,11 +165,20 @@ export async function revertMonthlyBonus(
 }
 
 /**
- * Ranking algorithm:
- * 1. Primary: incomeScore = max(0, tentativeRevenue - totalPenalty) (DESC)
- * 2. Tie-breaker #1: errorRate (ASC)
- * 3. Tie-breaker #2: rankScore priority (DESC)
- * 4. Tie-breaker #3: tasksCompleted (DESC), then revenue (DESC), then username (ASC)
+ * Xếp hạng thưởng — CHỈ THEO DOANH THU:
+ *   1. Doanh thu "Thực nhận" (tổng `task.value` của task Hoàn tất), giảm dần
+ *   2. Phá hoà: số task hoàn tất (giảm dần), rồi username (tăng dần, cho ổn định)
+ *
+ * Thưởng = doanh thu × % của hạng Top 1/2/3 đang bật trong BonusConfig.
+ * Người đủ điều kiện = có doanh thu > 0. Không có điều kiện nào khác.
+ *
+ * [BỎ HẠNG S/A/B/C/D 2026-07-31] Chú thích cũ ở đây mô tả một thuật toán KHÁC:
+ * `incomeScore = doanh thu - điểm phạt` làm khoá chính, rồi phá hoà bằng errorRate và
+ * rankScore. Cả ba dòng đó đều SAI so với mã: `incomeScore` được tính rồi không ai đọc,
+ * hàm `rankPriority` đã bị xoá từ lâu, và phép sắp xếp chưa bao giờ nhìn tới điểm phạt.
+ * Nói cách khác, ĐIỂM PHẠT CHƯA BAO GIỜ TRỪ THƯỞNG — chú thích cũ mới là thứ khiến người
+ * đọc tưởng có. Nay cả biến chết lẫn chú thích sai đều đã dọn, và hàm này không còn đọc
+ * ErrorLog một lần nào.
  */
 export async function calculateMonthlyBonus(workspaceId: string) {
     let stage = 'init'
@@ -189,7 +197,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
         if (!workspace) return { success: false, error: 'Workspace not found.' }
 
         // Tasks vẫn được aggregate theo workspaceId (1 workspace = 1 cycle).
-        // NHƯNG payrollLock + bonus + monthlyRank records phải lưu month/year THỰC
+        // NHƯNG payrollLock + bonus records phải lưu month/year THỰC
         // (extracted từ workspace.name format "MM / YYYY") để truy vết được trong
         // year-end report, audit, và phân tích history. Hardcode month=0/year=0
         // trước đây gây mất dữ liệu cycle — tất cả workspace đều ghi cùng key (0,0,wsId).
@@ -237,15 +245,11 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             _sum: { value: true }
         })
 
-        // Use calculatedScore directly to avoid fragile relation join with ErrorDictionary.
-        stage = 'aggregate-penalty'
-        const penaltyAggregates = await workspacePrisma.errorLog.groupBy({
-            by: ['userId'],
-            where: {
-                workspaceId
-            },
-            _sum: { calculatedScore: true }
-        })
+        // [BỎ HẠNG S/A/B/C/D 2026-07-31] Trước đây chỗ này gộp `errorLog.calculatedScore` theo
+        // người để tính điểm phạt. Điểm phạt chỉ phục vụ phép chấm hạng S/A/B/C/D — nó KHÔNG bao
+        // giờ trừ vào thưởng. Bỏ hạng thì truy vấn này thành thừa, nên gỡ luôn: phép tính lương
+        // thưởng từ nay không đọc ErrorLog một lần nào.
+        // Sổ ghi lỗi vẫn còn nguyên và vẫn tra được ở "Hồ sơ vi phạm của bạn".
 
         const candidateUserIds = Array.from(
             new Set(completedTaskAggregates.map(row => row.assigneeId).filter(Boolean) as string[])
@@ -284,9 +288,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 .filter(row => row.assigneeId)
                 .map(row => [row.assigneeId as string, toSafeNumber(row._sum.value)])
         )
-        const penaltyByUserId = new Map(
-            penaltyAggregates.map(row => [row.userId, toSafeNumber(row._sum.calculatedScore)])
-        )
 
         interface UserRanking {
             userId: string
@@ -296,10 +297,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             tentativeRevenue: number
             tasksCompleted: number
             monthlySalary: number
-            totalPenalty: number
-            errorRate: number
-            rankScore: string
-            incomeScore: number
         }
 
         const rankings: UserRanking[] = []
@@ -310,18 +307,7 @@ export async function calculateMonthlyBonus(workspaceId: string) {
             const revenue = completed.revenue
             const tasksCompleted = completed.tasksCompleted
             const pendingRevenue = pendingByUserId.get(user.id) || 0
-            const totalPenalty = penaltyByUserId.get(user.id) || 0
             const tentativeRevenue = revenue + pendingRevenue
-            const errorRate = tasksCompleted >= 8 ? Number((totalPenalty / tasksCompleted).toFixed(2)) : 0
-
-            let rankScore = 'UNRANKED'
-            if (tasksCompleted >= 8) {
-                if (errorRate < 0.3) rankScore = 'S'
-                else if (errorRate <= 0.6) rankScore = 'A'
-                else if (errorRate <= 1.0) rankScore = 'B'
-                else if (errorRate <= 1.5) rankScore = 'C'
-                else rankScore = 'D'
-            }
 
             rankings.push({
                 userId: user.id,
@@ -331,10 +317,6 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 tentativeRevenue,
                 tasksCompleted,
                 monthlySalary: revenue,
-                totalPenalty,
-                errorRate,
-                rankScore,
-                incomeScore: Math.max(0, tentativeRevenue - totalPenalty)
             })
         }
 
@@ -401,7 +383,8 @@ export async function calculateMonthlyBonus(workspaceId: string) {
 
             // Clear old data for this month/workspace.
             await tx.monthlyBonus.deleteMany({ where: { month: currentMonth, year: currentYear, workspaceId } })
-            await tx.monthlyRank.deleteMany({ where: { month: currentMonth, year: currentYear, workspaceId } })
+            // [BỎ HẠNG S/A/B/C/D 2026-07-31] Không còn dòng xoá MonthlyRank ở đây, vì cũng không
+            // còn dòng ghi nào. Hàm này thôi hẳn việc đụng tới bảng đó.
 
             // Create new bonuses.
             if (eligibleForBonus.length > 0) {
@@ -436,22 +419,12 @@ export async function calculateMonthlyBonus(workspaceId: string) {
                 }
             }
 
-            // Create new ranks.
-            const monthlyRankData = rankings.map(user => ({
-                userId: user.userId,
-                month: currentMonth,
-                year: currentYear,
-                workspaceId,
-                profileId: workspace.profileId ?? null,
-                totalTasks: user.tasksCompleted,
-                totalPenalty: user.totalPenalty,
-                errorRate: user.errorRate,
-                rank: user.rankScore,
-                isLocked: true
-            }))
-            if (monthlyRankData.length > 0) {
-                await tx.monthlyRank.createMany({ data: monthlyRankData })
-            }
+            // [BỎ HẠNG S/A/B/C/D 2026-07-31] Trước đây chỗ này ghi một hàng MonthlyRank cho MỖI
+            // nhân sự, mang hạng S/A/B/C/D cùng điểm phạt và tỉ lệ lỗi. Luật hạng đã bị bỏ nên
+            // không ghi nữa. Bảng `MonthlyRank` VẪN CÒN trong database theo quyết định của chủ dự
+            // án (dữ liệu cũ giữ lại, không xoá) — chỉ là từ nay không ai ghi và không ai đọc.
+            // Nếu sau này muốn dọn hẳn bảng thì đó là việc riêng, phải đẩy mã này lên production
+            // TRƯỚC rồi mới xoá bảng.
 
             // Lock the cycle LAST — only after every write above succeeded.
             await tx.payrollLock.upsert({

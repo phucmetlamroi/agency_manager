@@ -32,12 +32,18 @@ const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi
  * Cách phân biệt hai trường hợp ngoặc: đếm ngoặc mở và ngoặc đóng bên trong chuỗi đã bắt.
  * Thừa ngoặc đóng nghĩa là cái cuối cùng đến từ câu văn bao ngoài.
  */
-function trimTrailingPunctuation(raw: string): string {
+export function trimUrlTail(raw: string, opts: { stripSemicolon?: boolean } = {}): string {
+    const { stripSemicolon = true } = opts
+    // `stripSemicolon: false` dành cho đường dựng HTML (src/lib/comment-markdown.ts): ở đó chuỗi
+    // ĐÃ được thoát ký tự nên có thể kết thúc bằng `&quot;` hay `&amp;`. Cắt dấu `;` sẽ phá vỡ
+    // thực thể HTML thành `&quot` — sai địa chỉ, và trông như lỗi ngẫu nhiên không ai truy ra được.
+    const marks = stripSemicolon ? '.,;:!?' : '.,:!?'
+
     let s = raw
     while (s.length > 0) {
         const last = s[s.length - 1]
 
-        if ('.,;:!?'.includes(last)) {
+        if (marks.includes(last)) {
             s = s.slice(0, -1)
             continue
         }
@@ -100,7 +106,7 @@ export function linkify(input: string): LinkifySegment[] {
     while ((m = re.exec(input)) !== null) {
         const rawMatch = m[0]
         const start = m.index
-        const display = trimTrailingPunctuation(rawMatch)
+        const display = trimUrlTail(rawMatch)
 
         // Cả chuỗi chỉ toàn dấu câu sau khi gỡ -> không phải link, bỏ qua.
         if (!display) continue

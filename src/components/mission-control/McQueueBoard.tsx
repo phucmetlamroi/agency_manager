@@ -5,8 +5,16 @@
 //   • left column = tasks chờ giao (unassigned / "Đang đợi giao")
 //   • click "Giao" → popover "Giao cho ai?" (search editors + rank + workload) → assignTask
 //   • marketplace pill toggles the real Phiên Chợ (toggleMarketplace)
-// Reuses the SAME server actions /admin uses (assignTask blocks Rank D + checks workspace
-// membership + notifies; toggleMarketplace). Admin-gated at the page level.
+// Reuses the SAME server actions /admin uses (assignTask + toggleMarketplace). Admin-gated at the
+// page level. Chốt còn lại trong assignTask là `isAssigneeInWorkspaceProfile` — nó hỏi người được
+// giao có thuộc PROFILE (tổ chức) của workspace không, qua BẤT KỲ đường nào trong ba: User.profileId,
+// ProfileAccess, hoặc WorkspaceMember. Nên đừng mô tả nó là "workspace membership" như chú thích cũ:
+// nó KHÔNG đòi phải có hàng WorkspaceMember. (Bên MCP mới là `assertWorkspaceMember` đòi hàng đó thật.)
+// Nó CÒN loại thẳng người có role CLIENT hoặc LOCKED, kể cả khi họ đúng profile — nên câu trợ giúp
+// "chặn giao cho người ngoài tổ chức" bên dưới vẫn chưa kể hết: người bị chặn có thể đang ở trong.
+// [GỠ THẺ ĐỎ 2026-07-31] Trước đây danh sách editor còn KHOÁ NÚT phía trình duyệt khi rank === 'D'
+// (`blocked`), song song với chốt server. Cả hai đã bị gỡ. Rank vẫn hiện dưới dạng nhãn S/A/B/C/D
+// cạnh tên — nó là thông tin tham khảo cho người giao việc, không còn là hàng rào.
 import { useState, useTransition, useMemo, type CSSProperties } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -23,7 +31,7 @@ import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 export interface McQueueEditor {
     id: string; name: string; initials: string; avatar: string
     rank?: string; rankColor?: string
-    workingCount: number; workloadPct: number; blocked?: boolean
+    workingCount: number; workloadPct: number
 }
 export interface McQueueTask {
     id: string; title: string; desc: string
@@ -220,8 +228,8 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", maxHeight: 260 }}>
                                     {filteredEditors.length === 0 && <span style={{ fontSize: 11, color: "#52525B", padding: "8px 4px", textAlign: "center" }}>Không có editor khớp.</span>}
                                     {filteredEditors.map((e) => (
-                                        <Pressable key={e.id} type="button" disabled={pending || e.blocked} onClick={() => doAssign(assigningTask.id, e.id, e.name)}
-                                            style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, textAlign: "left", cursor: e.blocked ? "not-allowed" : "pointer", opacity: e.blocked ? 0.45 : 1,
+                                        <Pressable key={e.id} type="button" disabled={pending} onClick={() => doAssign(assigningTask.id, e.id, e.name)}
+                                            style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, textAlign: "left", cursor: "pointer",
                                                 background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
                                             <span style={{ width: 28, height: 28, borderRadius: 999, background: e.avatar, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff", flexShrink: 0 }}>{e.initials}</span>
                                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -229,7 +237,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                                     <span style={{ fontSize: 12, fontWeight: 700, color: "#F4F4F5" }}>{e.name}</span>
                                                     {e.rank && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 9, fontWeight: 800, color: e.rankColor, border: `1px solid ${e.rankColor}66`, borderRadius: 4, padding: "0 4px" }}>{e.rank}</span>}
                                                 </div>
-                                                <div style={{ fontSize: 10, color: "#A1A1AA" }}>{e.blocked ? "Rank D — bị chặn giao" : `${e.workingCount} đang làm · ${loadLabel(e.workloadPct)}`}</div>
+                                                <div style={{ fontSize: 10, color: "#A1A1AA" }}>{`${e.workingCount} đang làm · ${loadLabel(e.workloadPct)}`}</div>
                                             </div>
                                             <div style={{ width: 54, height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)", flexShrink: 0 }}>
                                                 <div style={{ width: `${e.workloadPct}%`, height: "100%", borderRadius: 999, background: barColor(e.workloadPct) }} />
@@ -248,7 +256,7 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 9, color: "#A1A1AA", fontSize: 11, fontWeight: 600, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
                                     <UserX style={{ width: 13, height: 13 }} />Đóng
                                 </Pressable>
-                                <div style={{ fontSize: 10, color: "#52525B", lineHeight: 1.5, padding: "0 4px" }}>Giao xong → task chuyển “Nhận task”, editor nhận thông báo. Server chặn giao cho Rank D “thẻ đỏ” + người ngoài tổ chức.</div>
+                                <div style={{ fontSize: 10, color: "#52525B", lineHeight: 1.5, padding: "0 4px" }}>Giao xong → task chuyển “Nhận task”, editor nhận thông báo. Server chặn giao cho người ngoài tổ chức.</div>
                                 {mktOpen && (
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: "1px dashed rgba(16,185,129,0.35)", color: "#34D399" }}>
                                         <Store style={{ width: 14, height: 14 }} /><span style={{ fontSize: 11, fontWeight: 600 }}>Marketplace đang mở — editor cũng có thể tự nhận</span>

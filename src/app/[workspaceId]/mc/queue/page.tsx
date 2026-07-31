@@ -106,7 +106,8 @@ export default async function MissionControlQueuePage({ params }: { params: Prom
             id: u.id, name, initials: initials(name), avatar: grad(u.id),
             rank, rankColor: rank ? (RANK_HEX[rank] || '#A1A1AA') : undefined,
             workingCount, workloadPct: Math.min(100, Math.round((workingCount / 5) * 100)),
-            blocked: rank === 'D',
+            // [GỠ THẺ ĐỎ 2026-07-31] Bỏ cờ `blocked: rank === 'D'` — nó khoá nút giao việc ngay
+            // trên trình duyệt, là mảnh cuối cùng của luật thẻ đỏ còn sống sau khi chốt server bị gỡ.
         }
     })
 

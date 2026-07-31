@@ -586,6 +586,42 @@ export async function completeUpload(
         fail(413, 'FILE_TOO_LARGE', 'Tệp vượt quá dung lượng cho phép.', { maxBytes: capForKind(version.mediaKind).toString() })
     }
 
+    // [BILLING P1.3] Ghi ĐÈ sizeBytes bằng byte THẬT vừa đo được từ R2.
+    //
+    // Trước bản vá này cột sizeBytes chỉ chứa con số do TRÌNH DUYỆT khai lúc initiate: presigned
+    // PUT/parts không ghim Content-Length (chính comment [C1] ngay trên tự khai điều đó), nên sửa
+    // một dòng trong yêu cầu là khai 1MB cho tệp 4GB. Chốt [C1] CÓ đo byte thật — nhưng chỉ để
+    // TỪ CHỐI tệp vượt trần rồi vứt kết quả đi, cột vẫn giữ nguyên số khai.
+    //
+    // Số khai đó chính là thứ mọi hạn mức dung lượng theo gói sẽ cộng vào. Không vá thì hạn mức
+    // GB chỉ là trang trí: người khai gian vượt trần vẫn tải lên thoải mái, còn người trung thực
+    // thì bị chặn đúng hạn. Luồng đính kèm bình luận đã làm đúng từ lâu (comments.ts, share-
+    // comments.ts đều dùng `BigInt(head.size || …)`); đây là áp cùng cách vào luồng video.
+    //
+    // KHÔNG để lỗi ghi làm hỏng cả lần tải lên: tệp đã nằm đúng chỗ trên R2 và đã qua trần rồi,
+    // đánh sập nó chỉ vì lệch sổ sách là đánh đổi sai. Nhưng cũng KHÔNG nuốt im lặng — ghi log
+    // để đối soát tìm lại được. `stored` rỗng (hiếm: R2 vừa báo hoàn tất mà chưa thấy vật thể)
+    // thì giữ nguyên số khai, tức suy biến về đúng hành vi cũ.
+    if (stored) {
+        const realBytes = BigInt(stored.size)
+        if (realBytes !== version.sizeBytes) {
+            reviewLog('warn', 'upload.complete.size_mismatch', {
+                versionId: version.id,
+                declaredBytes: version.sizeBytes.toString(),
+                actualBytes: realBytes.toString(),
+            })
+            await prisma.reviewVersion
+                .updateMany({ where: { id: version.id }, data: { sizeBytes: realBytes } })
+                .catch((e) =>
+                    reviewLog('error', 'upload.complete.size_writeback_failed', {
+                        versionId: version.id,
+                        actualBytes: realBytes.toString(),
+                        error: String(e),
+                    }),
+                )
+        }
+    }
+
     // R2 object is final — mark the session (bookkeeping + the gate driveCompletion relies on),
     // then drive the state machine. driveCompletion is idempotent, so a retry after a crash here
     // (session marked done, version still UPLOADED) self-heals on the next complete/poll call.

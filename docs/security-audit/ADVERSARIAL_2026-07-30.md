@@ -472,6 +472,12 @@ HẠ từ HIGH xuống MEDIUM (không phải bác bỏ):
 
 **Vá đề xuất**
 
+> ⛔ **PHƯƠNG ÁN (a) ĐÃ VÔ HIỆU 2026-07-31 — ĐỪNG LÀM.** Chủ dự án đã bỏ hẳn luật thẻ đỏ; hàm
+> `assertNotRedCarded` **không còn tồn tại** trong `guards.ts`, và tham chiếu `guards.ts:37-40`
+> dưới đây cũng đã lệch. Phương án **(b)** — bỏ tham số `userId` khỏi tool `claim_task` — thì
+> **vẫn còn hiệu lực và vẫn đúng**, vì nhận định "MCP claim_task là cửa giao việc cho người khác,
+> không phải đường tự-nhận" không phụ thuộc vào luật thẻ đỏ.
+
 Hoặc (a) cắm `await assertNotRedCarded(wsId, userId)` ngay sau `assertWorkspaceMember` ở marketplace-service.ts:129 — hợp lệ vì MCP claim_task KHÔNG phải đường tự-nhận (userId đến từ ngoài), nên không tạo lệch với web claimTask vốn khoá theo phiên; hoặc (b) nếu muốn giữ nguyên ngữ nghĩa 'tự-nhận', bỏ tham số `userId` khỏi tool và không cho MCP claim thay người khác. Sửa luôn chú thích ở guards.ts:37-40 vì lập luận hiện tại dựa trên tiền đề sai.
 
 ---

@@ -7,7 +7,7 @@ import { prisma } from '../prisma-client.js'
 import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
-import { assertWorkspaceMember, assertNotRedCarded } from './guards.js'
+import { assertWorkspaceMember } from './guards.js'
 import { writeMcpAudit } from './audit.js'
 
 // ---------------------------------------------------------------------------
@@ -29,8 +29,7 @@ export async function assignTask(
     // [AUDIT HT-036 fix] The assignee must be a member of THIS workspace — otherwise a caller
     // could assign a task to a user from another workspace/tenant within the profile.
     await assertWorkspaceMember(wsId, assigneeId)
-    // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Web chặn giao task cho nhân sự Rank D; MCP thì không.
-    await assertNotRedCarded(wsId, assigneeId)
+    // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ ở cả web lẫn MCP — xem `guards.ts`.
 
     // Verify task exists
     const task = await wsPrisma.task.findUnique({
@@ -189,8 +188,7 @@ export async function bulkAssignTasks(
     }
     // [AUDIT HT-036 fix] Verify the assignee belongs to this workspace once, up front.
     await assertWorkspaceMember(wsId, assigneeId)
-    // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Web chặn giao task cho nhân sự Rank D; MCP thì không.
-    await assertNotRedCarded(wsId, assigneeId)
+    // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ ở cả web lẫn MCP — xem `guards.ts`.
     if (!taskIds || taskIds.length === 0) {
         throw new Error('taskIds array must not be empty')
     }

@@ -34,7 +34,7 @@
 - **HT-041** `mcp-server/src/services/task-service.ts` (create_task) — `clientId` không validate thuộc workspace → gắn task vào client tenant khác. Validate clientId∈workspace.
 - **HT-040** `mcp-server/src/services/status-service.ts` — mọi mutation MCP không ghi AuditLog. Thêm `audit()` trong cùng transaction (actorUserId = MCP service identity). *(gồm P5-003)*
 - **[Low] P5-002** `task-service.ts:242` — thêm PAID-payroll lock (mirror web `update-task-details.ts:68-89`) trước khi ghi đè jobPriceUSD/value/profitVND.
-- **[Low] P6-SWEEP-1** `assign-service.ts:37` — thêm guard rank-D red-card (mirror `task-management-actions.ts:154`).
+- ~~**[Low] P6-SWEEP-1** — guard rank-D red-card~~ **VÔ HIỆU 2026-07-31**: luật thẻ đỏ đã bị gỡ khỏi cả web lẫn MCP. Không còn parity để giữ.
 - **[Low] P6-SWEEP-2** — thêm `where {version}` optimistic-lock cho update_status/assign/details.
 - *(Ngữ cảnh: MCP chạy service-account cấp profile = admin. Các Low ở đây là parity/defense-in-depth; các High là cross-tenant thật do MCP thiếu WorkspaceMember-check.)*
 

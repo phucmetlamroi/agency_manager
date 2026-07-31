@@ -201,13 +201,26 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             if (assignmentId.startsWith('agency:')) {
                 return { error: 'Agency assignment is no longer supported.' }
             }
-            const latestRank = await workspacePrisma.monthlyRank.findFirst({
-                where: { userId: assignmentId, workspaceId },
-                orderBy: { createdAt: 'desc' }
-            })
-            if (latestRank && latestRank.rank === 'D') {
-                return { error: 'Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D).' }
-            }
+            // [GỠ THẺ ĐỎ 2026-07-31] Chốt "Rank D thì không được giao việc" ĐÃ BỊ GỠ theo quyết
+            // định của chủ dự án. Trước đây chỗ này đọc MonthlyRank mới nhất của người được giao và
+            // từ chối nếu rank === 'D'. Phép chấm hạng (bonus-actions.ts) vẫn chạy nguyên; chỉ việc
+            // DÙNG hạng làm hàng rào giao việc là không còn.
+            //
+            // Bản ghi MonthlyRank giờ chỉ còn được ĐỌC ĐỂ HIỂN THỊ, không còn quyết định gì.
+            // VẼ ra màn hình ở hai chỗ: chấm cảnh báo trên avatar (AssigneeCell) và các màn Mission
+            // Control (/mc/**). NẠP dữ liệu cho hai chỗ đó thì nhiều hơn — ngoài task-detail-loader
+            // và mc-task-drawer-data còn có admin/page.tsx, admin/queue/page.tsx, dashboard/page.tsx,
+            // dashboard/tasks/page.tsx. Đừng tin một con số cứng ở đây; trước khi đụng vào model hãy
+            // tự chạy `grep -rn "monthlyRanks" src/` — danh sách viết tay kiểu này rất dễ lạc hậu.
+            // ⚠️ Trang Phân tích và Leaderboard cũng hiện chữ S/A/B/C/D
+            // nhưng chúng TỰ TÍNH LẠI từ errorRate sống bằng ngưỡng riêng — đó là con số KHÁC, không
+            // phải bản ghi này. Trang /admin/payroll không hiện hạng S/A/B/C/D nào cả (cột "rank" ở
+            // đó là MonthlyBonus.rank kiểu số, tức huy chương Top 1/2/3).
+            //
+            // ⚠️ Đừng cắm lại một mình ở đây. Luật này từng nằm ở 8 điểm chặn phía máy chủ (3 đường
+            // web + 5 tool MCP dùng chung một vị ngữ ở guards.ts) CỘNG 1 chỗ khoá nút ngay trên
+            // trình duyệt trong Mission Control. Thiếu một cửa là một lần hai nút bấm trả lời khác
+            // nhau về cùng một người.
 
             // [AUDIT R14 — fix] The assignee must belong to THIS workspace's profile —
             // don't let an admin assign a task (with its wage/client data + notification)

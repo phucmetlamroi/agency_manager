@@ -301,25 +301,19 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         //
         // Dùng khuôn của `bulkAssignTasks` trong chính file này, đặt TRƯỚC transaction.
         //
-        // ⚠️ [PHẢN BIỆN vòng 3 · CS4-R1] Lần vá đầu chép THIẾU MỘT NỬA khuôn đó rồi chú thích lại
-        // ghi là "nguyên khuôn" — thiếu chốt THẺ ĐỎ (Rank D). Hệ quả: đây thành cửa gán việc DUY
-        // NHẤT không chặn nhân sự đang bị phạt, tức lặp lại đúng lỗi R7-1 vừa vá cho MCP
-        // (`claim_task` là cửa thứ 5 đi vòng chốt thẻ đỏ) — chỉ khác là ở web.
+        // 📌 Ghi chú lịch sử: bản vá CS4-R1 từng thêm ở đây một chốt THẺ ĐỎ (Rank D) nữa. Chốt đó
+        // đã bị gỡ ngày 2026-07-31; phần còn lại của khuôn — chốt R14 — vẫn nguyên.
         if ('assigneeId' in data && data.assigneeId) {
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
             const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId)
             if (!assigneeAllowed) {
                 return { error: 'Editor được chọn không thuộc workspace/profile này.' }
             }
-            // Chốt thẻ đỏ — vị ngữ chép đúng `bulkAssignTasks` để hai cửa không trả lời khác nhau
-            // về cùng một người.
-            const latestRank = await prisma.monthlyRank.findFirst({
-                where: { userId: data.assigneeId, workspaceId },
-                orderBy: { createdAt: 'desc' },
-            })
-            if (latestRank && latestRank.rank === 'D') {
-                return { error: 'Không thể giao Task: Nhân sự đang bị Cảnh cáo Đỏ (Rank D).' }
-            }
+            // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ khỏi mọi cửa giao việc theo quyết định
+            // của chủ dự án — xem chú thích ở `task-management-actions.ts` (nhánh ASSIGN TO USER)
+            // để biết đủ danh sách và những gì được giữ lại.
+            // Chốt R14 phía trên (người được giao phải thuộc profile của workspace) GIỮ NGUYÊN: đó là
+            // hàng rào tenant, không phải luật thưởng-phạt.
         }
 
         // ─────────────────────────────────────────────────────────────────────────────────────
@@ -833,14 +827,15 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
         const notifications: any[] = []
 
         if (cleanAssigneeId) {
-            // Check Rank D
-            const latestRank = await prisma.monthlyRank.findFirst({
-                where: { userId: cleanAssigneeId, workspaceId },
-                orderBy: { createdAt: 'desc' }
-            })
-            if (latestRank && latestRank.rank === 'D') {
-                return { error: 'Kh\u00f4ng th\u1ec3 giao Task: Nh\u00e2n s\u1ef1 \u0111ang b\u1ecb C\u1ea3nh c\u00e1o \u0110\u1ecf (Rank D).' }
-            }
+            // [RED CARD REMOVED / GO THE DO 2026-07-31] Chot Rank D da bi go o day va o moi cua
+            // giao viec khac. Xem chu thich day du o `task-management-actions.ts` (nhanh ASSIGN TO
+            // USER): no liet ke con lai nhung gi va nhac dung cam lai mot minh mot ben.
+            //
+            // Viet KHONG DAU la co y. File nay TRON hai loi: co comment UTF-8 tho doc binh thuong
+            // (vi du dong 802), va co comment dung escape \uXXXX (vi du dong ngay ben duoi,
+            // "[AUDIT R14 — fix]"). Escape chi duoc giai ma trong chuoi va dinh danh, KHONG
+            // duoc giai ma trong comment `//` — nen o VUNG NAY, khi viet co dau thi chu bi ghi ra
+            // duoi dang escape va thanh mot dong ky tu rac. ASCII tranh han cau hoi do.
 
             // [AUDIT R14 \u2014 fix] Assignee must belong to THIS workspace's profile \u2014 don't
             // let an admin bulk-assign tasks to a foreign-tenant userId passed via RPC.

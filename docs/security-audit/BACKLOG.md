@@ -264,8 +264,10 @@
   - CONFIRMED, tác động thật (lộ JWT_SECRET→forge session, DATABASE_URL→DB prod) NHƯNG cần AV:Local (đọc filesystem victim); secret do user tự nhập qua setup-wizard, không bake trong binary phát tán. Obfuscation-only đúng như bản chất electron-store. Đã có ở P4-007.
 - **[P5-005] (Low, reachable=false) Thiếu env-guard fail-closed cho Inngest signing** — `src/app/api/inngest/route.ts:11`
   - CONFIRMED kỹ thuật: `INNGEST_DEV=1` ở prod → mode='dev' → bỏ qua xác thực chữ ký → POST giả invoke `review-janitor` (xoá cứng Mux+R2+DB trash>30 ngày). NHƯNG mặc định = cloud (an toàn); `.env`/`.env.example` KHÔNG set `INNGEST_DEV` ở đâu → tiền đề khai thác VẮNG. Khuyến nghị: thêm `INNGEST_SIGNING_KEY` vào `env.ts` + chặn `INNGEST_DEV` ở prod (fail-closed như JWT_SECRET).
-- **[P6-SWEEP-1] (Low) MCP assign/bulk_assign/claim bỏ guard rank-D red-card** — `mcp-server/src/services/assign-service.ts:37`
-  - Web chặn giao task cho editor "thẻ đỏ" (rank-D) ở `task-management-actions.ts:154`; MCP không có → business-rule parity bypass. Chỉ qua credential MCP admin.
+- ~~**[P6-SWEEP-1] (Low) MCP assign/bulk_assign/claim bỏ guard rank-D red-card**~~ — **VÔ HIỆU 2026-07-31.**
+  - Phát hiện gốc: web chặn giao task cho editor "thẻ đỏ" (rank-D), MCP không có → lệch luật nghiệp vụ.
+  - Đã được vá, rồi **cả luật lẫn bản vá bị gỡ bỏ** theo quyết định của chủ dự án: Rank D không còn
+    chặn giao việc ở bất kỳ đâu. Không còn parity nào để giữ. **Đừng cắm lại guard này.**
 - **[P6-SWEEP-2] (Low) MCP ghi task không có version-predicate (mất optimistic-lock)** — `mcp-server/src/services/status-service.ts:97`
   - Web dùng `updateMany where {version}` để chặn lost-update; MCP `update({version:{increment:1}})` không có điều kiện version → 2 đường ghi prod (web+MCP) đồng thời có thể clobber âm thầm. Latent.
 

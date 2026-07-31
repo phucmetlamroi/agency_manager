@@ -487,7 +487,13 @@ Grid 2 cột.
   - `"-- Hủy giao (Unassign User) --"` → Tương tự
   - **Team members** (lọc bỏ CLIENT, LOCKED): Avatar + username + rank dot
 
-- **Chặn giao cho rank D**: Error toast "Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D)."
+- ~~**Chặn giao cho rank D**~~ — **ĐÃ GỠ 2026-07-31.** Rank D không còn chặn giao việc ở đường web
+  và MCP, cũng không còn khoá nút trong Mission Control. Hai việc đó nằm ở HAI commit khác nhau —
+  nếu ai revert riêng commit Mission Control thì câu này sai một nửa trở lại. Dot cảnh báo ở §7.1
+  vẫn còn: nó là chỉ dấu hiệu suất, không phải hàng rào.
+  Trên đường giao việc vẫn còn chốt khác, không phải chỉ một: `isAssigneeInWorkspaceProfile` —
+  người được giao phải thuộc profile của workspace, và bên trong nó loại luôn CLIENT/LOCKED. Phía
+  MCP là `assertWorkspaceMember` (chốt này thì đòi hàng WorkspaceMember thật, chặt hơn bản web).
 
 - **Khi đang chọn nhiều task (bulk)**:
 

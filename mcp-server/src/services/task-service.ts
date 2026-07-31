@@ -8,7 +8,7 @@ import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
 import { isValidStatus, type TaskStatus } from './statuses.js'
-import { assertWorkspaceMember, assertClientInProfile, assertNotRedCarded } from './guards.js'
+import { assertWorkspaceMember, assertClientInProfile } from './guards.js'
 import { sanitizeExternalUrl } from '../safe-url.js'
 import { writeMcpAudit } from './audit.js'
 
@@ -68,9 +68,7 @@ export async function createTask(
     // [AUDIT HT-036 fix] If an assignee is given, they must be a member of this workspace.
     if (data.assigneeId) {
         await assertWorkspaceMember(wsId, data.assigneeId)
-        // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Cửa phụ cùng lớp: gán assigneeId qua create_task /
-        // update_task_details cũng phải qua chốt thẻ đỏ, không chỉ assign_task.
-        await assertNotRedCarded(wsId, data.assigneeId)
+        // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ ở cả web lẫn MCP — xem `guards.ts`.
     }
 
     const createData: Record<string, any> = {
@@ -331,9 +329,7 @@ export async function updateTaskDetails(
         // [AUDIT HT-036 fix] A newly-set assignee must be a member of this workspace.
         if (data.assigneeId) {
             await assertWorkspaceMember(wsId, data.assigneeId)
-        // [AUDIT SWEEP-2026-07-30 fix · P6-SWEEP-1] Cửa phụ cùng lớp: gán assigneeId qua create_task /
-        // update_task_details cũng phải qua chốt thẻ đỏ, không chỉ assign_task.
-        await assertNotRedCarded(wsId, data.assigneeId)
+            // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ ở cả web lẫn MCP — xem `guards.ts`.
         }
         updateData.assigneeId = data.assigneeId || null
         enforceAssigneeStatusInvariant(updateData, currentTask)

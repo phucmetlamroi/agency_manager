@@ -42,7 +42,7 @@
 | 4 | L4 GapClosure | G1-8+triage | 0 | 1 | 6 | DONE — **7 CONFIRMED** (HT-036..042 mcp/electron/infra); 1 FP, 2→Low, 1 dup |
 | 5 | L5 Untested-class | L5-1..6 | 0 | 2* | 2* | DONE (pre-triage) — 21 finding (2H+3M+9Low+7Info); **reachable C/H/M mới = 4** (P5-001/002 High MCP-PayrollLock+money-overwrite, P5-003 Med MCP-no-audit-2, P5-004 Med electron-key). Pass 5 KHÔNG sạch ⇒ G1 chưa đạt. *chờ triage Pass 6 |
 | 5-triage | (Pass-6 triage) | verifier≠finder ×5 | 0 | 0 | 0 | DONE — P5-001 FALSE_POSITIVE; P5-002/003/004/005 → **Low** (P5-002 dup P4-024, P5-004 dup P4-007). **0 C/H/M mới.** Pass 5 = **PASS SẠCH #1** |
-| 6 | L6 MCP-parity sweep + READ-surface | sweep + critic4 | 0 | 0 | 0 | DONE (w0dahl20j) — liệt kê đủ 11 MCP write-tool + read-surface; chỉ 2 finding Low mới (rank-D bypass, version-predicate); 0 High/Med mới. **PASS SẠCH #2** ⇒ **G1 ĐẠT** |
+| 6 | L6 MCP-parity sweep + READ-surface | sweep + critic4 | 0 | 0 | 0 | DONE (w0dahl20j) — liệt kê đủ 11 MCP write-tool + read-surface; chỉ 2 finding Low mới (~~rank-D bypass~~ — VÔ HIỆU 2026-07-31, luật thẻ đỏ đã bị bỏ hẳn; version-predicate); 0 High/Med mới. **PASS SẠCH #2** ⇒ **G1 ĐẠT** |
 
 **CRITIC #2 (G8) go/no-go:** LÕI web action-layer ĐÃ BÃO HOÀ (21→7→7, High mới ở RÌA: electron/IPC, không còn ở action-layer). CHƯA đạt G1 (cần 2 pass sạch liên tiếp). Chạy Lens 5 (class chưa test) → nếu sạch + 1 lens xác nhận sạch nữa ⇒ G1 ⇒ FINAL_REPORT.
 

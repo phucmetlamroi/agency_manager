@@ -6,7 +6,7 @@ import { prisma } from '../prisma-client.js'
 import { getMcpAuthContext, validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
-import { assertWorkspaceMember, assertNotRedCarded } from './guards.js'
+import { assertWorkspaceMember } from './guards.js'
 import { writeMcpAudit } from './audit.js'
 
 // ---------------------------------------------------------------------------
@@ -127,21 +127,14 @@ export async function claimTask(
     if (!userId) throw new Error('userId is required to claim a task')
     // [AUDIT HT-036 fix] The claiming user must be a member of this workspace.
     await assertWorkspaceMember(wsId, userId)
-    // [PHẢN BIỆN 2026-07-30 · R7-1] ĐÂY LÀ CỬA GIAO VIỆC THỨ 5, KHÔNG PHẢI ĐƯỜNG TỰ-NHẬN-VIỆC.
+    // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ ở cả web lẫn MCP — xem `guards.ts`.
     //
-    // Bản vá P6-SWEEP-1 cắm `assertNotRedCarded` vào 4 tool (assign_task, bulk_assign_tasks,
-    // create_task, update_task_details) và CỐ Ý bỏ qua chỗ này, với lập luận "web cũng không chặn
-    // đường tự-nhận-việc". Tiền đề đó SAI ở MCP: web `claimTask` lấy userId TỪ PHIÊN
-    // (src/actions/claim-actions.ts — `userId = access.userId`), còn tool MCP nhận `userId` như một
-    // THAM SỐ do người gọi truyền vào ("Claim a marketplace task for a specific user"). Hai hàm
-    // trùng tên nhưng khác bản chất: một cái tự-nhận, một cái GIAO CHO NGƯỜI KHÁC.
-    //
-    // Hệ quả của việc bỏ sót: agent bị assign_task từ chối vì thẻ đỏ chỉ cần thử tool kế tiếp —
-    // toggle_marketplace rồi claim_task với chính editor Rank D đó — là qua. Chốt vừa cắm vào 4 cửa
-    // bị đi vòng bằng cửa thứ 5, và nhật ký còn ghi `actorUserId = userId` nên vết kiểm toán trông
-    // như chính editor tự nhận việc. Thêm ở đây KHÔNG tạo lệch với web, vì web không có đường nào
-    // giao việc cho người khác qua marketplace.
-    await assertNotRedCarded(wsId, userId)
+    // ⚠️ GIỮ LẠI phần nhận định vẫn đúng của [PHẢN BIỆN 2026-07-30 · R7-1]: tool MCP `claim_task`
+    // KHÔNG phải đường tự-nhận-việc. Web `claimTask` lấy userId TỪ PHIÊN
+    // (src/actions/claim-actions.ts — `userId = access.userId`), còn tool này nhận `userId` như một
+    // THAM SỐ do người gọi truyền vào ("Claim a marketplace task for a specific user") — tức nó là
+    // một cửa GIAO VIỆC CHO NGƯỜI KHÁC. Bất kỳ luật giao-việc nào thêm về sau đều phải tính cả cửa
+    // này, đừng nhìn cái tên `claim` rồi bỏ qua như lần trước.
 
     // Use raw prisma for the transaction (optimistic locking pattern)
     const result = await prisma.$transaction(async (tx) => {

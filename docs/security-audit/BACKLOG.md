@@ -271,6 +271,45 @@
 - **[P6-SWEEP-2] (Low) MCP ghi task không có version-predicate (mất optimistic-lock)** — `mcp-server/src/services/status-service.ts:97`
   - Web dùng `updateMany where {version}` để chặn lost-update; MCP `update({version:{increment:1}})` không có điều kiện version → 2 đường ghi prod (web+MCP) đồng thời có thể clobber âm thầm. Latent.
 
+### PHÁT SINH khi gỡ luật thẻ đỏ (2026-07-31) — CÓ TỪ TRƯỚC, chờ chủ dự án quyết
+
+Ba mục dưới đây do vòng phản biện đợt gỡ thẻ đỏ tìm ra. **Không** phải hệ quả của việc gỡ luật, và
+**chưa** vá — cả ba đều đụng số liệu thật hoặc là hàng rào mới, phải có chủ dự án duyệt trước.
+Chúng trở nên đáng chú ý hơn kể từ khi bỏ thẻ đỏ, vì quyết định giao việc nay chuyển sang cho
+người đọc số liệu thay vì để máy chặn.
+
+- **[RD-1] (High) Hai công thức chấm hạng lệch nhau, và lệch đúng ở ngưỡng thẻ đỏ cũ**
+  - `src/actions/bonus-actions.ts:319-323` (bản ghi MonthlyRank chốt sổ) dùng `< 0.3` rồi `<= 0.6 / 1.0 / 1.5`.
+  - `src/actions/analytics-actions.ts:65-69` và `src/components/dashboard/Leaderboard.tsx:70-74`
+    **tự tính lại** từ errorRate sống, dùng `< 0.6 / 1.0 / 1.5`, và có thêm hai nhánh riêng cho
+    người làm dưới 8 task / 0 task.
+  - Hệ quả: người có errorRate đúng **1.50** hiện **D** ở trang Phân tích nhưng chỉ **C** (chấm
+    vàng) trên avatar. Người làm 3 task với 5 điểm phạt: Phân tích hét **D**, còn avatar và toàn bộ
+    Mission Control **im hoàn toàn** (UNRANKED, không chấm).
+  - Sửa được, nhưng **đổi ngưỡng là đổi số liệu thật** → cần chốt lấy `<` hay `<=`, và gom về một
+    hàm dùng chung.
+
+- **[RD-2] (Medium, TIỀN) Điểm phạt hiện KHÔNG trừ thưởng — nhưng chú thích nói ngược**
+  - `bonus-actions.ts:372` `const eligibleForBonus = rankings.filter(r => r.revenue > 0)` — không
+    lọc theo hạng. Sắp xếp `:349-353` chỉ theo `revenue → tasksCompleted → username`.
+    `bonusAmount = revenue × percent` (`:412`). Hạng và điểm phạt **không đụng vào một đồng nào**.
+  - Nhưng docblock `:168-174` vẫn ghi thuật toán cũ: `incomeScore = revenue - totalPenalty`, tie-break
+    theo `errorRate` rồi `rankScore`. **Cả ba dòng đều sai**; `incomeScore` tính ở `:337` rồi không
+    ai đọc, hàm `rankPriority` đã bị xoá.
+  - Đây chính là đoạn người ta sẽ mở ra để trả lời "thẻ đỏ còn ăn vào thưởng không". Đọc chú thích →
+    tưởng CÒN. Đọc mã → KHÔNG. Đến từ `95be7eb`, không phải đợt thẻ đỏ.
+
+- **[RD-3] (Low) MCP không loại CLIENT/LOCKED khi giao việc, web thì có**
+  - `mcp-server/src/services/guards.ts:15-24` `assertWorkspaceMember` chỉ hỏi hàng WorkspaceMember
+    có tồn tại không, **không đọc vai trò**. Web `isAssigneeInWorkspaceProfile`
+    (`src/lib/workspace-membership.ts:85-86`) loại thẳng CLIENT và LOCKED.
+  - `deactivateUser` (`src/actions/user-actions.ts:327-334`) đặt `role='LOCKED'` mà **không xoá**
+    hàng WorkspaceMember → editor đã bị vô hiệu hoá vẫn được 5 tool MCP giao việc, trong khi web từ
+    chối. Và MCP không phát thông báo nào (`grep -rni notif mcp-server/src` = 0) nên task nằm im
+    trên một tài khoản chết, chỉ còn một dòng AuditLog.
+  - Thêm chốt vai trò vào MCP là hàng rào bảo mật mới → cần chủ dự án duyệt. Đã ghi vào
+    `docs/TASK_INTERACTION_SITEMAP.md` §7.2 để không ai vá nhầm chiều.
+
 ### ÂM TÍNH có bằng chứng (đóng class — dùng cho FINAL_REPORT)
 - **SQLi**: 16 call-site `$queryRaw/$executeRaw` đều `Prisma.sql`/`Prisma.join` tham số hoá; 0 `queryRawUnsafe`. KHÔNG reachable. (L5-6, folders.ts:119/713, member-actions.ts:1217/1291, comments.ts:530/539, rate-limit-db.ts:25)
 - **Client-bundle secret**: chỉ `NEXT_PUBLIC_*` công khai đúng ý định; không rò secret server. (notification-broadcast.ts:9)

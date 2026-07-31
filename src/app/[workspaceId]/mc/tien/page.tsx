@@ -17,7 +17,7 @@ import McPayrollBoard, { type McPayrollData, type McPayrollEditor } from '@/comp
 
 export const dynamic = 'force-dynamic'
 
-const RANK_HEX: Record<string, string> = { S: '#FACC15', A: '#34D399', B: '#60A5FA', C: '#A1A1AA', D: '#F87171' }
+// [BO HANG S/A/B/C/D 2026-07-31] Bo bang mau hang RANK_HEX.
 const GRADIENTS = [
     'linear-gradient(135deg,#6366F1,#8B5CF6)', 'linear-gradient(135deg,#10B981,#06B6D4)', 'linear-gradient(135deg,#EC4899,#F43F5E)',
     'linear-gradient(135deg,#A855F7,#EC4899)', 'linear-gradient(135deg,#F59E0B,#EAB308)', 'linear-gradient(135deg,#06B6D4,#3B82F6)',
@@ -50,7 +50,7 @@ export default async function MissionControlPayrollPage({ params }: { params: Pr
 
     const [workspace, usersRaw, currentUser, finance] = await Promise.all([
         prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } }),
-        // Same include as /admin/payroll — plus monthlyRanks for the S/A/B badge (MC style).
+        // Same include as /admin/payroll.
         wp.user.findMany({
             where: { username: { not: 'admin' } },
             include: {
@@ -61,7 +61,6 @@ export default async function MissionControlPayrollPage({ params }: { params: Pr
                 },
                 bonuses: { where: { workspaceId }, select: { bonusAmount: true, bonusPercent: true, rank: true } },
                 payrolls: { where: { workspaceId }, select: { status: true } },
-                monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } },
             },
             orderBy: { username: 'asc' },
         }),
@@ -91,12 +90,10 @@ export default async function MissionControlPayrollPage({ params }: { params: Pr
         const taskIncome = completed.reduce((s: number, t: any) => s + Number(t.value || 0), 0)
         const bonusAmount = Number(u.bonuses?.[0]?.bonusAmount || 0)
         const total = taskIncome + bonusAmount
-        const rank = (u.monthlyRanks?.[0]?.rank as string | undefined) || undefined
         const name = getDisplayName(u)
         const totalTasks = completed.length + pending.length
         return {
             id: u.id, name, initials: initials(name), avatar: grad(u.id),
-            rank, rankColor: rank ? (RANK_HEX[rank] || '#A1A1AA') : undefined,
             completedCount: completed.length, pendingCount: pending.length,
             progressPct: totalTasks > 0 ? Math.round((completed.length / totalTasks) * 100) : 0,
             taskIncomeVND: taskIncome, bonusVND: bonusAmount, totalVND: total,

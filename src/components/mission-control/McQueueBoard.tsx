@@ -3,7 +3,7 @@
 // [Giao diện 2 · Mission Control · M2 Kho Task Đợi / Triage] Desktop giao-việc screen.
 // Ported from the design's "MÀN 2 — HÀNG CHỜ (TRIAGE)". DATA-DRIVEN + functional:
 //   • left column = tasks chờ giao (unassigned / "Đang đợi giao")
-//   • click "Giao" → popover "Giao cho ai?" (search editors + rank + workload) → assignTask
+//   • click "Giao" → popover "Giao cho ai?" (search editors + workload) → assignTask
 //   • marketplace pill toggles the real Phiên Chợ (toggleMarketplace)
 // Reuses the SAME server actions /admin uses (assignTask + toggleMarketplace). Admin-gated at the
 // page level. Chốt còn lại trong assignTask là `isAssigneeInWorkspaceProfile` — nó hỏi người được
@@ -30,7 +30,7 @@ import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 
 export interface McQueueEditor {
     id: string; name: string; initials: string; avatar: string
-    rank?: string; rankColor?: string
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `rank` + `rankColor`.
     workingCount: number; workloadPct: number
 }
 export interface McQueueTask {
@@ -235,7 +235,6 @@ export default function McQueueBoard({ data }: { data: McQueueData }) {
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                                     <span style={{ fontSize: 12, fontWeight: 700, color: "#F4F4F5" }}>{e.name}</span>
-                                                    {e.rank && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 9, fontWeight: 800, color: e.rankColor, border: `1px solid ${e.rankColor}66`, borderRadius: 4, padding: "0 4px" }}>{e.rank}</span>}
                                                 </div>
                                                 <div style={{ fontSize: 10, color: "#A1A1AA" }}>{`${e.workingCount} đang làm · ${loadLabel(e.workloadPct)}`}</div>
                                             </div>

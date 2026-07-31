@@ -50,7 +50,6 @@ function CardBody({ t, dragging }: { t: McTask; dragging?: boolean }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 20, height: 20, borderRadius: 999, background: t.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#fff', flexShrink: 0 }}>{t.initials}</span>
                 <span style={{ fontSize: 11, color: '#D4D4D8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.assignee}</span>
-                {t.rank && <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 9, fontWeight: 800, color: t.rankColor, border: `1px solid ${t.rankColor}66`, borderRadius: 4, padding: '0 4px', flexShrink: 0 }}>{t.rank}</span>}
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 10, fontWeight: t.meta.startsWith('Trễ') ? 700 : 400, color: t.meta.startsWith('Trễ') ? '#F87171' : '#A1A1AA', whiteSpace: 'nowrap' }}>{t.meta}</span>
             </div>

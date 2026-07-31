@@ -1,6 +1,6 @@
 // [Giao diện 2 · Mission Control · M9 Thành viên] Data-wired member cards.
 // Roster = getProfileMembers (org roles OWNER/ADMIN/USER); metrics hydrated from the
-// workspace-scoped User (tasks/bonuses/monthlyRanks/presence + isTreasurer) exactly like
+// workspace-scoped User (tasks/bonuses/presence + isTreasurer) exactly like
 // /mc/tien. Salary is aggregated to a single VND number server-side — no jobPriceUSD / raw
 // task value arrays reach the client. Admin-gated fail-closed (wages are admin-only).
 import { redirect } from 'next/navigation'
@@ -17,7 +17,7 @@ import McMembersBoard, { type McMembersData, type McMember } from '@/components/
 
 export const dynamic = 'force-dynamic'
 
-const RANK_HEX: Record<string, string> = { S: '#FACC15', A: '#34D399', B: '#60A5FA', C: '#A1A1AA', D: '#F87171' }
+// [BO HANG S/A/B/C/D 2026-07-31] Bo bang mau hang RANK_HEX va moi chi so loi.
 const GRADIENTS = [
     'linear-gradient(135deg,#6366F1,#8B5CF6)', 'linear-gradient(135deg,#10B981,#06B6D4)', 'linear-gradient(135deg,#EC4899,#F43F5E)',
     'linear-gradient(135deg,#A855F7,#EC4899)', 'linear-gradient(135deg,#F59E0B,#EAB308)', 'linear-gradient(135deg,#06B6D4,#3B82F6)',
@@ -65,7 +65,7 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
     const members = roster.members ?? []
     const userIds = members.map((m) => m.userId)
 
-    // Hydrate per-member workspace metrics (workspace-scoped prisma → monthlyRanks/tasks already
+    // Hydrate per-member workspace metrics (workspace-scoped prisma → tasks already
     // scoped by workspace). Only completed tasks needed for salary; active count fetched separately.
     const [hydrated, activeGroups] = await Promise.all([
         userIds.length
@@ -74,7 +74,6 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
                 include: {
                     tasks: { where: { workspaceId, status: SALARY_COMPLETED_STATUS }, select: { value: true } },
                     bonuses: { where: { workspaceId }, select: { bonusAmount: true } },
-                    monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true, errorRate: true } },
                     presence: { select: { status: true, lastHeartbeat: true } },
                 },
             })
@@ -100,12 +99,7 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
         const salaryVND =
             (u?.tasks ?? []).reduce((s: number, t: any) => s + Number(t.value || 0), 0) +
             Number(u?.bonuses?.[0]?.bonusAmount || 0)
-        const rankRow = u?.monthlyRanks?.[0]
-        const ranked = rankRow && rankRow.rank && rankRow.rank !== 'UNRANKED'
-        const rank = ranked ? (rankRow.rank as string) : undefined
-        const errorRate = ranked ? Number(rankRow.errorRate) : null
-        const errorColor = errorRate !== null ? (errorRate < 1.0 ? '#34D399' : '#FBBF24') : '#71717A'
-        const errorLabel = errorRate === null ? undefined : errorRate < 0.3 ? 'thấp' : errorRate >= 1.0 ? 'theo dõi' : undefined
+        // [BO HANG S/A/B/C/D 2026-07-31] Bo rank + errorRate + errorLabel + errorColor.
 
         const activeCount = activeById.get(m.userId) ?? 0
         const workloadPct = Math.round((activeCount / maxActive) * 100)
@@ -122,10 +116,9 @@ export default async function MissionControlMembersPage({ params }: { params: Pr
             id: m.id, userId: m.userId, name, initials: initials(name), avatar: grad(m.userId),
             roleLabel: roleLabel(m.role).toUpperCase(),
             isTreasurer: Boolean(u?.isTreasurer),
-            rank, rankColor: rank ? (RANK_HEX[rank] || '#A1A1AA') : undefined,
             online: presence.online, presenceLabel: presence.label,
             activeCount, workloadPct, loadLabel, loadColor, barColor,
-            salaryVND, errorRate, errorLabel, errorColor,
+            salaryVND,
         }
     })
 

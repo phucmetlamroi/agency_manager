@@ -39,7 +39,8 @@ export interface McTaskDetail {
     id: string; code: string; title: string; type: string; tags: string[]
     status: string; statusHex: string; statusLabel: string; phaseIndex: number
     client: string | null
-    assignee: { name: string; initials: string; avatar: string; rank?: string; rankColor?: string } | null
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `rank` + `rankColor` khỏi khối người được giao.
+    assignee: { name: string; initials: string; avatar: string } | null
     managerName: string | null
     assignedByName: string | null
     deadline: string | null
@@ -293,7 +294,6 @@ export default function McTaskDrawer({ detail, workspaceId, fullEditHref, overla
                                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                                         <span style={{ width: 18, height: 18, borderRadius: 999, background: detail.assignee.avatar, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 800, color: "#fff" }}>{detail.assignee.initials}</span>
                                         {detail.assignee.name}
-                                        {detail.assignee.rank && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 9, fontWeight: 800, color: detail.assignee.rankColor, border: `1px solid ${detail.assignee.rankColor}66`, borderRadius: 4, padding: "0 4px" }}>{detail.assignee.rank}</span>}
                                     </span>
                                 ) : <span style={{ color: "#71717A" }}>Chưa giao</span>}
                             </Row>

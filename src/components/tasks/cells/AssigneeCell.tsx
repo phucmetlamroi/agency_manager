@@ -28,24 +28,12 @@ function displayName(user: { username: string; displayName?: string | null; nick
     return user.displayName?.trim() || user.username
 }
 
-// [GỠ THẺ ĐỎ 2026-07-31] Chấm màu này GIỮ LẠI, nhưng chú giải phải đổi.
+// [BỎ HẠNG S/A/B/C/D 2026-07-31] Xoá `rankFlag` + `rankFlagTitle` và chấm màu vàng/đỏ trên avatar.
 //
-// Khi luật thẻ đỏ còn hiệu lực, chữ "Cảnh báo" là mô tả đúng: hạng D thật sự bị máy chặn giao việc.
-// Luật đã bỏ, nên chấm đỏ nay không dẫn tới hậu quả nào. Để nguyên chữ "Cảnh báo" ngay trong danh
-// sách chọn người giao việc là mời admin tự né người đó — tức luật vẫn được thi hành, nhưng bằng
-// phản xạ thay vì bằng code, và lần này KHÔNG có thông báo, không có nhật ký, không ai chịu trách
-// nhiệm. Đó là hình thái tệ hơn cả luật cũ.
-//
-// Nay chú giải nói đúng bản chất: một con số tham khảo, không phải một lệnh cấm.
-function rankFlag(entity: any): string | null {
-    const r = entity?.monthlyRanks?.[0]?.rank
-    return r === 'C' ? 'bg-yellow-500' : r === 'D' ? 'bg-red-500' : null
-}
-
-/** Chú giải cho chấm hạng — nói rõ đây là tham khảo, không phải hàng rào. */
-function rankFlagTitle(rank: unknown): string {
-    return `Hạng ${String(rank ?? '—')} kỳ gần nhất — chỉ để tham khảo, không chặn giao việc`
-}
+// Lịch sử ngắn để người sau khỏi dựng lại: chấm này đọc `monthlyRanks[0].rank`, vàng cho hạng C và
+// đỏ cho hạng D. Khi luật thẻ đỏ còn hiệu lực nó là chỉ dấu của một lệnh cấm có thật. Gỡ luật xong,
+// nó thành một dấu hiệu thị giác không dẫn tới hậu quả nào — mà lại nằm ngay TRONG danh sách chọn
+// người giao việc, nên vẫn khiến người giao tự né. Nay bỏ luôn cả hạng lẫn chấm.
 
 export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId, onSelectionCleared }: AssigneeCellProps) {
     const router = useRouter()
@@ -157,18 +145,12 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
     // ── Non-admin: read-only ────────────────────────────────────────────────
     if (!isAdmin) {
         if (task.assignee) {
-            const flagColor = rankFlag(task.assignee as any)
             return (
                 <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Avatar className="h-6 w-6">
-                            <AvatarImage src={(task.assignee as any).avatarUrl || `https://avatar.vercel.sh/${task.assignee.username}`} className="object-cover" />
-                            <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
-                        </Avatar>
-                        {flagColor && (
-                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={rankFlagTitle((task.assignee as any).monthlyRanks?.[0]?.rank)} />
-                        )}
-                    </div>
+                    <Avatar className="h-6 w-6">
+                        <AvatarImage src={(task.assignee as any).avatarUrl || `https://avatar.vercel.sh/${task.assignee.username}`} className="object-cover" />
+                        <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
+                    </Avatar>
                     <span className="text-sm">{displayName(task.assignee)}</span>
                 </div>
             )
@@ -271,7 +253,6 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                         )}
                         {filtered.length > 0 ? (
                             filtered.map((u, idx) => {
-                                const flagColor = rankFlag(u as any)
                                 const isCurrent = task.assignee?.id === u.id
                                 const isActive = idx === activeIndex
                                 return (
@@ -282,15 +263,10 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                         onMouseEnter={() => setActiveIndex(idx)}
                                         className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-primary/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                     >
-                                        <div className="relative">
-                                            <Avatar className="h-5 w-5">
-                                                <AvatarImage src={(u as any).avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
-                                                <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
-                                            </Avatar>
-                                            {flagColor && (
-                                                <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-surface-1 ${flagColor} shadow-sm`} title={rankFlagTitle((u as any).monthlyRanks?.[0]?.rank)} />
-                                            )}
-                                        </div>
+                                        <Avatar className="h-5 w-5">
+                                            <AvatarImage src={(u as any).avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
+                                            <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
+                                        </Avatar>
                                         <span className="truncate">{displayName(u)}</span>
                                     </button>
                                 )

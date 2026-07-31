@@ -48,7 +48,6 @@ export default async function MissionControlBoardPage({ params }: { params: Prom
                 assignee: {
                     select: {
                         id: true, username: true, displayName: true, role: true, nickname: true,
-                        monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } },
                     },
                 },
                 assignedBy: { select: { id: true, username: true, displayName: true, nickname: true } },
@@ -63,7 +62,6 @@ export default async function MissionControlBoardPage({ params }: { params: Prom
             orderBy: [{ username: 'asc' }],
             select: {
                 id: true, username: true, displayName: true, role: true, nickname: true,
-                monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } },
             },
         }),
     ])

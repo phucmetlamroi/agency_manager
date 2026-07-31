@@ -22,7 +22,6 @@ const TASK_INCLUDE = {
     assignee: {
         select: {
             id: true, username: true, displayName: true, role: true, nickname: true,
-            monthlyRanks: { orderBy: { createdAt: 'desc' as const }, take: 1, select: { rank: true } },
         },
     },
     assignedBy: { select: { id: true, username: true, displayName: true, nickname: true } },

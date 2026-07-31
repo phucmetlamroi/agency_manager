@@ -119,7 +119,6 @@ export default async function UserDashboard({ params, searchParams }: {
                     username: true,
                     role: true,
                     nickname: true,
-                    monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } },
                 },
             },
             taskTags: { include: { tagCategory: { select: { id: true, name: true } } } },

@@ -257,6 +257,31 @@ export function TaskDetailModal({
         if (isBulkMode && bulkSelectedIds) {
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, patch, workspaceId) as any
             if (res?.success) {
+                // [PHẢN BIỆN 2026-07-30 · R3-4] CHỐT KỲ LƯƠNG PHẢI ĐƯỢC NÓI RA Ở ĐÂY NỮA.
+                //
+                // `bulkUpdateTaskDetails` trả `{ success: true, count: 0, skippedPayrollLocked: [...] }`
+                // khi MỌI task bị chốt lương chặn — không có khoá `error`. Nhánh cũ chỉ đọc
+                // `res.success` nên bắn toast MÀU XANH "Đã cập nhật 0 task", rồi `handleSaveFinance`
+                // dùng giá trị trả về `true` để chạy setForm/setLocalTask với số tiền MỚI. Kết quả:
+                // admin sửa giá 300→500 cho 5 task thuộc kỳ đã trả lương, thấy báo thành công và
+                // thấy 500 trên màn hình, trong khi DB vẫn là 300. Con số đó chỉ tồn tại trong state
+                // React và admin ra quyết định (báo giá, đối soát) dựa trên nó.
+                //
+                // Bản vá gốc CÓ dạy `BulkEditTaskModal` đọc `skippedPayrollLocked` — nhưng đây là
+                // NƠI GỌI THỨ HAI của cùng một action và đã bị bỏ sót. Dùng lại đúng khuôn thông báo
+                // của BulkEditTaskModal để hai chỗ nói cùng một câu.
+                const skipped: string[] = res.skippedPayrollLocked ?? []
+                if (skipped.length > 0) {
+                    toast.warning(
+                        `${skipped.length} task KHÔNG đổi được số tiền vì kỳ lương đã đóng: ` +
+                        skipped.slice(0, 5).join(', ') +
+                        (skipped.length > 5 ? `… (+${skipped.length - 5})` : ''),
+                        { duration: 8000 },
+                    )
+                }
+                // Không một task nào được ghi ⇒ KHÔNG cập nhật lạc quan, nếu không giao diện sẽ
+                // hiển thị giá trị chưa bao giờ tới database.
+                if (res.count === 0) return false
                 toast.success(`Đã cập nhật ${res.count ?? bulkSelectedIds.length} task`)
                 return true
             }
@@ -269,7 +294,11 @@ export function TaskDetailModal({
             toast.success(successMsg)
             return true
         }
-        toast.error('Lưu thất bại')
+        // [PHẢN BIỆN 2026-07-30 · R3-4] Nhánh một-task trước đây nuốt luôn `res.error` bằng một câu
+        // cứng, tức nuốt đúng câu `payrollClosedMessage(gate)` mà bản vá kỳ lương viết ra
+        // (update-task-details.ts). Admin thấy "Lưu thất bại" và không bao giờ biết lý do là kỳ lương
+        // đã đóng — một chốt đúng nhưng câm thì vẫn dẫn tới quyết định sai.
+        toast.error((res as any)?.error ?? 'Lưu thất bại')
         return false
     }
 

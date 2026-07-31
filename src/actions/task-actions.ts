@@ -157,7 +157,14 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             // Update Task Status
             const updateData = {
                 status: newStatus,
-                ...(newNotes ? { notes_vi: newNotes } : {}),
+                // [AUDIT SWEEP-2026-07-30 · H2 fix — NGUỒN của lỗ XSS] `notes_vi` là brief nội bộ và
+                // theo `update-task-details.ts` nó là cột CHỈ ADMIN được ghi. Nhưng đây là đường ghi
+                // duy nhất KHÔNG role-gate: tham số `newNotes` đi thẳng vào DB, không lọc, và không
+                // một UI nào trong repo truyền nó vào (mã chết trên giao diện, nhưng server action là
+                // POST endpoint gọi trực tiếp được). Kết hợp với công tắc "kế thừa ghi chú" của Velox,
+                // đó chính là cách HTML của một MEMBER tới được ô xem trước trong phiên ADMIN.
+                // Gác bằng đúng vị từ mà chính hàm này đã dùng cho các chốt khác.
+                ...(newNotes && isWorkspaceAdmin ? { notes_vi: newNotes } : {}),
                 ...deadlineUpdate,
                 ...poolReset,
                 ...archiveUpdate,

@@ -13,6 +13,8 @@ import { requireReviewAccess } from './access'
 import { getFolderScope, assertVersionInScope } from './folder-scope'
 import { apiError } from './errors'
 import { presignPutObject, presignGetObject, headObject } from './r2'
+import { limitDb } from './rate-limit-db'
+import { canonicalAttachmentImageMime } from './media-constants'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { annotationSchema, toAnnotationEnvelope, readAnnotationShapes } from './annotation'
 import {
@@ -57,7 +59,10 @@ function msToFrame(ms: number, fps: Fps): number {
 const attachmentInputSchema = z.object({
     attachmentId: z.string().uuid(),
     fileName: z.string().min(1).max(255),
-    mimeType: z.string().regex(/^image\//, 'image_only'),
+    // [AUDIT HT-020 fix] Cùng allowlist với initiateAttachment. Đây là đường ghi hàng
+    // CommentAttachment vào DB — nếu chỉ siết ở bước presign mà để hở schema này, client vẫn khai
+    // được mimeType tuỳ ý cho hàng dữ liệu, và /raw sẽ tin theo nó.
+    mimeType: z.string().refine((v) => canonicalAttachmentImageMime(v) !== null, 'image_only'),
     sizeBytes: z.number().int().positive().max(MAX_ATTACH_BYTES),
     width: z.number().int().positive().max(20000).optional(),
     height: z.number().int().positive().max(20000).optional(),
@@ -636,11 +641,21 @@ export async function initiateAttachment(input: {
     mimeType: string
 }): Promise<{ attachmentId: string; putUrl: string; expiresAt: string }> {
     const access = await requireReviewAccess()
-    // [AUDIT HT-020 fix] Accept raster images only. `image/svg+xml` passes the `image/` prefix
-    // but SVG can carry inline <script> → stored XSS when served/opened inline. Owner decision Q5:
-    // SVG is not needed for comment attachments, so reject it outright.
-    if (!/^image\//.test(input.mimeType) || /svg/i.test(input.mimeType)) {
-        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ đính kèm được ảnh (không hỗ trợ SVG).')
+    // [AUDIT SWEEP-2026-07-30 fix · NEW-attach-presign-unbounded] Đường NỘI BỘ này trước đây KHÔNG
+    // có một chốt tần suất nào: bất kỳ tài khoản MEMBER còn cookie hợp lệ đều mint được URL PUT ký
+    // sẵn ở tốc độ HTTP, mỗi URL sống 1 giờ và cho PUT tới trần single-PUT của R2. Không tạo bình
+    // luận thì object nằm lại R2 vĩnh viễn, không hàng DB nào trỏ tới nên janitor không thấy.
+    // Khoá theo NGƯỜI GỬI (khuôn nguyên văn ở api/integrations/scan-folder/route.ts).
+    const rl = await limitDb(`attach-init:${access.userId}`, 10, 60, { failClosed: true })
+    if (!rl.success) {
+        throw apiError(429, 'RATE_LIMITED', 'Bạn đính kèm quá nhanh. Thử lại sau một phút.')
+    }
+    // [AUDIT HT-020 fix] Vòng vá trước dùng "có tiền tố image/ VÀ không chứa chữ svg" — một danh
+    // sách CẤM. Nay dùng ALLOWLIST dùng chung với luồng upload bản dựng: chỉ 6 định dạng raster mà
+    // trình duyệt thật sự render trong <img>. Danh sách cấm chỉ chặn được cách viết ta nghĩ ra.
+    const mime = canonicalAttachmentImageMime(input.mimeType)
+    if (!mime) {
+        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ đính kèm được ảnh JPEG/PNG/WebP/GIF/AVIF/BMP (không hỗ trợ SVG).')
     }
     const size = Number(input.sizeBytes)
     if (!Number.isFinite(size) || size <= 0 || size > MAX_ATTACH_BYTES) {
@@ -649,7 +664,10 @@ export async function initiateAttachment(input: {
     const attachmentId = randomUUID()
     const key = attachmentKey(access.userId, attachmentId, input.fileName)
     const ttl = 60 * 60 // 1h to PUT
-    const putUrl = await presignPutObject(key, input.mimeType, ttl)
+    // ⚠️ Truyền `mime` vào đây chỉ để R2 có một giá trị mặc định hợp lý — nó KHÔNG ràng buộc được
+    // client (Content-Type không nằm trong chữ ký; xem presignPutObject). Chốt chặn thật nằm ở
+    // getAttachmentRawUrl bên dưới.
+    const putUrl = await presignPutObject(key, mime, ttl)
     return { attachmentId, putUrl, expiresAt: new Date(Date.now() + ttl * 1000).toISOString() }
 }
 
@@ -661,5 +679,37 @@ export async function getAttachmentRawUrl(attachmentId: string): Promise<string>
     // [Q3] Khách xem được ảnh đính kèm của những bình luận họ được thấy — nếu không, khung
     // bình luận của khách sẽ toàn ảnh vỡ. resolveCommentCtx tự chặn bình luận nội bộ.
     await resolveCommentCtx(attach.commentId, true)
-    return presignGetObject(attach.r2Key, { expiresIn: 15 * 60 })
+    // [AUDIT HT-020 fix] ĐÂY MỚI LÀ CHỖ CHẶN THẬT — xem chú thích ở presignPutObject.
+    //
+    // Kiểu tệp mà R2 đang lưu là do CLIENT đặt lúc PUT (Content-Type không được ký), nên nó không
+    // đáng tin: kẻ tấn công xin presign bằng 'image/png' rồi PUT kèm header
+    // `Content-Type: image/svg+xml` (hoặc text/html) là object nằm đó với kiểu tuỳ ý.
+    // Vòng vá trước của tôi quyết định inline-hay-tải-về dựa trên `attach.mimeType` trong DB —
+    // nhưng trường đó CŨNG do client khai lúc tạo bình luận, nên khai 'image/png' là qua hết.
+    //
+    // Nay LUÔN ép `ResponseContentType` (tham số này NẰM TRONG chữ ký) bằng một giá trị do MÁY CHỦ
+    // chọn, nên byte thật là gì cũng không đổi được cách trình duyệt hiểu:
+    //   · kiểu đã khai nằm trong allowlist → phục vụ đúng kiểu raster đó. Kể cả ruột là SVG,
+    //     trình duyệt KHÔNG bao giờ tự suy ngược sang SVG từ một kiểu ảnh đã khai (mimesniff cấm),
+    //     nên kết quả tệ nhất chỉ là một ảnh vỡ.
+    //   · ngoài allowlist (hàng cũ còn sót) → octet-stream + buộc tải về.
+    //
+    // ⚠️ `ResponseContentDisposition: attachment` đặt VÔ ĐIỀU KIỆN, không chỉ cho hàng cũ.
+    // Lý do: `ResponseContentType` chỉ cứu ta NẾU R2 có cài đặt tham số đó — mà tài liệu tương
+    // thích S3 của Cloudflare KHÔNG hề nhắc tới nó, và kiểu hỏng thường gặp của các lớp tương
+    // thích là LẶNG LẼ BỎ QUA tham số lạ. Nếu R2 bỏ qua, object vẫn được phục vụ bằng
+    // Content-Type kẻ tấn công đã lưu, và ta không hề biết: không lỗi, không log. Đúng cái hình
+    // hài của lỗ hổng gốc — một chốt chặn trông thì đúng nhưng dựa trên giả định chưa kiểm chứng
+    // về hệ thống của người khác. Content-Disposition thì ĐÃ được chứng minh chạy trên R2 (chính
+    // app này đang dựa vào nó ở /r/[slug]/download-url). Giữ cả hai: cái nào R2 hiểu cũng chặn.
+    //
+    // KHÔNG ảnh hưởng hiển thị: trình duyệt BỎ QUA Content-Disposition khi tải ảnh qua thẻ <img>,
+    // mà khung bình luận (ảnh nhỏ + lightbox) chỉ dùng <img src>. Chỉ khi ai đó dán thẳng URL
+    // /raw lên thanh địa chỉ thì tệp mới tải về thay vì mở — và đó CHÍNH LÀ đường tấn công.
+    const stored = canonicalAttachmentImageMime(attach.mimeType)
+    return presignGetObject(attach.r2Key, {
+        expiresIn: 15 * 60,
+        responseContentType: stored ?? 'application/octet-stream',
+        downloadFileName: attach.fileName,
+    })
 }

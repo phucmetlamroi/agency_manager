@@ -26,6 +26,7 @@ import { veloxMapToHookGraph } from "@/lib/velox/hook-graph-convert"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import type { VeloxScanResult } from "@/lib/velox/v4-types"
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput"
+import { ensureExternalLinks } from "@/lib/utils"
 import { taskTypeLabel } from "@/lib/display-labels"
 import {
     mapVeloxPayloadToFormData,
@@ -1444,10 +1445,31 @@ export default function AddTaskModal({
 
                         {/* Notations (rich text preview) */}
                         <PreviewAccordion title="Ghi chú" defaultOpen={false}>
-                            {form.notes.trim() ? (
+                            {/*
+                              * [AUDIT SWEEP-2026-07-30 · H2 fix] ĐÂY LÀ SINK XSS DUY NHẤT CÒN THÔ.
+                              * 5 nơi render cùng dữ liệu `notes_vi` này đều đã lọc (TaskDetailModal,
+                              * TaskDetailMobile, mobile/TaskDrawer, TaskCommentThread) — chỉ ô xem trước
+                              * ở đây thì không, nên `notes` đi thẳng vào innerHTML. innerHTML không chạy
+                              * <script> nhưng CHẠY `onerror` của <img>.
+                              *
+                              * Nguồn bẩn KHÔNG phải chính admin: một MEMBER ghi HTML vào `notes_vi` của
+                              * task mình (updateTaskStatus, xem bản vá kèm ở task-actions.ts), rồi công
+                              * tắc "kế thừa ghi chú" của Velox mang giá trị đó vào form của ADMIN
+                              * (getLastClientNote lấy bản `updatedAt` mới nhất) ⇒ mã của MEMBER chạy
+                              * trong phiên ADMIN = leo thang đặc quyền trong cùng tenant.
+                              *
+                              * KHÔNG dựa vào TipTap để rửa: `content` khởi tạo không phát transaction
+                              * nên `onChange` không chạy, còn nhánh `setContent` chỉ kích hoạt khi editor
+                              * RỖNG — chèn một đoạn văn trước payload là vô hiệu hoá nó. Và StepIndicator
+                              * cho bấm thẳng sang bước xem trước, bỏ qua hẳn editor.
+                              *
+                              * Dùng `ensureExternalLinks` (lib/utils) vì nó là khuôn ĐÃ CHẠY ở
+                              * mobile/TaskDrawer: DOMPurify + fail-closed trả '' khi không có DOM (SSR).
+                              */}
+                            {ensureExternalLinks(form.notes).trim() ? (
                                 <div
                                     className="text-[13px] text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none"
-                                    dangerouslySetInnerHTML={{ __html: form.notes }}
+                                    dangerouslySetInnerHTML={{ __html: ensureExternalLinks(form.notes) }}
                                 />
                             ) : (
                                 <span className="text-[13px] text-muted-foreground">Chưa thêm ghi chú</span>

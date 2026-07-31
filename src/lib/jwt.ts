@@ -8,6 +8,20 @@ const key = new TextEncoder().encode(env.JWT_SECRET)
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 30 // 2_592_000s
 
 /**
+ * [AUDIT SWEEP-2026-07-30 · N8] HẠN TUYỆT ĐỐI của một phiên, tính từ lần ĐĂNG NHẬP THẬT.
+ *
+ * SESSION_MAX_AGE ở trên là hạn TRƯỢT: middleware ký lại cookie 30 ngày mới mỗi khi token còn dưới
+ * 15 ngày, nên một chuỗi JWT bị đánh cắp chỉ cần được dùng để GET một trang bất kỳ mỗi <15 ngày là
+ * sống VÔ HẠN. Cổng thu hồi thật (`isSessionLive` so sessionVersion với DB) không chạy ở Edge —
+ * middleware không có DB — nên "đăng xuất mọi thiết bị" KHÔNG cắt được vòng gia hạn này.
+ *
+ * Mốc tuyệt đối cắt vòng đó mà không phá trải nghiệm trượt của QĐ-13: 90 ngày (quyết định của chủ
+ * dự án 2026-07-30 — người dùng hoạt động liên tục đăng nhập lại 4 lần/năm).
+ * Token cũ không có claim `authAt` ⇒ coi như 0 ⇒ không được gia hạn ⇒ tự rụng trong ≤30 ngày.
+ */
+export const SESSION_ABSOLUTE_MAX_AGE = 60 * 60 * 24 * 90 // 7_776_000s
+
+/**
  * Sign a JWT with HS256.
  *
  * @param payload Object to sign (typically `{ user, expires }`).

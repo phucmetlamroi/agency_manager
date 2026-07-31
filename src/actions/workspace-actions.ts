@@ -23,7 +23,16 @@ export async function createWorkspaceAction(formData: FormData) {
     }
 
     // [Sprint Z] RBAC gate — Owner hoặc Admin role mới được tạo workspace.
-    const { canCreateWorkspace } = await import('@/lib/profile-permissions')
+    const { canCreateWorkspace, isSessionLive } = await import('@/lib/profile-permissions')
+    // [AUDIT HT-033 fix] NỬA SAU CỦA ĐƯỜNG NÉ LỆNH KHOÁ. canCreateWorkspace chỉ đọc
+    // ProfileAccess.role — nó KHÔNG BAO GIỜ đọc User.role hay User.sessionVersion. Nên một tài
+    // khoản đã bị khoá vẫn "có quyền" theo nghĩa của vị từ đó, và nếu nó vừa tự tạo Profile ở
+    // createProfileForUser thì nó chính là OWNER của profile mới → qua cổng dễ dàng.
+    // Vị từ phân quyền trả lời "vai trò này được làm gì"; nó không trả lời "tài khoản này còn
+    // sống không". Phải hỏi cả hai.
+    if (!(await isSessionLive(session))) {
+        return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
+    }
     if (!(await canCreateWorkspace(session.user.id, profileId))) {
         return { error: 'Bạn không có quyền tạo Workspace trong Profile này. Chỉ Owner và Admin mới được tạo.' }
     }
@@ -41,13 +50,6 @@ export async function createWorkspaceAction(formData: FormData) {
         return { error: 'Mô tả không được quá 200 ký tự' }
     }
 
-    // Rate limit: max 10 workspaces owned per user to prevent abuse.
-    const ownedCount = await prisma.workspaceMember.count({
-        where: { userId: session.user.id, role: 'OWNER' },
-    })
-    if (ownedCount >= 10) {
-        return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
-    }
 
     // [Sprint B] Subscription gating removed — tất cả user đều có quyền tạo workspace.
     // Rate limit 10/user vẫn còn để chống abuse.
@@ -55,6 +57,19 @@ export async function createWorkspaceAction(formData: FormData) {
     try {
         let newWorkspaceId = ''
         await prisma.$transaction(async (tx) => {
+            // [AUDIT SWEEP-2026-07-30 fix] Trần 10 workspace/user trước đây đếm NGOÀI transaction
+            // rồi tạo bên trong mà không đếm lại (check-then-act): N request song song của cùng một
+            // người đều đọc 9 và đều tạo. Không có ràng buộc DB nào cưỡng chế trần này.
+            // Khuôn đúng đã có trong repo: advisory lock theo user + RE-COUNT bên trong transaction
+            // (src/lib/review/guest-subscribe.ts).
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ws-quota:${session.user.id}`}, 0))`
+            const ownedCount = await tx.workspaceMember.count({
+                where: { userId: session.user.id, role: 'OWNER' },
+            })
+            if (ownedCount >= 10) {
+                throw new Error('WORKSPACE_QUOTA_REACHED')
+            }
+
             const workspace = await tx.workspace.create({
                 data: {
                     name: name.trim(),
@@ -85,6 +100,9 @@ export async function createWorkspaceAction(formData: FormData) {
         revalidatePath('/workspace')
         return { success: true, workspaceId: newWorkspaceId }
     } catch (e: any) {
+        if (e?.message === 'WORKSPACE_QUOTA_REACHED') {
+            return { error: 'Bạn đã đạt giới hạn 10 Workspace. Hãy xóa workspace cũ trước khi tạo mới.' }
+        }
         console.error(e)
         return { error: 'Lỗi khởi tạo Workspace' }
     }
@@ -134,6 +152,33 @@ export async function renameWorkspaceAction(workspaceId: string, newName: string
 export async function getWorkspacesForProfile(profileId: string) {
     const session = await getSession()
     if (!session?.user?.id) return []
+
+    // [AUDIT SWEEP-2026-07-30 · H3 fix] `profileId` đến TỪ NGƯỜI GỌI và trước đây được dùng thẳng
+    // làm bộ lọc — cổng duy nhất là "có đăng nhập không". Tức bất kỳ ai đã đăng nhập cũng liệt kê
+    // được id/tên/mô tả TOÀN BỘ workspace của một tenant khác chỉ bằng cách truyền profileId lạ.
+    //
+    // Sổ kiểm toán cũ chấm mục này reachable=false vì "không file nào import hàm". ĐO CƠ CHẾ THÌ
+    // SAI: transform 'use server' của Next đăng ký MỌI export của module làm server reference, và
+    // các export cùng file (createWorkspaceAction, restoreWorkspaceAction…) ĐƯỢC Client Component
+    // import — nên cả module vào layer action-browser và hàm này CÓ id trong action manifest.
+    // "Không ai import" ≠ "không gọi được". Quy tắc reachable phải đo theo MODULE, không theo export.
+    //
+    // Gác bằng đúng vị từ mà getProfileMembers dùng: người gọi phải có ProfileAccess trên profile đó.
+    //
+    // ⚠️ KÈM NHÁNH LEGACY, CÓ LÝ DO CỤ THỂ: `getProfileRole` CHỈ đọc bảng `ProfileAccess`. Liên kết
+    // cũ `User.profileId` (cột vẫn còn trong schema) KHÔNG được nó xét, nên một tài khoản chỉ còn
+    // liên kết theo đường cũ sẽ nhận [] và **trình chuyển workspace trống trơn**. Đúng lớp sự cố đã
+    // xảy ra một lần trước đây ("mọi workspace biến mất trừ cái mới nhất") và lần đó nguyên nhân
+    // cũng là một bộ lọc thêm vào ĐÂY. Vì vậy chấp nhận cả hai đường liên kết: vẫn chặn profileId
+    // lạ (mục tiêu của bản vá), mà không cắt tài khoản legacy khỏi chính tenant của họ.
+    const { getProfileRole } = await import('@/lib/profile-permissions')
+    const hasAccess =
+        (await getProfileRole(session.user.id, profileId)) !== null ||
+        (await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { profileId: true },
+        }))?.profileId === profileId
+    if (!hasAccess) return []
 
     // Hide soft-deleted workspaces from the switcher.
     // The `status` column may not exist pre-migration; in that case the where
@@ -399,6 +444,27 @@ export async function createNextMonthWithRollover(currentWorkspaceId: string) {
     })
     if (!source) return { error: 'Không tìm thấy Workspace nguồn.' }
     profileId = source.profileId
+
+    // [PHẢN BIỆN vòng 4 · REG-5] NGỪNG ĐẺ THÊM WORKSPACE KHÔNG CÓ PROFILE.
+    //
+    // Dòng dưới từng là `profileId: profileId ?? undefined` khi tạo workspace mới — nghĩa là một
+    // workspace nguồn có `profileId = NULL` sẽ sinh ra một workspace MỚI cũng NULL, mỗi lần bấm
+    // "Tạo tháng mới". Đó là lý do tập workspace-không-profile KHÔNG phải "dữ liệu cũ đóng băng":
+    // nó tự lớn lên mỗi tháng.
+    // Và workspace vừa sinh ra đã chết một nửa ngay từ ngày đầu: sau chiến dịch vá lệch nguồn,
+    // 7 chức năng admin (tạo task, xuất/xem/huỷ hoá đơn, ghi thanh toán, đổi vai trò…) đều fail
+    // closed khi thiếu profileId. Một nút được hỗ trợ không được phép tạo ra hàng mà mọi hành động
+    // khác sau đó từ chối đụng tới.
+    //
+    // Chặn ở đây thay vì đoán profile: workspace nguồn cần được backfill trước
+    // (scripts/backfill-workspace-profile-id.ts), rồi thao tác này chạy lại bình thường.
+    if (!profileId) {
+        return {
+            error:
+                'Workspace nguồn chưa gắn Profile nên không thể tạo tháng mới — ' +
+                'nếu tạo, tháng mới cũng sẽ không dùng được. Báo quản trị viên chạy backfill Profile trước.',
+        }
+    }
 
     // Derive next month from the source name ("Tháng 6/2026" → 7/2026).
     const { month, year } = extractPayrollCycle(source.name)

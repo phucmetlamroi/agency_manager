@@ -20,6 +20,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { ensureWorkspaceMembership, isAssigneeInWorkspaceProfile } from '@/lib/workspace-membership'
@@ -136,13 +137,18 @@ export async function createTasksFromBatch(
 
         // Verify ADMIN access + capture user/profile info
         const { user, session } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-        const profileId = (user as any)?.sessionProfileId
+        // [PHẢN BIỆN 2026-07-30 · CS-4] Phạm vi dữ liệu lấy từ profile CỦA WORKSPACE — cùng nguồn
+        // mà cổng vừa chấm — chứ KHÔNG từ claim `sessionProfileId`. Claim đặt được tuỳ ý qua
+        // /api/profile/select, nên lấy nó ở đây là mở đường ghi xuyên tenant: `Client` nằm trong
+        // bypassModels (profileId là bộ lọc duy nhất), và chốt R14 bên dưới bị lật ngược khi được
+        // đưa claim của tenant nạn nhân. Guard `!profileId` ngay dưới đã fail-closed sẵn.
+        const profileId = await resolveWorkspaceProfileId(workspaceId)
 
         if (!workspaceId || workspaceId.trim() === '') {
             return { error: 'Lỗi nội bộ: workspaceId thiếu.' }
         }
         if (!profileId || typeof profileId !== 'string') {
-            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile.' }
+            return { error: 'Workspace này chưa gắn Profile — không thể tạo task. Báo quản trị viên.' }
         }
 
         // [Trial P0] The Manager (picked in the form), else the creator.
@@ -183,7 +189,7 @@ export async function createTasksFromBatch(
         // reject foreign-tenant userIds before ensureWorkspaceMembership provisions them
         // (it upserts a ProfileAccess for any global id, a cross-tenant injection primitive).
         for (const assigneeId of uniqueAssignees) {
-            const ok = await isAssigneeInWorkspaceProfile(assigneeId, workspaceId, profileId)
+            const ok = await isAssigneeInWorkspaceProfile(assigneeId, workspaceId)
             if (!ok) {
                 return { error: 'Có editor được gán không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
             }

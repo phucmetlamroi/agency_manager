@@ -32,8 +32,11 @@ import {
 } from '@/lib/review/share-auth'
 import { guestAppBaseUrl } from '@/lib/review/guest-emails/wrap'
 import { sanitizeClientText, FEEDBACK_MAX_LEN, RATING_FEEDBACK_MAX_LEN, TITLE_MAX_LEN, LINK_MAX_LEN } from '@/lib/sanitize'
-import { rateLimit } from '@/lib/rate-limit'
-import { limitDb } from '@/lib/review/rate-limit-db'
+// [AUDIT SWEEP-2026-07-30 · N9] `rateLimit` (in-memory) đã bị gỡ khỏi file này — cả 4 chốt của cổng
+// khách nay dùng `limitDb` (bền, trên Postgres) khoá theo NGƯỜI GỬI/NGƯỜI NHẬN, không theo link.
+// Thư viện `@/lib/rate-limit` vẫn còn cho các nơi gọi khác; đừng dùng lại nó cho bề mặt khách.
+import { limitDb, type RateLimitResult } from '@/lib/review/rate-limit-db'
+import { canonicalEmailKey } from '@/lib/review/email-key'
 import { resolveShareToken, getRequestIp } from '@/lib/share-link-auth'
 import { generateOtp, hashOtp, verifyOtp, generateRandomToken } from '@/lib/otp'
 import { sendEmail } from '@/lib/email'
@@ -523,42 +526,37 @@ function renderNotifyVerifyEmailHtml(code: string, brand: string): string {
 }
 
 /**
- * Collapse an address to the mailbox it actually reaches, for rate-limit keys ONLY.
- * Never store or send this — it is deliberately lossy. `+tag` suffixes are stripped for every
- * provider (universally a same-inbox alias); dots are stripped only for Gmail, which is the one
- * major provider that ignores them.
+ * [AUDIT HT-015] Câu "quá nhiều lần thử" kèm THỜI GIAN CHỜ THẬT.
+ *
+ * `limitDb` đã tính sẵn `retryAfterSec` mà mọi nơi gọi ở đây đều vứt đi, rồi in một câu cứng
+ * "thử lại sau một giờ" — sai với người bấm ở phút thứ 55, và không cho họ biết nên đợi bao lâu.
+ * Các route /r/ anh em đều trả `retryAfterSec` ra ngoài; làm theo.
  */
-const PLUS_ALIAS_DOMAINS = new Set([
-    'gmail.com', 'googlemail.com',
-    'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
-    'yahoo.com', 'ymail.com',
-    'icloud.com', 'me.com', 'mac.com',
-    'protonmail.com', 'proton.me', 'pm.me',
-    'fastmail.com', 'zoho.com', 'aol.com',
-])
+function formatWait(sec: number): string {
+    // Tầng hộp thư có cửa sổ 24 giờ, nên chia phút ra là "about 1440 minutes" — đúng số nhưng
+    // người đọc không dùng được. Đổi đơn vị theo độ lớn.
+    if (sec < 90) return 'about a minute'
+    const mins = Math.ceil(sec / 60)
+    if (mins < 90) return `about ${mins} minutes`
+    const hours = Math.ceil(mins / 60)
+    if (hours < 36) return hours === 1 ? 'about an hour' : `about ${hours} hours`
+    const days = Math.ceil(hours / 24)
+    return days === 1 ? 'about a day' : `about ${days} days`
+}
 
-function notifyInboxKey(email: string): string {
-    const at = email.lastIndexOf('@')
-    if (at < 1) return email
-    let local = email.slice(0, at)
-    const domain = email.slice(at + 1)
-    // [Review round 2] Only for providers that DEFINITELY treat +tag as an alias of one
-    // mailbox. Stripping it everywhere was wrong: a company running its own mail server can
-    // provision ops@ and ops+vip@ as two real, separate mailboxes, and collapsing them meant
-    // three code requests to the first told the second "Too many attempts for this email"
-    // before it had ever asked for one. Unknown domains keep their local part intact — the
-    // worst case there is a cap that is merely per-address, which is where it started.
-    if (PLUS_ALIAS_DOMAINS.has(domain)) {
-        const plus = local.indexOf('+')
-        if (plus > 0) local = local.slice(0, plus)
+function tooManyAttempts(rl: RateLimitResult, scopeNote?: string): { success: false; error: string } {
+    // [AUDIT HT-015 — vòng 2] PHÂN BIỆT "BẠN LÀM QUÁ NHIỀU" VỚI "PHÍA CHÚNG TÔI HỎNG".
+    // Với failClosed, một sự cố của limiter (thiếu bảng RateLimitBucket, statement timeout) cũng
+    // trả success=false kèm retryAfterSec = trọn cửa sổ — tức khách bị báo "quá nhiều lần thử, đợi
+    // khoảng 60 phút" cho một lỗi máy chủ mà họ không gây ra và đợi bao lâu cũng không hết. Chặn
+    // vẫn đúng; đổ lỗi cho khách thì không.
+    if (rl.errored) {
+        return { success: false, error: 'Something went wrong on our side. Please try again in a few minutes.' }
     }
-    // Dots are ignored by Gmail only — and googlemail.com is the SAME mailbox as gmail.com,
-    // so it has to fold into one key or the alias this exists to close survives at half
-    // strength (a.b@googlemail.com and ab@gmail.com are one inbox, two buckets).
-    if (domain === 'gmail.com' || domain === 'googlemail.com') {
-        return `${local.replace(/\./g, '')}@gmail.com`
+    return {
+        success: false,
+        error: `Too many attempts${scopeNote ? ` ${scopeNote}` : ''}. Please try again in ${formatWait(rl.retryAfterSec)}.`,
     }
-    return `${local}@${domain}`
 }
 
 /** Current notify-email state for the portal Settings panel. Null = invalid token. */
@@ -589,21 +587,53 @@ export async function requestPortalNotifyEmail(
     if (!NOTIFY_EMAIL_RX.test(email) || email.length > 200) {
         return { success: false, error: 'Please enter a valid email address.' }
     }
-    // [AUDIT HT-015 fix] Cap verification emails PER TARGET INBOX with the PERSISTENT DB limiter
-    // (survives serverless cold-starts, unlike the in-memory rateLimit below). Without a per-inbox
-    // cap keyed on the destination address, the portal could be abused to email-bomb an arbitrary
-    // victim inbox (the per-link+ip cap doesn't bound how many distinct addresses one caller hits).
-    // [Authz 2026-07] Key on the DELIVERY inbox, not the typed string. The cap existed to stop
-    // this endpoint being used to email-bomb an arbitrary victim, but keying on the raw address
-    // meant victim+1@gmail.com, victim+2@… and v.i.c.t.i.m@… were three separate buckets
-    // delivering to one mailbox — 3/hour became unbounded for the cost of typing a plus sign.
-    const inboxRl = await limitDb(`portal-notify-inbox:${notifyInboxKey(email)}`, 3, 60 * 60)
-    if (!inboxRl.success) {
-        return { success: false, error: 'Too many attempts for this email. Please try again later.' }
-    }
+    // [AUDIT HT-015 fix] Chặn dùng endpoint này làm máy bắn thư vào một hộp thư bất kỳ.
+    //
+    // Bệnh gốc: cả hai chốt cũ đều là `rateLimit()` in-memory — reset mỗi lần cold-start và không
+    // chia sẻ giữa các instance serverless, tức trên Vercel gần như không chặn được gì. Nay dùng
+    // `limitDb` (bộ đếm bền trên Postgres) với `failClosed: true`: limitDb mặc định fail-OPEN cho
+    // sẵn sàng dịch vụ — đúng với đường ĐỌC — nhưng ở đây một sự cố DB sẽ biến endpoint thành máy
+    // gửi thư không giới hạn, nên thà chặn.
+    //
+    // HÌNH DẠNG CHỐT LẤY NGUYÊN CỦA LUỒNG KHÁCH /r/ (request-pin), là nơi codebase đã trả lời
+    // đúng câu hỏi này rồi. Mọi tầng đều gắn vào NGƯỜI GỬI (ip) hoặc NGƯỜI NHẬN (hộp thư), KHÔNG
+    // tầng nào chỉ gắn vào link.
+    //
+    // VÌ SAO KHÔNG CÓ TRẦN THEO LINK — vòng trước tôi thêm một cái 10/giờ và bị bác đúng chỗ này:
+    // xô đếm theo link là XÔ CHUNG SỐ PHẬN. Ai cầm link chuyển tiếp (đúng mô hình đe doạ của
+    // chính finding) chỉ cần bắn 10 lượt vào địa chỉ của chính họ là khách thật hết quota cả giờ,
+    // không đặt nổi email nhận thông báo, không đổi được khi chuyển hòm thư, không xin lại được
+    // mã khi mã cũ rơi vào spam. Chạy cron mỗi đầu giờ là khoá vĩnh viễn với giá 3 thư/giờ gửi
+    // cho chính mình. `share-link-auth.ts` đã ghi rõ bài học này và cố ý để tầng theo token ở
+    // 2000/phút chỉ làm "chốt chặn chạy loạn, không phải chốt sắc" — tôi thì đặt 10/GIỜ, chật hơn
+    // 12000 lần, ngay trong cùng luồng.
+    const inboxKey = canonicalEmailKey(email)
     const ip = await getRequestIp()
-    const rl = await rateLimit(`portal-notify-req:${scope.shareLinkId}:${ip}`, 5, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many attempts. Please try again in an hour.' }
+
+    // Tầng 1 — NGƯỜI GỬI. Bỏ qua hoàn toàn khi nền tảng không cho biết IP: `getRequestIp` trả
+    // chuỗi 'unknown', và gộp mọi khách vào một xô 'unknown' bền chính là lỗi khoá nhầm ở trên,
+    // chỉ khác là không tự lành sau cold-start nữa. `resolveShareToken` bỏ qua tầng IP của nó
+    // trong đúng tình huống này, vì đúng lý do này.
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`portal-notify-ip:${ip}`, 10, 60 * 60, { failClosed: true })
+        if (!ipRl.success) return tooManyAttempts(ipRl)
+    }
+    // Tầng 2 — chống bấm liên tục, và tầng 3 — chống bùng phát. Cả hai khoá theo (hộp thư, link).
+    const cooldown = await limitDb(`portal-notify-cd:${inboxKey}:${scope.shareLinkId}`, 1, 60, { failClosed: true })
+    if (!cooldown.success) return tooManyAttempts(cooldown)
+    const burst = await limitDb(`portal-notify-burst:${inboxKey}:${scope.shareLinkId}`, 3, 10 * 60, { failClosed: true })
+    if (!burst.success) return tooManyAttempts(burst)
+    // Tầng 4 — NGƯỜI NHẬN, và là chốt SẮC của finding này: trần theo hộp thư đích, tính chung
+    // trên MỌI link. Không có tầng này thì một botnet cầm nhiều link vẫn dồn thư về một nạn nhân,
+    // mỗi link một hạn mức riêng. Khoá theo hộp thư CHÍNH TẮC nên victim+1@, victim+2@ (mọi domain)
+    // dùng chung một hạn mức thay vì mỗi cách viết được cấp một hạn mức mới.
+    // ⚠️ GIỚI HẠN THẬT CỦA CHỐT NÀY, nói đúng để người sau không tin quá: dấu chấm chỉ được bỏ cho
+    // gmail.com/googlemail.com. Nhà cung cấp khác cũng bỏ qua dấu chấm (ví dụ Google Workspace trên
+    // tên miền riêng) thì v.ictim@ và vi.ctim@ vẫn là các xô đếm riêng — hạn mức thực tế nhân lên
+    // theo số cách rắc dấu chấm. Không nới rộng ở đây vì với đa số nhà cung cấp, dấu chấm là ký tự
+    // THẬT của địa chỉ; gộp bừa sẽ khoá nhầm hai người khác nhau. Hành vi này giống hệt luồng /r/.
+    const inboxRl = await limitDb(`portal-notify-inbox:${inboxKey}`, 10, 24 * 60 * 60, { failClosed: true })
+    if (!inboxRl.success) return tooManyAttempts(inboxRl, 'for this email address')
 
     const code = generateOtp()
     await prisma.clientShareLink.update({
@@ -632,8 +662,28 @@ export async function verifyPortalNotifyEmail(
     // Bound OTP brute-force: a 6-digit code with a 15-min TTL must not be guessable. Cap attempts
     // per link+ip (defense-in-depth on top of resolveShareToken's per-ip limiter).
     const ip = await getRequestIp()
-    const rl = await rateLimit(`portal-notify-verify:${scope.shareLinkId}:${ip}`, 10, NOTIFY_CODE_TTL_MS)
-    if (!rl.success) return { success: false, error: 'Too many attempts. Please try again later.' }
+    // [AUDIT HT-015 fix — lỗ liền kề, KHÔNG thuộc phạm vi finding] Chốt chống dò mã này cũng dùng
+    // bộ đếm in-memory, tức là trên serverless nó gần như không chặn được gì: mã 6 chữ số = 1 triệu
+    // tổ hợp, và mỗi cold-start/instance mới lại cho thêm 10 lượt. Cùng gốc bệnh với HT-015 nên
+    // chuyển sang bộ đếm bền luôn; ghi lại là phát hiện mới, không phải một phần của HT-015.
+    //
+    // ⚠️ ĐÍNH CHÍNH lý lẽ tôi viết vòng trước: đoán trúng mã KHÔNG cho kẻ tấn công "đặt email nhận
+    // thông báo của khách thành địa chỉ của họ". Xác thực chỉ THĂNG CẤP giá trị đang nằm ở
+    // notifyEmailPending, mà người duy nhất đặt được pending lại chính là người cầm token — họ chỉ
+    // cần xin mã về địa chỉ của mình rồi xác thực hợp lệ. Việc chuyển sang bộ đếm bền vẫn đúng
+    // (chốt in-memory trên serverless là chốt giả), nhưng lý do thì hẹp hơn tôi đã viết.
+    //
+    // CỐ Ý KHÔNG thêm trần theo link ở đây, dù bên request đã có nhiều tầng: trần theo link ở bước
+    // xác thực sẽ cho người cầm link khoá luôn bước xác thực của khách thật — đúng kiểu chặn dịch
+    // vụ mà bản vá này vừa gỡ bỏ ở bên request. Hệ quả còn lại đã ghi vào nợ: xoay IP thì mỗi IP
+    // lại được 10 lượt mới, trần thật là 2000/phút theo token của resolveShareToken.
+    const rl = await limitDb(
+        `portal-notify-verify:${scope.shareLinkId}:${ip}`,
+        10,
+        Math.ceil(NOTIFY_CODE_TTL_MS / 1000),
+        { failClosed: true },
+    )
+    if (!rl.success) return tooManyAttempts(rl)
     const link = await prisma.clientShareLink.findUnique({
         where: { id: scope.shareLinkId },
         select: { notifyEmailPending: true, notifyEmailCodeHash: true, notifyEmailCodeExpiresAt: true },
@@ -818,11 +868,29 @@ export async function approveDeliverableViaToken(token: string, taskId: string) 
         `Khách hàng "${scope.clientName}" đã duyệt "${task.title}" (qua link chia sẻ). Task được đánh dấu Hoàn tất.`,
     )
 
+    // [AUDIT HT-006 fix] Chủ dự án đã chốt "khách duyệt = hoàn tất" (OPEN_QUESTIONS Q1, phương án
+    // b), nên hành vi kích hoạt tính lương giữ nguyên — đó là rủi ro đã được chấp nhận, không
+    // phải lỗi cần vá. Cái CÒN LẠI phải vá là vết kiểm toán: đây là lượt ghi duy nhất trong hệ
+    // thống vừa đưa task vào trạng thái TÍNH LƯƠNG vừa không có người dùng nào đứng tên.
+    //
+    // actorUserId buộc phải là null — người cầm link chia sẻ không có tài khoản User, không có
+    // id nào để điền. Nên phải ghi lại mọi thứ CÓ THỂ nhận dạng được: link nào, của khách nào,
+    // từ đâu, bằng trình duyệt gì. Nếu sau này tranh chấp "ai bấm duyệt cái này", đây là toàn bộ
+    // bằng chứng tồn tại. (ipAddress/userAgent nay được audit() tự lấy — xem HT-002.)
     void audit({
         workspaceId: task.workspaceId, actorUserId: null, action: 'task.client_approved',
         targetType: 'Task', targetId: taskId,
-        before: { status: task.status },
-        after: { status: 'Hoàn tất', clientReview: 'APPROVED', viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
+        before: { status: task.status, clientReview: task.clientReview },
+        after: {
+            status: 'Hoàn tất',
+            clientReview: 'APPROVED',
+            triggersPayroll: true,
+            actor: 'share-link-holder (không có tài khoản User)',
+            viaShareLinkId: scope.shareLinkId,
+            clientId: scope.clientId,
+            clientName: scope.clientName,
+            ip: await getRequestIp(),
+        },
     })
 
     if (task.workspaceId) {
@@ -1173,103 +1241,31 @@ export async function getSubmitOptionsViaToken(token: string) {
     }
 }
 
-/**
- * Client creates a task from the portal. Token-authed (no session); every input
- * is re-validated against the link's scope server-side. The task lands UNASSIGNED
- * ('Đang đợi giao') with the Raw/B-roll links encoded in the pipe format the admin
- * TaskDetailModal parses; the requirement goes to notes_vi. Admin then triages.
+/*
+ * [AUDIT SWEEP-2026-07-30] `createTaskViaToken` ĐÃ ĐƯỢC XOÁ (quyết định của chủ dự án: gỡ mã chết).
+ *
+ * Đây là đường v1: khách bấm là TẠO THẲNG một Task. Nó đã bị luồng v2 bên dưới thay thế — cổng khách
+ * nay gọi `submitClientRequestViaToken` để tạo một ClientTaskRequest, rồi admin xét trong "Hộp thư
+ * yêu cầu" mới sinh Task thật. Chú thích cũ ở đây tự ghi "retained but unused".
+ *
+ * VÌ SAO XOÁ chứ không để đó: nó là bề mặt GHI (tạo Task, ghi notes_vi, ghi link) gọi được bằng token
+ * chia sẻ, không còn ai bảo trì và không nằm trong bất kỳ luồng nghiệp vụ nào — đúng loại bẫy chờ mà
+ * ai đó cắm lại sẽ bỏ qua các chốt v2 đã thêm sau này.
+ *
+ * ⚠️ `getSubmitOptionsViaToken` phía trên KHÔNG chết, đừng dọn theo: nó vẫn được
+ * `components/portal/share/SharePortalClient.tsx` gọi để nạp danh sách chọn cho wizard v2.
+ * (Bản kế hoạch đợt vá gộp hai hàm này thành một mục — sai; chỉ một trong hai là mã chết.)
  */
-export async function createTaskViaToken(
-    token: string,
-    input: { workspaceId: string; clientId: number; title: string; rawLink: string; brollLink?: string; notes?: string },
-) {
-    const scope = await resolveShareToken(token)
-    if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    // Per-link burst guard (best-effort; the 256-bit token is the real wall).
-    const rl = await rateLimit(`client-create-task:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
-    // [L18a] These errors surface to the (English) client portal via CreateTaskPanel → keep them EN
-    // to match line 493; only the internal staff UI is Vietnamese.
-    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
-
-    // Fail-closed scope checks — client cannot inject another profile's/client's id.
-    if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
-        return { success: false, error: 'Missing information.' }
-    }
-    if (!scope.workspaceIds.includes(input.workspaceId)) return { success: false, error: 'Invalid month.' }
-    if (!scope.clientIds.includes(input.clientId)) return { success: false, error: 'Invalid brand.' }
-
-    // The chosen month must still be ACTIVE.
-    const ws = await prisma.workspace.findFirst({
-        where: { id: input.workspaceId, status: 'ACTIVE' },
-        select: { id: true },
-    })
-    if (!ws) return { success: false, error: 'This month is no longer active.' }
-
-    // Validate + sanitize.
-    const title = sanitizeClientText(input.title || '', TITLE_MAX_LEN)
-    if (!title) return { success: false, error: 'Please enter a project / video name.' }
-    const rawLink = cleanLink(input.rawLink)
-    if (!looksLikeUrl(rawLink)) return { success: false, error: 'Invalid raw link (must start with http/https).' }
-    const brollLink = input.brollLink ? cleanLink(input.brollLink) : ''
-    if (brollLink && !looksLikeUrl(brollLink)) return { success: false, error: 'Invalid b-roll link.' }
-    const notes = input.notes ? sanitizeClientText(input.notes, FEEDBACK_MAX_LEN) : ''
-
-    // Encode to the format the admin TaskDetailModal parses (split('|') → RAW:/BROLL:).
-    const resources = `RAW: ${rawLink}` + (brollLink ? ` | BROLL: ${brollLink}` : '')
-
-    let task: { id: string; title: string }
-    try {
-        task = await prisma.task.create({
-            data: {
-                title,
-                resources,
-                notes_vi: notes || null,
-                clientId: input.clientId,
-                workspaceId: input.workspaceId,
-                profileId: scope.profileId,           // from scope, never client input
-                status: 'Đang đợi giao',              // unassigned pool, admin triages
-                assigneeId: null,
-                assignedById: null,
-                type: 'Khách gửi',                    // distinct label → admin spots client submissions
-                version: 0,
-                isArchived: false,
-            },
-            select: { id: true, title: true },
-        })
-    } catch (err) {
-        console.error('[createTaskViaToken] create failed', err)
-        return { success: false, error: 'Không tạo được task. Vui lòng thử lại.' }
-    }
-
-    await notifyProfileAdmins(
-        scope.profileId,
-        'Khách gửi yêu cầu mới',
-        `Khách hàng "${scope.clientName}" vừa gửi task: "${title}"`,
-        task.id,
-    )
-
-    void audit({
-        workspaceId: input.workspaceId, actorUserId: null, action: 'task.client_submitted',
-        targetType: 'Task', targetId: task.id,
-        after: { title, clientId: input.clientId, viaShareLinkId: scope.shareLinkId, ip: await getRequestIp() },
-    })
-
-    try {
-        revalidatePath(`/${input.workspaceId}/admin`)
-        revalidatePath(`/${input.workspaceId}/admin/queue`)
-        revalidatePath(`/${input.workspaceId}/dashboard`)
-    } catch { /* best-effort */ }
-
-    return { success: true, taskId: task.id }
-}
 
 /* ───────────────────────────────────────────────────────────────────────────
    Client Task Submission v2 — request INTAKE (ClientTaskRequest) + sub-brand
-   creation. Supersedes the v1 direct-to-Task path above: the portal wizard now
-   calls submitClientRequestViaToken, which creates a NEW ClientTaskRequest and
-   emails every profile OWNER/ADMIN. An admin later accepts it into a real Task
-   from the "Hộp thư yêu cầu" inbox. createTaskViaToken is retained but unused.
+   creation. Supersedes the v1 direct-to-Task path: the portal wizard calls
+   submitClientRequestViaToken, which creates a NEW ClientTaskRequest and emails
+   every profile OWNER/ADMIN. An admin later accepts it into a real Task from the
+   "Hộp thư yêu cầu" inbox.
+   [AUDIT SWEEP-2026-07-30] Đường v1 (createTaskViaToken) nay ĐÃ XOÁ — câu cũ ở đây
+   ghi "retained but unused", không còn đúng.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const DESIRED_TYPES = new Set(['Short form', 'Long form', 'Trial'])
@@ -1351,8 +1347,28 @@ export async function submitClientRequestViaToken(token: string, input: SubmitCl
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    const rl = await rateLimit(`client-submit-request:${scope.shareLinkId}`, 20, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    // [AUDIT SWEEP-2026-07-30 fix · N9] Chốt cũ là `rateLimit()` IN-MEMORY khoá theo shareLinkId.
+    // Trên serverless đó là chốt GIẢ: mỗi lambda mới lại cấp 20 lượt và Vercel rải request trên
+    // nhiều instance, nên trần thật chỉ còn 2000/phút/token của resolveShareToken. Mỗi lượt = 1
+    // ClientTaskRequest + 1 email THẬT cho MỖI OWNER/ADMIN của profile.
+    //
+    // KHÔNG chuyển sang `limitDb` mà GIỮ khoá shareLinkId — đó đúng là hình dạng đã bị bác ở HT-015:
+    // xô theo LINK là xô chung số phận, và bộ đếm BỀN thì không tự lành sau cold-start nữa, nên ai
+    // cầm link chuyển tiếp chỉ cần bắn hết quota là khách THẬT mất quyền gửi yêu cầu.
+    // Dùng đúng khuôn hai tầng của `requestPortalNotifyEmail` trong chính file này (:608-634):
+    // tầng NGƯỜI GỬI (IP) + tầng NGƯỜI NHẬN (profile — đích thật của email).
+    //
+    // [PHẢN BIỆN 2026-07-30 · R5-3] TẦNG "PROFILE" ĐÃ BỊ GỠ KHỎI ĐƯỜNG CHẶN GHI — xem lý do đầy đủ
+    // ngay trên `notifyProfileAdminsOfRequest` ở cuối hàm. Tóm tắt: bản vá N9 thay xô-theo-LINK bằng
+    // xô-theo-PROFILE, tức đổi một xô chung số phận lấy một xô chung số phận RỘNG HƠN — cấp tenant.
+    // Ở đây chỉ còn tầng NGƯỜI GỬI (IP), đúng nghĩa: nó tính trên chính người đang bắn.
+    {
+        const ip = await getRequestIp()
+        if (ip !== 'unknown') {
+            const ipRl = await limitDb(`portal-req-ip:${ip}`, 10, 60 * 60, { failClosed: true })
+            if (!ipRl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+        }
+    }
 
     // Fail-closed scope checks — client cannot inject another profile's ids.
     if (!input || typeof input.workspaceId !== 'string' || typeof input.clientId !== 'number') {
@@ -1432,11 +1448,32 @@ export async function submitClientRequestViaToken(token: string, input: SubmitCl
         return { success: false, error: 'Could not send your request. Please try again.' }
     }
 
-    await notifyProfileAdminsOfRequest(
-        scope,
-        { id: req.id, title, workspaceId: input.workspaceId, rawFootage, notes },
-        ws.name,
-    )
+    // [PHẢN BIỆN 2026-07-30 · R5-3] TRẦN THEO PROFILE CHỈ CÒN GÁC EMAIL, KHÔNG GÁC VIỆC GỬI YÊU CẦU.
+    //
+    // Bản vá N9 đặt `portal-req-profile:{profileId}` 20/giờ, BỀN, `failClosed`, và ĐẶT TRƯỚC cả
+    // validate input. Đó chính là hình dạng mà chính bản vá đó tuyên bố loại bỏ — xô chung số phận —
+    // chỉ khác là bán kính rộng gấp trăm lần: không phải một link, mà MỌI khách của MỌI workspace
+    // thuộc profile. Người cầm một link đã chuyển tiếp bắn 20 payload RÁC từ 2 IP là khoá cả tenant
+    // tới hết giờ; bộ đếm bền nên không tự lành sau cold-start; một cron mỗi đầu giờ = khoá vĩnh viễn
+    // với giá 20 request/giờ. Trước bản vá, chốt in-memory theo link không tạo nổi hiệu ứng này.
+    //
+    // Tài nguyên cần bảo vệ ở đây là HỘP THƯ ADMIN (mỗi lượt gửi 1 email cho MỖI OWNER/ADMIN), không
+    // phải quyền gửi yêu cầu của khách. Nên tầng này nay chỉ quyết định CÓ GỬI EMAIL HAY KHÔNG:
+    // `ClientTaskRequest` vẫn được tạo, vẫn hiện ở /admin/requests kèm badge chưa đọc. Kịch bản xấu
+    // nhất giờ là admin mất thông báo email trong một giờ — không còn là khách không gửi được việc.
+    // Hạn mức nới 20→60 vì nó không còn chặn đường ghi, và đặt SAU khi input đã hợp lệ nên payload
+    // rác không đốt quota nữa.
+    // `failClosed: true` giữ nguyên: DB hỏng ⇒ bỏ qua email, KHÔNG bỏ qua yêu cầu.
+    const emailBudget = await limitDb(`portal-req-profile-mail:${scope.profileId}`, 60, 60 * 60, { failClosed: true })
+    if (emailBudget.success) {
+        await notifyProfileAdminsOfRequest(
+            scope,
+            { id: req.id, title, workspaceId: input.workspaceId, rawFootage, notes },
+            ws.name,
+        )
+    } else {
+        console.warn('[submitClientRequestViaToken] email fan-out throttled for profile', scope.profileId, '— request', req.id, 'vẫn được tạo')
+    }
 
     void audit({
         workspaceId: input.workspaceId, actorUserId: null, action: 'request.client_submitted',
@@ -1463,8 +1500,17 @@ export async function createSubClientViaToken(token: string, input: { name: stri
 
     // DB-backed, like every other portal write: the in-memory limiter resets on each cold start,
     // so on serverless it capped almost nothing.
-    const rl = await limitDb(`client-create-subclient:${scope.shareLinkId}`, 10, 60 * 60)
-    if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    //
+    // [AUDIT SWEEP-2026-07-30 fix · N9] NHƯNG khoá theo `shareLinkId` là XÔ CHUNG SỐ PHẬN, và ở đây
+    // bộ đếm lại BỀN — tổ hợp tệ nhất: ai cầm link chuyển tiếp bắn 10 lượt là khách THẬT không tạo
+    // được thương hiệu con nào trong cả giờ, và không tự lành sau cold-start. Chuyển sang khoá theo
+    // NGƯỜI GỬI (IP). Trần nghiệp vụ thật của tính năng này vẫn là `SUBCLIENT_CAP` (20 ACTIVE mỗi
+    // khách mẹ) + `MAX_SUBCLIENT_DEPTH` — hai chốt đó không bị xoay IP làm yếu đi.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const rl = await limitDb(`portal-subclient-ip:${ip}`, 10, 60 * 60, { failClosed: true })
+        if (!rl.success) return { success: false, error: 'Too many requests. Please try again later.' }
+    }
 
     if (!input || typeof input.parentId !== 'number') return { success: false, error: 'Missing information.' }
     if (!scope.clientIds.includes(input.parentId)) return { success: false, error: 'Invalid parent brand.' }
@@ -1704,11 +1750,30 @@ export async function postCommentViaToken(token: string, taskId: string, body: s
     const scope = await resolveShareToken(token)
     if (!scope) return { success: false, error: 'This link is invalid.' }
 
-    const rl = await rateLimit(`client-comment:${scope.shareLinkId}`, 30, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+    // [AUDIT SWEEP-2026-07-30 fix · N9] Xem giải thích đầy đủ ở `submitClientRequestViaToken`:
+    // bộ đếm in-memory theo shareLinkId là chốt giả trên serverless, và chuyển thẳng sang bộ đếm bền
+    // với cùng khoá theo LINK sẽ biến lỗi lạm dụng thành lỗi chặn dịch vụ đối với khách thật.
+    // Mỗi lượt ở đây = 1 hàng TaskComment (rác hiện trong UI staff) + 1 Notification + 1 email THẬT
+    // tới Manager của task.
+    //
+    // TẦNG NGƯỜI GỬI ĐẶT TRƯỚC `findScopedTask` CÓ CHỦ ĐÍCH: nó chặn luôn cả truy vấn tra task, nên
+    // kẻ tấn công không dùng được endpoint này làm máy đọc DB. Tầng NGƯỜI NHẬN phải đặt SAU, vì
+    // trước đó ta chưa biết Manager là ai.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`portal-comment-ip:${ip}`, 30, 60 * 60, { failClosed: true })
+        if (!ipRl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+    }
 
     const { task } = await findScopedTask(token, taskId, { id: true, clientId: true, workspaceId: true, assignedById: true, title: true })
     if (!task) return { success: false, error: 'This link is invalid or the item no longer exists.' }
+
+    // Tầng NGƯỜI NHẬN — chốt SẮC: trần theo Manager, tính chung trên MỌI link. Không có tầng này thì
+    // một botnet cầm nhiều link vẫn dồn thư về một Manager, mỗi link một hạn mức riêng.
+    if (task.assignedById) {
+        const mgrRl = await limitDb(`portal-comment-mgr:${task.assignedById}`, 60, 60 * 60, { failClosed: true })
+        if (!mgrRl.success) return { success: false, error: 'Too many messages. Please try again later.' }
+    }
 
     const clean = sanitizeClientText(body || '', FEEDBACK_MAX_LEN)
     if (!clean) return { success: false, error: 'Please write a message.' }
@@ -1779,8 +1844,15 @@ export async function toggleReactionViaToken(token: string, commentId: string, e
     if (!scope) return { success: false, error: 'This link is invalid.' }
     if (!isValidReaction(emoji)) return { success: false, error: 'Unsupported reaction.' }
 
-    const rl = await rateLimit(`client-react:${scope.shareLinkId}`, 120, 60 * 60 * 1000)
-    if (!rl.success) return { success: false, error: 'Too many actions. Please try again later.' }
+    // [AUDIT SWEEP-2026-07-30 fix · N9] Bộ đếm in-memory theo link → bộ đếm bền theo NGƯỜI GỬI.
+    // Khác ba chốt kia: bấm cảm xúc KHÔNG gửi email nào, nên thiệt hại chỉ là hàng DB rác. Vì vậy
+    // chỉ có tầng IP, và ngưỡng để rộng (bấm/bỏ cảm xúc là hành vi tần suất cao của khách thật).
+    // Cố ý KHÔNG thêm tầng theo link — cùng lý do xô-chung-số-phận đã ghi ở hai hàm trên.
+    const ip = await getRequestIp()
+    if (ip !== 'unknown') {
+        const ipRl = await limitDb(`portal-react-ip:${ip}`, 300, 60 * 60, { failClosed: true })
+        if (!ipRl.success) return { success: false, error: 'Too many actions. Please try again later.' }
+    }
 
     const comment = await prisma.taskComment.findFirst({
         where: { id: commentId, isDeleted: false, visibility: 'CLIENT' },

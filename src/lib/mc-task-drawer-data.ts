@@ -14,6 +14,15 @@ import { getTaskAssets } from '@/lib/review/task-assets'
 import { getDisplayName } from '@/lib/display-name'
 import type { McTaskDetail, McReviewAsset } from '@/components/mission-control/McTaskDrawer'
 
+import { sanitizeExternalUrl } from '@/lib/safe-url'
+
+// [AUDIT HT-031 fix] Trả null (không phải '#') vì McTaskDrawer gác bằng `detail.productLink &&`
+// — null làm nút biến mất hẳn, tốt hơn một nút trông bấm được nhưng không đi đâu.
+function safeExternal(raw: unknown): string | null {
+    const cleaned = sanitizeExternalUrl(typeof raw === 'string' ? raw : undefined)
+    return cleaned ? cleaned : null
+}
+
 const STATUS_HEX: Record<string, string> = {
     'Đang đợi giao': '#A855F7', 'Nhận task': '#3B82F6', 'Đã nhận task': '#3B82F6', 'Đang thực hiện': '#EAB308',
     'Đã nộp video (nội bộ)': '#6366F1', 'Đang sửa feedback (nội bộ)': '#F59E0B', 'Đã sửa feedback (nội bộ)': '#14B8A6', 'Revision': '#EF4444',
@@ -21,7 +30,7 @@ const STATUS_HEX: Record<string, string> = {
     'Quá hạn': '#DC2626', 'Hoàn tất': '#10B981', 'Đã hủy': '#52525B',
 }
 const STATUS_LABEL: Record<string, string> = { Revision: 'Sửa lại' }
-const RANK_HEX: Record<string, string> = { S: '#FACC15', A: '#34D399', B: '#60A5FA', C: '#A1A1AA', D: '#F87171' }
+// [BO HANG S/A/B/C/D 2026-07-31] Bo bang mau hang RANK_HEX.
 const GRADIENTS = [
     'linear-gradient(135deg,#6366F1,#8B5CF6)', 'linear-gradient(135deg,#10B981,#06B6D4)', 'linear-gradient(135deg,#EC4899,#F43F5E)',
     'linear-gradient(135deg,#A855F7,#EC4899)', 'linear-gradient(135deg,#F59E0B,#EAB308)', 'linear-gradient(135deg,#06B6D4,#3B82F6)',
@@ -73,7 +82,6 @@ export async function buildMcTaskDrawerData(workspaceId: string, taskId: string)
     const t: any = res.task
     const client = t.client ? (t.client.parent?.name ? `${t.client.parent.name} / ${t.client.name}` : t.client.name) : null
     const assigneeName = t.assignee ? getDisplayName(t.assignee) : null
-    const assigneeRank = t.assignee?.monthlyRanks?.[0]?.rank as string | undefined
 
     // Review deliverables — best-effort: a review-module hiccup must not sink the whole drawer.
     let review: McReviewAsset[] = []
@@ -107,13 +115,17 @@ export async function buildMcTaskDrawerData(workspaceId: string, taskId: string)
         phaseIndex: phaseOf(t.status),
         client,
         assignee: assigneeName
-            ? { name: assigneeName, initials: initials(assigneeName), avatar: grad(t.assigneeId || assigneeName), rank: assigneeRank, rankColor: assigneeRank ? (RANK_HEX[assigneeRank] || '#A1A1AA') : undefined }
+            ? { name: assigneeName, initials: initials(assigneeName), avatar: grad(t.assigneeId || assigneeName) }
             : null,
         managerName: t.assignedBy ? getDisplayName(t.assignedBy) : null,
         assignedByName: t.assignedBy ? getDisplayName(t.assignedBy) : null,
         deadline: fmtDT(t.deadline),
         wageVND: Number(t.wageVND ?? t.value ?? 0),
-        productLink: t.productLink && String(t.productLink).trim() ? String(t.productLink).trim() : null,
+        // [AUDIT HT-031 fix] McTaskDrawer render giá trị này thẳng vào `href` mà không lọc, và
+        // file component đó thuộc vùng Mission Control phải giữ nguyên byte. Lọc ở ĐÂY — tầng
+        // dữ liệu, ngoài vùng đóng băng — nên lỗ đóng được mà không chạm vào component. Nạn nhân
+        // ở màn này là admin, nên nó nặng hơn kịch bản khách trong finding gốc.
+        productLink: safeExternal(t.productLink),
         rawFootageLink: extractRaw(t.resources),
         createdAt: fmtDate(t.createdAt),
         updatedAt: fmtDate(t.updatedAt),

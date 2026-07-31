@@ -23,6 +23,24 @@ export async function assertWorkspaceMember(wsId: string, userId: string): Promi
     }
 }
 
+/*
+ * [GỠ THẺ ĐỎ 2026-07-31] `assertNotRedCarded` ĐÃ BỊ XOÁ khỏi file này.
+ *
+ * Nó từng chặn việc giao task cho nhân sự có MonthlyRank mới nhất là 'D', và được gọi ở 5 tool
+ * (assign_task, bulk_assign_tasks, create_task, bulk_update_details, claim_task) để MCP không lệch
+ * với web. Chủ dự án quyết định bỏ hẳn luật này ở CẢ HAI phía cùng lúc, nên guard cũng đi theo —
+ * để lại một hàm không ai gọi chỉ mời người sau cắm lại một mình một bên.
+ *
+ * ⚠️ Cửa thứ tư tên `bulk_update_details`, KHÔNG phải `update_task_details` — chú thích cũ trong
+ * repo (kể cả marketplace-service.ts trước đây) gọi sai tên này. `updateTaskDetails` là tên HÀM
+ * service; tool đăng ký thật nằm ở tools/bulk-ops.ts:16. Đây là cửa đổi được người nhận cho tới
+ * 50 task trong MỘT lời gọi, nên gọi sai tên là cách nhanh nhất để nó lọt khỏi tầm mắt người rà.
+ *
+ * MonthlyRank vẫn được tính và hiển thị bình thường; nó chỉ không còn là hàng rào giao việc.
+ * Các guard tenant trong file này (assertWorkspaceMember, assertClientInProfile) KHÔNG liên quan
+ * và giữ nguyên.
+ */
+
 /** Throw unless client `clientId` belongs to the MCP profile and is active. [HT-041] */
 export async function assertClientInProfile(clientId: number): Promise<void> {
     const ctx = getMcpAuthContext()

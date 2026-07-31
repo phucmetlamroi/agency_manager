@@ -7,6 +7,12 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  // [AUDIT SWEEP-2026-07-30 fix · N8(c)] getSession() không đọc DB ⇒ không thấy LOCKED / thu hồi
+  // phiên. Route này mở luồng OAuth để GẮN token nhà cung cấp vào workspace, nên phải hỏi liveness.
+  const { isSessionLive } = await import('@/lib/profile-permissions')
+  if (!(await isSessionLive(session))) {
+    return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
+  }
 
   const { searchParams } = new URL(req.url)
   const workspaceId = searchParams.get('workspaceId')

@@ -1226,6 +1226,16 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
                 await tx.profileAccess.deleteMany({
                     where: { userId: targetUserId, profileId: revokeProfileId, role: 'USER' },
                 })
+                // [AUDIT HT-023 fix] BẤT BIẾN: dấu ProfileAccessRequest APPROVED KHÔNG được sống
+                // lâu hơn quyền ProfileAccess mà nó chứng nhận.
+                // Kể từ HT-023, dấu APPROVED chính là thứ cho phép ADMIN gỡ một người. Nếu ở đây
+                // chỉ xoá quyền mà để dấu lại, thì lần sau người đó được mời vào bằng CỬA CHÍNH
+                // TẮC, dấu cũ vẫn nằm đó và được "nhận vơ" cho quyền mới — ADMIN lại gỡ được một
+                // thành viên bình thường, tức HT-023 mở lại mà không cần race nào.
+                // removeCrossTeamAccess đã xoá cả hai trong một transaction; hai cửa này thì chưa.
+                await tx.profileAccessRequest.deleteMany({
+                    where: { userId: targetUserId, targetProfileId: revokeProfileId },
+                })
             }
         }
     })
@@ -1299,6 +1309,11 @@ export async function leaveWorkspace(workspaceId: string) {
             if (remaining === 0) {
                 await tx.profileAccess.deleteMany({
                     where: { userId, profileId: revokeProfileId, role: 'USER' },
+                })
+                // [AUDIT HT-023 fix] Cùng bất biến như removeWorkspaceMember ở trên: dấu APPROVED
+                // không được sống lâu hơn quyền nó chứng nhận. Xem chú thích dài ở đó.
+                await tx.profileAccessRequest.deleteMany({
+                    where: { userId, targetProfileId: revokeProfileId },
                 })
             }
         }

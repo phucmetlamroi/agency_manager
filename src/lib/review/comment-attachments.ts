@@ -1,8 +1,12 @@
 // [Review module P4.5] Client-side image-attachment upload for comments (PRD 1.5,
 // API-SPEC §4). Two steps that mirror the P4.1 server contract: (1) initiate presigns
 // a PUT to R2 under the caller's own userId prefix; (2) PUT the bytes directly to R2.
-// The PUT MUST send the exact Content-Type the presign was signed with (r2.ts
-// presignPutObject signs ContentType) or R2 returns SignatureDoesNotMatch. The
+// ⚠️ [AUDIT HT-020] Chú thích cũ ở đây nói "PUT PHẢI gửi đúng Content-Type mà presign đã ký, nếu
+// không R2 trả SignatureDoesNotMatch" — ĐIỀU ĐÓ SAI, và chính niềm tin sai này đã sinh ra lỗ hổng.
+// @aws-sdk/s3-request-presigner đánh dấu content-type là KHÔNG-KÝ-ĐƯỢC (dist-cjs/index.js:47), nên
+// chuỗi ký chỉ gồm `host`: client PUT với Content-Type nào cũng hợp lệ, và R2 lưu đúng cái đó.
+// Nghĩa là kiểu tệp lúc lưu hoàn toàn do client định đoạt — chốt chặn phải nằm ở lúc PHỤC VỤ
+// (`responseContentType` trong presignGetObject), không phải lúc tải lên. The
 // fileName passed to initiate and later to createComment must match — the server
 // re-derives the same R2 key from (userId, attachmentId, fileName) to claim the object.
 

@@ -1,6 +1,22 @@
 import { NextResponse, userAgent } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { decrypt, encrypt, SESSION_MAX_AGE } from '@/lib/jwt'
+import { decrypt, encrypt, SESSION_MAX_AGE, SESSION_ABSOLUTE_MAX_AGE } from '@/lib/jwt'
+
+/**
+ * [AUDIT SWEEP-2026-07-30 fix · NEW-middleware-protected-prefix-never-matches]
+ *
+ * Vị từ cũ là `['/admin','/dashboard'].some(p => pathname.startsWith(p))` — và nó KHÔNG BAO GIỜ KHỚP,
+ * vì mọi route thật đều có dạng `/{workspaceId}/admin|dashboard`. Tức cổng "chưa đăng nhập thì đá về
+ * /login" của middleware chưa từng chạy cho đúng những trang nó định bảo vệ.
+ *
+ * Hệ quả chỉ là PHÒNG THỦ CHIỀU SÂU (đúng mức Low): layout vẫn gác việc render và mọi server action
+ * thật đều tự gác — nên đây là một lớp lưới rách, không phải cửa mở.
+ *
+ * Đã kiểm các path KHÔNG được khớp để không tạo vòng lặp redirect: `/login`, `/signup`, `/welcome`,
+ * `/account`, `/legal`, `/forgot-password`, `/portal-notify`, `/diagnostic` đều là một đoạn, hoặc
+ * đoạn thứ hai không thuộc nhóm. `/share` và `/r/` đã return sớm ở trên.
+ */
+const PROTECTED_SEG = /^\/[^/]+\/(admin|dashboard|team|mc)(\/|$)/
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
@@ -69,8 +85,8 @@ export async function middleware(request: NextRequest) {
 
     // 2. Auth Guard ONLY
     if (!sessionCookie) {
-        const protectedPaths = ['/admin', '/dashboard']
-        if (protectedPaths.some(p => pathname.startsWith(p))) {
+        const protectedPaths = PROTECTED_SEG
+        if (protectedPaths.test(pathname)) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
     } else {
@@ -91,6 +107,12 @@ export async function middleware(request: NextRequest) {
 
             // VERCEL FIX 4: CHECK EMBEDDED PROFILE ID
             // If they are trying to access a workspace or admin panel but haven't selected a profile
+            // ⚠️ [AUDIT SWEEP-2026-07-30] VỊ TỪ NÀY CŨNG KHÔNG BAO GIỜ KHỚP — VÀ CỐ Ý ĐỂ NGUYÊN.
+            // Sửa nó cho "khớp thật" sẽ HỒI SINH một lỗi UX đã bị xoá có chủ đích: `layout.tsx`
+            // ([Z+1.fix3]) ghi rõ hành vi "sessionProfileId null → redirect /login" từng làm sập
+            // trải nghiệm của người dùng cũ, và đã được thay bằng backfill profileId từ ProfileAccess
+            // đầu tiên. Middleware chạy ở Edge, KHÔNG có DB để backfill — nên làm nó khớp thật là đá
+            // mọi phiên legacy về /login vĩnh viễn. Chỉ vá hai nhánh cổng đăng nhập (:72, :111).
             const requiresProfilePaths = ['/admin', '/dashboard'];
             if (requiresProfilePaths.some(p => pathname.startsWith(p))) {
                 if (!session.user.sessionProfileId) {
@@ -108,8 +130,8 @@ export async function middleware(request: NextRequest) {
             const transient = name === 'JWSSignatureVerificationFailed'
             // Trang KHÔNG bảo vệ (vd /login, /signup) phải được render — chỉ dọn cookie hỏng
             // rồi next(), KHÔNG redirect (redirect /login khi đang ở /login = loop).
-            const protectedPaths = ['/admin', '/dashboard']
-            if (!protectedPaths.some(p => pathname.startsWith(p))) {
+            const protectedPaths = PROTECTED_SEG
+            if (!protectedPaths.test(pathname)) {
                 const res = NextResponse.next()
                 if (!transient) res.cookies.delete('session')
                 return res
@@ -144,21 +166,42 @@ export async function middleware(request: NextRequest) {
     // so sessionVersion(JWT) vs DB ở tầng DAL — refresh chỉ gia hạn cookie, DAL vẫn chặn data.
     if (sessionPayload?.user && !sessionPayload.user.isImpersonating) {
         const msLeft = ((sessionPayload.exp ?? 0) * 1000) - Date.now()
-        if (msLeft > 0 && msLeft < (SESSION_MAX_AGE * 1000) / 2) {
-            // Giữ parity với login(): kèm claim `expires` (consumer /api/profile/select đọc nó)
-            // + copy nguyên `user` (role/sessionVersion/sessionProfileId… đều còn).
-            const fresh = await encrypt(
-                { user: sessionPayload.user, expires: new Date(Date.now() + SESSION_MAX_AGE * 1000) },
-                `${SESSION_MAX_AGE}s`,
+        // [AUDIT SWEEP-2026-07-30 fix · N8] HẠN TUYỆT ĐỐI. Vòng gia hạn ở đây trước kia KHÔNG có
+        // điểm dừng: nó chép nguyên `sessionPayload.user` (gồm cả sessionVersion CŨ) vào cookie 30
+        // ngày mới, và không đọc DB được vì đây là Edge. Nên một chuỗi JWT bị đánh cắp chỉ cần được
+        // dùng GET một trang không-API mỗi <15 ngày là sống mãi — kể cả sau khi nạn nhân đã bấm
+        // "đăng xuất mọi thiết bị" (thao tác đó bump sessionVersion, và cổng đó chỉ chặn DỮ LIỆU ở
+        // tầng DAL, không chặn việc cookie tự gia hạn).
+        // Nay chặn theo `authAt` — mốc đăng nhập thật. Token cũ chưa có claim này ⇒ `?? 0` ⇒ hiệu số
+        // rất lớn ⇒ không gia hạn ⇒ tự rụng trong ≤30 ngày. Đó là hành vi MONG MUỐN, không phải lỗi.
+        const sessionAge = Date.now() - (sessionPayload.user.authAt ?? 0)
+        const withinAbsoluteWindow = sessionAge < SESSION_ABSOLUTE_MAX_AGE * 1000
+        if (msLeft > 0 && msLeft < (SESSION_MAX_AGE * 1000) / 2 && withinAbsoluteWindow) {
+            // [PHẢN BIỆN 2026-07-30 · R4-2] KẸP HẠN THEO NGÂN SÁCH TUYỆT ĐỐI CÒN LẠI.
+            // `withinAbsoluteWindow` ở trên chỉ là ĐIỀU KIỆN VÀO. Nếu vẫn cấp trọn SESSION_MAX_AGE
+            // thì một token gia hạn ở ngày thứ 89 sống tới ngày ~119 — trần thật là 120 ngày, không
+            // phải 90 như hằng số và commit ghi. Người vận hành đọc con số đó để lập kế hoạch ứng
+            // cứu, nên lệch 30 ngày là lệch thật, không phải chi tiết văn bản.
+            const absRemainingSec = Math.floor(
+                ((sessionPayload.user.authAt ?? 0) + SESSION_ABSOLUTE_MAX_AGE * 1000 - Date.now()) / 1000,
             )
-            finalResponse.cookies.set('session', fresh, {
-                maxAge: SESSION_MAX_AGE,
-                httpOnly: true,
-                // Khớp secure của auth.ts (Electron desktop chạy http → không đặt secure).
-                secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
-                sameSite: 'lax',
-                path: '/',
-            })
+            const ttlSec = Math.min(SESSION_MAX_AGE, absRemainingSec)
+            if (ttlSec > 0) {
+                // Giữ parity với login(): kèm claim `expires` (consumer /api/profile/select đọc nó)
+                // + copy nguyên `user` (role/sessionVersion/sessionProfileId… đều còn).
+                const fresh = await encrypt(
+                    { user: sessionPayload.user, expires: new Date(Date.now() + ttlSec * 1000) },
+                    `${ttlSec}s`,
+                )
+                finalResponse.cookies.set('session', fresh, {
+                    maxAge: ttlSec,
+                    httpOnly: true,
+                    // Khớp secure của auth.ts (Electron desktop chạy http → không đặt secure).
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    path: '/',
+                })
+            }
         }
     }
 

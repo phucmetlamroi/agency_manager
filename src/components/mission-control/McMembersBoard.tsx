@@ -1,5 +1,5 @@
 'use client'
-// [Giao diện 2 · Mission Control · M9 Thành viên] Card nhân sự — rank + tải + lương kỳ + lỗi tháng.
+// [Giao diện 2 · Mission Control · M9 Thành viên] Card nhân sự — tải + lương kỳ.
 // Data-wired (server page bơm xuống DTO đã tính sẵn VND; KHÔNG có jobPriceUSD/task value thô).
 // Reuse InviteToProfileModal (đúng luồng mời GĐ1). "Hồ sơ"/"Quyền" bắc cầu sang /admin/profile-members
 // (nơi GĐ1 quản lý vai trò/xoá) tới khi M14/M15 hồ sơ ra đời. Trang cha admin-gated fail-closed.
@@ -23,8 +23,7 @@ export type McMember = {
     avatar: string
     roleLabel: string
     isTreasurer: boolean
-    rank?: string
-    rankColor?: string
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `rank` + `rankColor`.
     online: boolean
     presenceLabel: string
     activeCount: number
@@ -33,9 +32,7 @@ export type McMember = {
     loadColor?: string
     barColor: string
     salaryVND: number
-    errorRate: number | null
-    errorLabel?: string
-    errorColor: string
+    // [BO HANG S/A/B/C/D 2026-07-31] Bo errorRate + errorLabel + errorColor.
 }
 
 export type McMembersData = {
@@ -159,9 +156,11 @@ export default function McMembersBoard({ data }: { data: McMembersData }) {
                         </div>
                     ) : (
                     <RevealGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+                        {/* [BỎ HẠNG S/A/B/C/D 2026-07-31] Trước đây thẻ của người hạng S có viền vàng
+                            + quầng sáng riêng. Bỏ hạng thì bỏ luôn cách tô đặc biệt đó — mọi thẻ
+                            nhân sự nay dùng chung một kiểu viền. */}
                         {data.members.map((m) => (
-                            <RevealItem key={m.id} whileHover={{ y: -4 }} style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 20, background: 'rgba(24,24,27,0.60)', backdropFilter: 'blur(12px)', border: m.rank === 'S' ? '1px solid rgba(250,204,21,0.20)' : '1px solid rgba(255,255,255,0.06)', boxShadow: '0 12px 32px rgba(0,0,0,0.55)', padding: 18 }}>
-                                {m.rank === 'S' && <div style={{ position: 'absolute', top: -40, right: -40, width: 130, height: 130, borderRadius: 999, background: 'rgba(250,204,21,0.06)', filter: 'blur(28px)', pointerEvents: 'none' }} />}
+                            <RevealItem key={m.id} whileHover={{ y: -4 }} style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 20, background: 'rgba(24,24,27,0.60)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 12px 32px rgba(0,0,0,0.55)', padding: 18 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                     <span style={{ position: 'relative', width: 44, height: 44, borderRadius: 999, background: m.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
                                         {m.initials}
@@ -170,7 +169,6 @@ export default function McMembersBoard({ data }: { data: McMembersData }) {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                                             <span style={{ fontSize: 15, fontWeight: 800, color: '#F4F4F5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</span>
-                                            {m.rank && <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 10, fontWeight: 800, color: m.rankColor, border: `1px solid ${m.rankColor}66`, borderRadius: 5, padding: '0 5px' }}>{m.rank}</span>}
                                             {m.isTreasurer && <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 7px', borderRadius: 999, background: 'rgba(6,182,212,0.12)', color: '#22D3EE', border: '1px solid rgba(6,182,212,0.30)' }}>TREASURER</span>}
                                         </div>
                                         <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 9, letterSpacing: '0.14em', color: '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.roleLabel} · {m.presenceLabel}</span>
@@ -190,12 +188,9 @@ export default function McMembersBoard({ data }: { data: McMembersData }) {
                                     <span style={{ fontSize: 11, color: '#71717A' }}>Lương kỳ này</span>
                                     <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 13, fontWeight: 800, color: m.salaryVND > 0 ? '#F4F4F5' : '#A1A1AA' }}>{fmtVND(m.salaryVND)}</span>
                                 </div>
-                                {m.errorRate !== null && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: 11, color: '#71717A' }}>Lỗi tháng</span>
-                                        <span style={{ fontSize: 12, fontWeight: 700, color: m.errorColor }}>{m.errorRate.toFixed(1)}{m.errorLabel ? ` — ${m.errorLabel}` : ''}</span>
-                                    </div>
-                                )}
+                                {/* [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ dòng "Lỗi tháng" — nó đọc
+                                    `MonthlyRank.errorRate`, mà bảng đó nay không còn được ghi nữa,
+                                    nên để lại chỉ hiện số cũ đóng băng. */}
 
                                 <div style={{ marginTop: 'auto', display: 'flex', gap: 8 }}>
                                     <Link href={manageHref} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#A1A1AA', padding: 7, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>Hồ sơ</Link>

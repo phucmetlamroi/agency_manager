@@ -7,6 +7,23 @@
  */
 
 import { buildUnsubscribeUrl } from './unsubscribe'
+import { escapeHtml } from './format'
+
+/**
+ * [AUDIT N10 fix] Nguồn duy nhất được phép đi vào thuộc tính `src` của ảnh trong email.
+ *
+ * Danh sách CHO PHÉP (`^https?://`) rồi mới escape. Vì là allowlist nên mọi mẹo ký tự điều khiển,
+ * scheme lạ hay chuỗi rỗng chỉ dẫn tới BỊ TỪ CHỐI, không thể dẫn tới lọt — cùng khuôn với
+ * `safeEmailUrl` trong `email-templates.ts` (bản vá HT-035).
+ *
+ * Trả null khi không đạt, để nơi gọi rơi về ảnh đại diện chữ cái thay vì render một thẻ img hỏng.
+ */
+function safeImageSrc(raw: string | null | undefined): string | null {
+    if (typeof raw !== 'string') return null
+    const s = raw.trim()
+    if (!/^https?:\/\//i.test(s)) return null
+    return escapeHtml(s)
+}
 
 const BRAND = '#7C3AED' // violet-600
 const BRAND_DARK = '#6D28D9' // violet-700
@@ -152,11 +169,30 @@ export function ctaRow(buttons: { text: string, url: string, variant?: 'primary'
     return `<div style="text-align:center;margin:24px 0 8px 0;">${html}</div>`
 }
 
-/** Avatar circle (40x40) with initial letter fallback */
+/**
+ * Avatar circle (40x40) with initial letter fallback.
+ *
+ * [AUDIT N10 fix] `url` là dữ liệu HỒ SƠ NGƯỜI DÙNG (`User.avatarUrl`) và trước đây được nội suy
+ * THÔ vào thuộc tính `src`, tức chỉ cần một dấu nháy kép trong giá trị là thoát ra khỏi thuộc
+ * tính. Hai template đang chạy dùng hàm này (taskComment, taskStatusChanged).
+ *
+ * VÌ SAO CHƯA KHAI THÁC ĐƯỢC, VÀ VÌ SAO VẪN PHẢI VÁ: hôm nay mọi nơi ghi `avatarUrl` đều sinh
+ * URL từ nguồn tin cậy — tải lên Vercel Blob (`upload-actions.ts:165`) và ảnh hồ sơ Google
+ * (`google-auth.ts:189`, `:213`). Nhưng đó là một bất biến YẾU và KHÔNG HIỂN NHIÊN: nó nằm rải
+ * ở hai file khác, không có gì ở đây nhắc tới nó, và `profile-actions.ts` còn sẵn dòng
+ * `// avatar: data.avatar` bị comment lại — tức đã từng có người định cho người dùng tự ghi
+ * trường này. Ngày ai đó bỏ comment, hoặc thêm luồng import avatar từ nơi khác, đây thành lỗ
+ * thoát thuộc tính ngay lập tức mà không ai phải sửa dòng nào ở file này.
+ * Nói cách khác: chốt phải nằm ở CHỖ DÙNG, không nằm ở trí nhớ của người viết chỗ ghi.
+ *
+ * `initial` cũng được escape: nó là ký tự ĐẦU của tên người dùng, nên một cái tên bắt đầu bằng
+ * dấu nháy kép sẽ đẩy đúng ký tự đó vào `alt="…"`.
+ */
 export function avatar(url: string | null | undefined, name: string, size = 40): string {
-    const initial = (name || '?').trim().charAt(0).toUpperCase()
-    if (url) {
-        return `<img src="${url}" alt="${initial}" width="${size}" height="${size}" style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;vertical-align:middle;">`
+    const initial = escapeHtml((name || '?').trim().charAt(0).toUpperCase())
+    const src = safeImageSrc(url)
+    if (src) {
+        return `<img src="${src}" alt="${initial}" width="${size}" height="${size}" style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;vertical-align:middle;">`
     }
     return `<span style="display:inline-block;width:${size}px;height:${size}px;line-height:${size}px;border-radius:50%;background:${BRAND};color:#ffffff;text-align:center;font-weight:700;font-size:${Math.floor(size / 2.2)}px;vertical-align:middle;">${initial}</span>`
 }

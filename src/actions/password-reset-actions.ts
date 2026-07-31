@@ -24,6 +24,7 @@ import { randomInt } from 'crypto'
 import { generateOtp, hashOtp, verifyOtp, generateRandomToken, hashToken } from '@/lib/otp'
 import { validatePasswordFull } from '@/lib/password-validator'
 import { checkOtpEmail, checkOtpIp } from '@/lib/rate-limit-upstash'
+import { getRequestIpFromHeaders } from '@/lib/request-ip'
 import { sendEmail } from '@/lib/email'
 import { buildPasswordResetOtpEmail } from '@/lib/notification-emails/templates/auth/password-reset-otp'
 import { buildPasswordChangedEmail } from '@/lib/notification-emails/templates/auth/password-changed'
@@ -54,7 +55,9 @@ async function getRequestMeta() {
     let userAgent: string | null = null
     try {
         const h = await headers()
-        ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown-ip'
+        // [AUDIT HT-002 fix] Was x-forwarded-for[0] — attacker-chosen, so the 10/h checkOtpIp cap
+        // could be bypassed by rotating the header, turning this into an OTP-email flood gun.
+        ip = await getRequestIpFromHeaders()
         userAgent = h.get('user-agent')
     } catch { /* edge runtime */ }
     return { ip, userAgent }

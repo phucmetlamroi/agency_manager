@@ -74,7 +74,18 @@ export async function presignUploadPart(
     return getSignedUrl(r2Client(), cmd, { expiresIn })
 }
 
-/** Presigned single PUT (image / tiny file — no multipart). */
+/**
+ * Presigned single PUT (image / tiny file — no multipart).
+ *
+ * ⚠️ [AUDIT HT-020] `contentType` KHÔNG RÀNG BUỘC ĐƯỢC GÌ. `@aws-sdk/s3-request-presigner` gọi
+ * `unsignableHeaders.add("content-type")` trong `S3RequestPresigner.prepareRequest` trước khi ký,
+ * nên Content-Type không nằm trong chữ ký lẫn chuỗi truy vấn — chuỗi ký chỉ có `SignedHeaders=host`
+ * (kiểm bằng cách grep tên hàm đó, đừng dựa vào số dòng: bản SDK mới sẽ làm lệch). Hệ quả:
+ * client PUT với Content-Type NÀO thì R2 lưu và phục vụ lại đúng cái đó, bất kể ta ký gì ở đây.
+ *
+ * Vì vậy ĐỪNG coi tham số này là một biện pháp bảo mật. Nơi duy nhất quyết định được kiểu tệp khi
+ * phục vụ là `responseContentType` của presignGetObject (tham số ĐÓ mới được ký).
+ */
 export async function presignPutObject(
     key: string,
     contentType: string,
@@ -129,14 +140,25 @@ export async function listParts(
 /** Presigned GET — Mux pull (24h) or member download (15min, attachment). */
 export async function presignGetObject(
     key: string,
-    opts: { expiresIn?: number; downloadFileName?: string } = {},
+    opts: { expiresIn?: number; downloadFileName?: string; responseContentType?: string } = {},
 ): Promise<string> {
     const cmd = new GetObjectCommand({
         Bucket: r2Bucket(),
         Key: key,
         ...(opts.downloadFileName
-            ? { ResponseContentDisposition: `attachment; filename="${opts.downloadFileName.replace(/"/g, '')}"` }
+            // [AUDIT HT-020] Trước đây chỉ bỏ dấu nháy kép. Nay HT-020 ép Content-Disposition cho
+            // MỌI ảnh đính kèm, kể cả của khách, nên tên tệp tới đây không còn là File.name do hệ
+            // điều hành ràng buộc mà là một chuỗi tự do trong body API — ký tự điều khiển và dấu
+            // gạch chéo ngược đột nhiên chạm được vào header. Lọc thêm chúng.
+            // ⚠️ ĐỪNG thay bằng sanitizeFileName(): hàm đó ép mọi ký tự ngoài ASCII thành '_', sẽ
+            // làm nát tên tệp tiếng Việt của mọi lượt tải về.
+            ? { ResponseContentDisposition: `attachment; filename="${opts.downloadFileName.replace(/[\x00-\x1F\x7F"\\]/g, '')}"` }
             : {}),
+        // [AUDIT HT-020 fix] `ResponseContentType` GHI ĐÈ Content-Type mà object đang mang, và —
+        // khác với header Content-Type lúc PUT — tham số này NẰM TRONG chuỗi truy vấn ĐƯỢC KÝ, nên
+        // client không sửa được. Đây là chỗ DUY NHẤT máy chủ thật sự quyết định được trình duyệt
+        // hiểu tệp này là gì. Xem chú thích ở presignPutObject để biết vì sao lúc PUT thì không.
+        ...(opts.responseContentType ? { ResponseContentType: opts.responseContentType } : {}),
     })
     return getSignedUrl(r2Client(), cmd, { expiresIn: opts.expiresIn ?? 24 * 60 * 60 })
 }

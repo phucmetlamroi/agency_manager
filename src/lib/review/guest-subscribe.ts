@@ -51,10 +51,21 @@ async function ensureSubscription(input: {
     })
 }
 
-/** Has this email already proven ownership (any live sub anywhere)? → skip the PIN. */
-async function emailAlreadyVerified(email: string): Promise<boolean> {
+/**
+ * Địa chỉ này đã có đăng ký còn sống ở đâu đó chưa.
+ *
+ * [AUDIT SWEEP-2026-07-30 · P1-025] ĐÍNH CHÍNH TÊN VÀ Ý NGHĨA: tên cũ `emailAlreadyVerified` nói
+ * rằng hàm này CHỨNG MINH sở hữu hộp thư — không đúng, và cái tên sai đó chính là lý do nhánh
+ * bỏ-qua-PIN được viết dựa vào nó. Nó chỉ trả lời "có hàng GuestSubscription nào chưa unsubscribe",
+ * tính trên MỌI tenant. Nay chỉ còn dùng như một điều kiện phụ, SAU khi phiên đã tự chứng minh.
+ *
+ * Đồng thời xoá filter chết `verifiedAt: { not: undefined }`: trong Prisma, `undefined` nghĩa là
+ * "bỏ qua điều kiện này", nên dòng đó chưa bao giờ lọc gì. Điều kiện THẬT duy nhất là
+ * `unsubscribedAt: null` — viết ra cho đúng thay vì giả vờ có hai điều kiện.
+ */
+async function hasLiveSubscriptionAnywhere(email: string): Promise<boolean> {
     const live = await prisma.guestSubscription.findFirst({
-        where: { email, unsubscribedAt: null, verifiedAt: { not: undefined } },
+        where: { email, unsubscribedAt: null },
         select: { id: true },
     })
     return !!live
@@ -72,8 +83,14 @@ export async function requestGuestPin(input: {
     share: ShareWithItems
     assetId: string
     email: string
-    /** True ONLY when `email` equals the authenticated guest session's own email. */
-    isOwnEmail: boolean
+    /**
+     * [AUDIT SWEEP-2026-07-30 fix · P1-025] Phiên khách ĐẦY ĐỦ, không chỉ id.
+     * Trước đây tham số là `isOwnEmail: boolean` do nơi gọi tự tính bằng
+     * `email === guest.email` — nhưng email trong phiên khách là TỰ KHAI (đặt qua
+     * POST /identity với force:true), nên "trùng email trong phiên" KHÔNG chứng minh sở hữu hộp thư.
+     * Cần cả object để đọc `emailVerifiedAt` — dấu duy nhất chỉ verify-pin thật đóng được.
+     */
+    guest: GuestSession | null
     guestSessionId: string | null
     ip: string | null
     /** [AUDIT H2] Sign-off flow: ALWAYS mint a fresh code (never take the own-email auto-subscribe
@@ -86,9 +103,25 @@ export async function requestGuestPin(input: {
     // Out-of-scope asset → do nothing (the route still answers a neutral pin_sent).
     if (!assetInShare(input.share, input.assetId)) return
 
-    // Skip-PIN / auto-subscribe is safe ONLY for the guest's own session email — and never for a
-    // sign-off, which must earn a fresh code from the actual inbox.
-    if (!input.alwaysSendCode && input.isOwnEmail) {
+    // [AUDIT SWEEP-2026-07-30 fix · P1-025] BỎ QUA PIN CHỈ KHI PHIÊN ĐÃ CHỨNG MINH HỘP THƯ.
+    //
+    // Điều kiện cũ là `input.isOwnEmail` — "email trùng với email trong phiên khách". Nhưng email đó
+    // do khách TỰ KHAI qua POST /identity (force:true), nên nó không chứng minh gì. Đường khai thác:
+    // ai giữ một slug còn sống tự khai `victim@corp.com`, và nếu địa chỉ đó đã từng subscribe thật ở
+    // BẤT KỲ tenant nào (điều `emailAlreadyVerified` hỏi, không giới hạn theo share) thì hệ thống
+    // gắn luôn victim làm người nhận thông báo của tenant này — im lặng, không gửi mã, không audit.
+    //
+    // Nay đòi đúng bất biến mà chính file này đã dựng cho verify-pin (`stampsSession`, :177):
+    // phiên phải có `emailVerifiedAt` VÀ email của phiên phải khớp — dấu đó chỉ được đóng sau khi
+    // verify-pin chạy thật (:213-215). Thêm `!isSyntheticGuestEmail` để danh tính tổng hợp do
+    // `createLinkClientGuestSession` tự cấp (share-auth.ts:353) không mở được nhánh này.
+    const sessionProvedInbox =
+        !!input.guest &&
+        input.guest.emailVerifiedAt != null &&
+        normEmail(input.guest.email) === email &&
+        !isSyntheticGuestEmail(email)
+
+    if (!input.alwaysSendCode && sessionProvedInbox) {
         // Already subscribed to THIS asset → nothing to do.
         const existing = await prisma.guestSubscription.findUnique({
             where: { email_assetId: { email, assetId: input.assetId } },
@@ -97,7 +130,7 @@ export async function requestGuestPin(input: {
         if (existing && !existing.unsubscribedAt) return
 
         // Verified elsewhere (ownership already proven) → subscribe straight to this asset.
-        if (await emailAlreadyVerified(email)) {
+        if (await hasLiveSubscriptionAnywhere(email)) {
             await ensureSubscription({
                 email,
                 assetId: input.assetId,

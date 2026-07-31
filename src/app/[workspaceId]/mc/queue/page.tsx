@@ -23,7 +23,7 @@ function initials(name: string): string {
     if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     return (name.trim().slice(0, 2) || '?').toUpperCase()
 }
-const RANK_HEX: Record<string, string> = { S: '#FACC15', A: '#34D399', B: '#60A5FA', C: '#A1A1AA', D: '#F87171' }
+// [BO HANG S/A/B/C/D 2026-07-31] Bo bang mau hang RANK_HEX.
 const TYPE_HUE: Record<string, string> = { 'Short form': '#38BDF8', 'Long form': '#A78BFA', 'Trial': '#FBBF24' }
 const WD = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 // A task is "active workload" for an editor if it isn't done/cancelled/back-in-queue.
@@ -52,7 +52,7 @@ export default async function MissionControlQueuePage({ params }: { params: Prom
         }),
         wp.user.findMany({
             where: { role: { notIn: ['CLIENT', 'LOCKED'] } },
-            select: { id: true, username: true, displayName: true, nickname: true, monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } } },
+            select: { id: true, username: true, displayName: true, nickname: true },
         }),
         // [marketplaceOpen] Column may not be in the generated client on every branch — read
         // defensively (matches /admin/queue), so a missing column never crashes the page.
@@ -100,13 +100,12 @@ export default async function MissionControlQueuePage({ params }: { params: Prom
     }
     const editors: McQueueEditor[] = (users as any[]).map((u) => {
         const name = getDisplayName(u)
-        const rank = (u.monthlyRanks?.[0]?.rank as string | undefined) || undefined
         const workingCount = loadByUser.get(u.id) ?? 0
         return {
             id: u.id, name, initials: initials(name), avatar: grad(u.id),
-            rank, rankColor: rank ? (RANK_HEX[rank] || '#A1A1AA') : undefined,
             workingCount, workloadPct: Math.min(100, Math.round((workingCount / 5) * 100)),
-            blocked: rank === 'D',
+            // [GỠ THẺ ĐỎ 2026-07-31] Bỏ cờ `blocked: rank === 'D'` — nó khoá nút giao việc ngay
+            // trên trình duyệt, là mảnh cuối cùng của luật thẻ đỏ còn sống sau khi chốt server bị gỡ.
         }
     })
 

@@ -53,8 +53,12 @@ async function main() {
     console.log(`Created ${memberCount} new WorkspaceMember records.`)
 
     // 3. Backfill Tasks
+    // [AUDIT HT-022 fix] Loại hàng cài đặt hệ thống. Nó CỐ Ý mang workspaceId=null — chính chỗ
+    // null đó là thứ giấu nó khỏi mọi truy vấn theo workspace. Sweep này nếu quét trúng nó sẽ
+    // biến credential Frame.io dạng thô (lưu trong notes_vi) thành một task bình thường trên
+    // bảng của workspace, hiện ra với mọi thành viên.
     const tasks = await prisma.task.updateMany({
-        where: { workspaceId: null },
+        where: { workspaceId: null, id: { not: 'global-system-settings' } },
         data: { workspaceId: wId }
     })
     console.log(`Updated ${tasks.count} Tasks.`)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateInvoicePDF, InvoiceData } from '@/lib/invoice-generator'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { verifyFinanceAccess } from '@/lib/security'
 
 export async function GET(
@@ -29,7 +29,17 @@ export async function GET(
             throw e
         }
 
-        const workspacePrisma = getWorkspacePrisma(workspaceId)
+        // [PHẢN BIỆN vòng 4 · INV-R1 — HIGH] ĐÂY LÀ SINK RÒ DỮ LIỆU của lỗ createInvoiceRecord.
+        //
+        // `getWorkspacePrisma(workspaceId)` KHÔNG truyền profileId, và `include: { client: true }`
+        // là QUAN HỆ LỒNG — lớp chèn tenancy KHÔNG viết lại quan hệ lồng, còn chốt fail-closed của
+        // `Client` chỉ bắn khi model Ở TẦNG TRÊN là Client (ở đây là Invoice). Nên hàng Client đi
+        // kèm KHÔNG có bộ lọc tenant nào, và `invoice.client.name` được in thẳng vào PDF.
+        // Kết hợp với việc `clientId` từng không được kiểm sở hữu lúc tạo hoá đơn, đó là đường dò
+        // sạch danh bạ khách của MỌI tenant. Chốt sở hữu đã thêm ở invoice-actions đóng đường TẠO
+        // MỚI; dòng này đóng đường ĐỌC, kể cả với hàng Invoice rác đã tồn tại từ trước.
+        const scopedProfileId = (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
+        const workspacePrisma = getWorkspacePrisma(workspaceId, scopedProfileId)
 
         // 2. Fetch Invoice Data
         const invoice = await workspacePrisma.invoice.findUnique({

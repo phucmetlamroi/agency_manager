@@ -1,6 +1,6 @@
 // [Giao diện 2 · Mission Control] Full-screen alternate admin UI (M1 Tổng quan), DATA-WIRED.
 // Loads the SAME data as /admin (tasks → the real 6 TaskWorkflowTabs columns, finance KPIs, leaderboard
-// from users+ranks, clients) and renders the Mission Control board. Mounted OUTSIDE /admin so it renders
+// from users, clients) and renders the Mission Control board. Mounted OUTSIDE /admin so it renders
 // its own shell — Giao diện 1 (/admin) is byte-identical. Admin-gated (verifyProfileAdminAccess) so the
 // revenue/KPIs never reach non-admins. Presentation route: no server action, no schema.
 import { redirect } from 'next/navigation'
@@ -26,7 +26,7 @@ const STATUS_HEX: Record<string, string> = {
     'Quá hạn': '#DC2626', 'Hoàn tất': '#10B981', 'Đã hủy': '#52525B',
 }
 const STATUS_LABEL: Record<string, string> = { Revision: 'Sửa lại' }
-const RANK_HEX: Record<string, string> = { S: '#FACC15', A: '#34D399', B: '#60A5FA', C: '#A1A1AA', D: '#F87171' }
+// [BO HANG S/A/B/C/D 2026-07-31] Bo bang mau hang RANK_HEX.
 const GRADIENTS = [
     'linear-gradient(135deg,#6366F1,#8B5CF6)', 'linear-gradient(135deg,#10B981,#06B6D4)', 'linear-gradient(135deg,#EC4899,#F43F5E)',
     'linear-gradient(135deg,#A855F7,#EC4899)', 'linear-gradient(135deg,#F59E0B,#EAB308)', 'linear-gradient(135deg,#06B6D4,#3B82F6)',
@@ -72,14 +72,14 @@ export default async function MissionControlPage({ params }: { params: Promise<{
         wp.task.findMany({
             where: { isArchived: false },
             include: {
-                assignee: { select: { id: true, username: true, displayName: true, nickname: true, monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } } } },
+                assignee: { select: { id: true, username: true, displayName: true, nickname: true } },
                 client: { include: { parent: true } },
             },
             orderBy: { createdAt: 'desc' },
         }),
         wp.user.findMany({
             where: { role: { notIn: ['CLIENT', 'LOCKED'] } },
-            select: { id: true, username: true, displayName: true, nickname: true, monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } } },
+            select: { id: true, username: true, displayName: true, nickname: true },
         }),
         wp.task.count({ where: { isArchived: true } }),
         computeWorkspaceFinance(workspaceId, profileId),
@@ -147,12 +147,10 @@ export default async function MissionControlPage({ params }: { params: Promise<{
     }
     const toCard = (t: any): McTask => {
         const name = t.assignee ? getDisplayName(t.assignee) : 'Chưa giao'
-        const rank = t.assignee?.monthlyRanks?.[0]?.rank as string | undefined
         return {
             id: t.id, title: t.title, status: t.status,
             statusLabel: STATUS_LABEL[t.status] || t.status, dot: STATUS_HEX[t.status] || '#A1A1AA',
             assignee: name, initials: initials(name), avatar: grad(t.assigneeId || name),
-            rank: rank || undefined, rankColor: rank ? (RANK_HEX[rank] || '#A1A1AA') : undefined,
             meta: metaFor(t), danger: t.status === 'Quá hạn' || t.status === 'Đã nhận feedback (khách)',
         }
     }
@@ -163,7 +161,7 @@ export default async function MissionControlPage({ params }: { params: Promise<{
         return { label: tab.label, hue: tab.hue, accent: tab.accent, count: inTab.length, tasks: shown.map(toCard), moreText: rest > 0 ? `+ ${rest} task nữa` : '', entryStatus: tab.entryStatus }
     })
 
-    // Leaderboard — top 3 by assigned-task count (from users + real ranks)
+    // Leaderboard — top 3 by assigned-task count
     const countByUser = new Map<string, number>()
     for (const t of tasks) if (t.assigneeId) countByUser.set(t.assigneeId, (countByUser.get(t.assigneeId) ?? 0) + 1)
     const leaderboard: McLeader[] = users
@@ -173,8 +171,7 @@ export default async function MissionControlPage({ params }: { params: Promise<{
         .slice(0, 3)
         .map((x, i) => {
             const name = getDisplayName(x.u)
-            const rank = (x.u.monthlyRanks?.[0]?.rank as string | undefined) || '—'
-            return { name, initials: initials(name), avatar: grad(x.u.id), sub: `${x.c} task`, rank, rankColor: RANK_HEX[rank] || '#A1A1AA', top: i === 0 }
+            return { name, initials: initials(name), avatar: grad(x.u.id), sub: `${x.c} task`, top: i === 0 }
         })
 
     // Client name chips (distinct, first 4)

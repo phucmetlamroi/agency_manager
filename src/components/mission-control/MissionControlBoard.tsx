@@ -26,8 +26,7 @@ export interface McTask {
     assignee: string
     initials: string
     avatar: string
-    rank?: string
-    rankColor?: string
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `rank` + `rankColor`.
     meta: string
     danger?: boolean
 }
@@ -42,7 +41,9 @@ export interface McColumn {
      *  null = column is not a valid drop target (e.g. "Quá hạn" is system-derived). */
     entryStatus: string | null
 }
-export interface McLeader { name: string; initials: string; avatar: string; sub: string; rank: string; rankColor: string; top?: boolean }
+// [BỎ HẠNG S/A/B/C/D 2026-07-31] `McLeader` bỏ `rank` + `rankColor`. Bảng xếp hạng tháng vẫn còn
+// và vẫn xếp theo DOANH THU — chỉ không còn huy hiệu chữ cái ở cuối mỗi dòng.
+export interface McLeader { name: string; initials: string; avatar: string; sub: string; top?: boolean }
 export interface McData {
     greetingName: string
     greeting?: string
@@ -225,13 +226,11 @@ export default function MissionControlBoard({ data }: { data: McData }) {
                         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, background: 'linear-gradient(180deg,rgba(234,179,8,0.10),rgba(234,179,8,0.02))', border: '1px solid rgba(250,204,21,0.25)' }}>
                             <div style={{ position: 'relative', width: 34, height: 34, borderRadius: 999, background: p.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', boxShadow: '0 0 18px rgba(234,179,8,0.5)' }}>{p.initials}<span style={{ position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)', color: '#FACC15' }}><Crown style={{ width: 12, height: 12, filter: 'drop-shadow(0 0 6px rgba(250,204,21,0.7))' }} /></span></div>
                             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F5' }}>{p.name}</div><div style={{ fontSize: 10, color: '#A1A1AA' }}>{p.sub}</div></div>
-                            <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 11, fontWeight: 800, color: p.rankColor, border: `1px solid ${p.rankColor}66`, borderRadius: 6, padding: '1px 7px' }}>{p.rank}</span>
                         </div>
                     ) : (
                         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                             <div style={{ width: 30, height: 30, borderRadius: 999, background: p.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#fff' }}>{p.initials}</div>
                             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F5' }}>{p.name}</div><div style={{ fontSize: 10, color: '#A1A1AA' }}>{p.sub}</div></div>
-                            <span style={{ fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 11, fontWeight: 800, color: p.rankColor, border: `1px solid ${p.rankColor}66`, borderRadius: 6, padding: '1px 7px' }}>{p.rank}</span>
                         </div>
                     ))}
                     <Link href={`/${data.workspaceId}/admin/analytics`} style={{ fontSize: 11, fontWeight: 600, color: '#A5B4FC' }}>Xem đầy đủ bảng xếp hạng</Link>

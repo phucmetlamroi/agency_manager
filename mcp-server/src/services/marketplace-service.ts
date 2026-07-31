@@ -3,10 +3,11 @@
  * Manages the task marketplace (open/close, listing, claiming, returning).
  */
 import { prisma } from '../prisma-client.js'
-import { validateWorkspaceAccess } from '../auth-context.js'
+import { getMcpAuthContext, validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
 import { assertWorkspaceMember } from './guards.js'
+import { writeMcpAudit } from './audit.js'
 
 // ---------------------------------------------------------------------------
 // toggleMarketplace
@@ -18,10 +19,35 @@ export async function toggleMarketplace(
 ) {
     await validateWorkspaceAccess(wsId)
 
-    const updated = await prisma.workspace.update({
-        where: { id: wsId },
-        data: { marketplaceOpen: enabled },
-        select: { id: true, name: true, marketplaceOpen: true },
+    // [AUDIT HT-040] Mở/đóng chợ task quyết định ai tự nhận được việc gì — thay đổi phạm vi cả
+    // workspace, trước đây không để lại vết.
+    const updated = await prisma.$transaction(async (tx) => {
+        // Đọc giá trị CŨ THẬT chứ không suy ra `!enabled`: bật lại một chợ vốn đã mở là no-op, và
+        // ghi "trước: đóng" vào nhật ký là bịa ra một thay đổi chưa từng xảy ra.
+        const prev = await tx.workspace.findUnique({
+            where: { id: wsId },
+            select: { marketplaceOpen: true },
+        })
+
+        const row = await tx.workspace.update({
+            where: { id: wsId },
+            data: { marketplaceOpen: enabled },
+            select: { id: true, name: true, marketplaceOpen: true },
+        })
+
+        await writeMcpAudit(tx, {
+            workspaceId: wsId,
+            action: 'workspace.updated',
+            targetType: 'Workspace',
+            targetId: wsId,
+            before: { marketplaceOpen: prev?.marketplaceOpen ?? null },
+            after: { marketplaceOpen: row.marketplaceOpen },
+            // Chữ ký hàm này không nhận profileId, nhưng service-account vẫn lấy được từ context —
+            // để trống sẽ tạo ra dòng nhật ký MCP duy nhất không truy được thuộc profile nào.
+            mcpProfileId: getMcpAuthContext().profileId,
+        })
+
+        return row
     })
 
     return {
@@ -101,6 +127,14 @@ export async function claimTask(
     if (!userId) throw new Error('userId is required to claim a task')
     // [AUDIT HT-036 fix] The claiming user must be a member of this workspace.
     await assertWorkspaceMember(wsId, userId)
+    // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ ở cả web lẫn MCP — xem `guards.ts`.
+    //
+    // ⚠️ GIỮ LẠI phần nhận định vẫn đúng của [PHẢN BIỆN 2026-07-30 · R7-1]: tool MCP `claim_task`
+    // KHÔNG phải đường tự-nhận-việc. Web `claimTask` lấy userId TỪ PHIÊN
+    // (src/actions/claim-actions.ts — `userId = access.userId`), còn tool này nhận `userId` như một
+    // THAM SỐ do người gọi truyền vào ("Claim a marketplace task for a specific user") — tức nó là
+    // một cửa GIAO VIỆC CHO NGƯỜI KHÁC. Bất kỳ luật giao-việc nào thêm về sau đều phải tính cả cửa
+    // này, đừng nhìn cái tên `claim` rồi bỏ qua như lần trước.
 
     // Use raw prisma for the transaction (optimistic locking pattern)
     const result = await prisma.$transaction(async (tx) => {
@@ -152,6 +186,20 @@ export async function claimTask(
             throw new Error('Task was claimed by another user (optimistic lock conflict)')
         }
 
+        // [AUDIT HT-040] Đây là thao tác MCP DUY NHẤT có người thật đứng sau: người tự nhận việc.
+        // Nên actorUserId ghi được tên thật, khác mọi chỗ khác phải để null (service-account MCP
+        // không có hàng User để trỏ khoá ngoại tới).
+        await writeMcpAudit(tx, {
+            workspaceId: wsId,
+            action: 'task.assigned',
+            targetType: 'Task',
+            targetId: taskId,
+            actorUserId: userId,
+            before: { assigneeId: null, status: task.status },
+            after: { assigneeId: userId, status: 'Nhận task', claimSource: 'MARKET' },
+            mcpProfileId: profileId,
+        })
+
         return {
             taskId,
             assigneeId: userId,
@@ -197,15 +245,30 @@ export async function returnTask(
 
     enforceAssigneeStatusInvariant(updateData, task)
 
-    const updated = await wsPrisma.task.update({
-        where: { id: taskId },
-        data: updateData,
-        select: {
-            id: true,
-            status: true,
-            assigneeId: true,
-            version: true,
-        },
+    // [AUDIT HT-040] Trả task về chợ = gỡ người nhận + đổi trạng thái; cũng phải để lại vết.
+    const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.task.update({
+            where: { id: taskId, workspaceId: wsId, profileId },
+            data: { ...updateData, version: { increment: 1 } }, // [AUDIT SWEEP · P6-SWEEP-2 — sổ bỏ sót đường này]
+            select: {
+                id: true,
+                status: true,
+                assigneeId: true,
+                version: true,
+            },
+        })
+
+        await writeMcpAudit(tx, {
+            workspaceId: wsId,
+            action: 'task.status_updated',
+            targetType: 'Task',
+            targetId: taskId,
+            before: { assigneeId: task.assigneeId, status: task.status },
+            after: { assigneeId: row.assigneeId, status: row.status },
+            mcpProfileId: profileId,
+        })
+
+        return row
     })
 
     return {

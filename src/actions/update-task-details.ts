@@ -4,20 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
+import { checkPayrollCycleClosed, payrollClosedMessage } from '@/lib/payroll-lock'
 
-// [AUDIT HT-031 fix] Neutralize dangerous URI schemes before storing productLink — it is later
-// rendered as an <a href> in the CLIENT portal (DeliverableDetailPanel) and the staff app. A
-// `javascript:`/`data:`/`vbscript:` value there is stored XSS: an editor (assignee) could hijack
-// the client's portal session or forge an approval. Accept only http(s); prepend https:// to a
-// bare domain; drop anything carrying another scheme.
-function sanitizeExternalUrl(raw: string | undefined): string | undefined {
-    if (raw === undefined) return undefined
-    const s = String(raw).trim()
-    if (!s) return ''
-    if (/^https?:\/\//i.test(s)) return s
-    if (/^[a-z][a-z0-9+.\-]*:/i.test(s)) return '' // non-http scheme (javascript:, data:, …) → drop
-    return `https://${s}`
-}
+// [AUDIT HT-031 fix] Bản chép cục bộ đã chuyển sang @/lib/safe-url (xem import phía trên) —
+// ba đường ghi khác từng bị bỏ sót đúng vì logic này nằm rải rác.
 
 export async function updateTaskDetails(id: string, data: {
     resources?: string
@@ -82,24 +73,16 @@ export async function updateTaskDetails(id: string, data: {
         // Handle Price Updates (Financials) - STRICTLY ADMIN ONLY
         if (isAdmin && (data.jobPriceUSD !== undefined || data.value !== undefined)) {
             // FINANCIAL LOCK CHECK
-            if (currentTask.assigneeId) {
-                const month = currentTask.createdAt.getMonth() + 1
-                const year = currentTask.createdAt.getFullYear()
-
-                const payroll = await workspacePrisma.payroll.findUnique({
-                    where: {
-                        userId_month_year_workspaceId: {
-                            userId: currentTask.assigneeId,
-                            month,
-                            year,
-                            workspaceId
-                        }
-                    } as any
-                })
-
-                if (payroll && payroll.status === 'PAID') {
-                    return { error: 'BLOCK: Kỳ lương này đã chốt (PAID). Không thể sửa đổi tài chính!' }
-                }
+            //
+            // [AUDIT SWEEP-2026-07-30 fix] Chốt cũ ở đây KHÔNG BAO GIỜ KHỚP: nó tra Payroll bằng
+            // tháng/năm của `currentTask.createdAt`, còn hàng Payroll lại được ghi theo
+            // `extractPayrollCycle(workspace.name)`. Lệch khoá ⇒ findUnique trả null ⇒ chốt tự mở.
+            // Và chính hàm này còn ghi lại `createdAt` ở nhánh deadline bên dưới, nên khoá tra cứu
+            // tự đổi được. Nay dùng helper dùng chung `checkPayrollCycleClosed` (xem lib/payroll-lock.ts)
+            // — khoá theo tháng workspace, chặn khi PayrollLock bật HOẶC có hàng Payroll PAID.
+            const gate = await checkPayrollCycleClosed(workspaceId, currentTask.assigneeId ?? null)
+            if (gate.closed) {
+                return { error: payrollClosedMessage(gate) }
             }
 
             const newJobPriceUSD = data.jobPriceUSD !== undefined ? data.jobPriceUSD : (currentTask.jobPriceUSD || 0)

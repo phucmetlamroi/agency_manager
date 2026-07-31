@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth-guard'
 import { getWorkspacePrisma } from '@/lib/prisma-workspace'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 
@@ -31,8 +32,67 @@ export async function deleteTask(id: string, workspaceId: string) {
     }
 }
 
+// [AUDIT HT-007 fix] ALLOWLIST — the ONLY keys updateTask may write.
+//
+// The previous fix blacklisted `id`/`workspaceId`/`profileId` with `delete`. That is not
+// enough, and the audit's own recommendation said so: `data` reaches Prisma as an unchecked
+// object, and Task carries RELATIONS (`workspace`, `profile`, `client`, `assignedBy`, …), so
+// `{ workspace: { connect: { id: '<victim>' } } }` walks straight past every `delete` and
+// still re-parents the task into another tenant. A blacklist can only ever block the spellings
+// someone thought of; an allowlist blocks the ones they didn't.
+//
+// Deliberately absent for EVERYONE — each has a dedicated, gated action and none belongs on a
+// "generic update": id · workspaceId · profileId · workspace · profile (tenancy / primary key)
+// · version (optimistic lock) · createdAt / updatedAt (audit trail) · clientUserId (identity)
+// · every relation-object form of the above.
+const TASK_FIELDS_MEMBER = [
+    'title',
+    'type',
+    'references',
+    'resources',
+    'notes_vi',
+    'notes_en',
+    'fileLink',
+    'productLink',
+    'duration',
+    'collectFilesLink',
+    'submissionFolder',
+    'frameUsername',
+    'framePassword',
+    'frameNote',
+] as const
+
+// Admin adds scheduling + assignment + archive flags. Nothing else the CALLER can name — note
+// that the invariant helpers below may still derive `status`/`deadline` from an `assigneeId`
+// change; those two values are hard-coded and non-terminal, so they cannot reach payroll.
+//
+// Everything an admin might expect here but will NOT find has a dedicated action that enforces a
+// rule this generic endpoint cannot. Routing writes through `updateTask` would silently skip them:
+//   status                → updateTaskStatus (task-actions.ts:28 isValidStatus — the guard added
+//                           after a junk status made a task vanish from every tab — plus the
+//                           optimistic `version` check at :108 and the notify/email fan-out).
+//                           NOTE: this endpoint does NOT call it and never did — it writes Prisma
+//                           directly. (It skips no FSM: validateTransition is a deliberate no-op,
+//                           fsm-config.ts:122. And Task has no status-history table at all.)
+//   value/wageVND/…       → updateTaskDetails (update-task-details.ts:83-103): refuses to touch money
+//                           once that month's Payroll is PAID, and keeps wageVND/profitVND in sync.
+//   clientId/projectId/   → the create paths validate these FKs against the profile
+//   assignedAgencyId/       (bulk-task-actions.ts:103-112, "AUDIT R14"). updateTask never did, so an
+//   invoiceId/assignedById  admin could point a task at another tenant's client/invoice/assigner.
+//   clientReview*         → share-portal-actions / review decision flow. Writing it by hand forges
+//                           the client's sign-off.
+// Keeping them out is the smaller and safer change: this action has NO caller in the repo, so the
+// dedicated paths are already the only ones anything actually uses.
+const TASK_FIELDS_ADMIN = [
+    ...TASK_FIELDS_MEMBER,
+    'deadline',
+    'assigneeId',
+    'isArchived',
+    'isPenalized',
+] as const
+
 // --- 2. GENERIC UPDATE (Chống Hack) ---
-export async function updateTask(id: string, data: any, workspaceId: string) {
+export async function updateTask(id: string, input: any, workspaceId: string) {
     try {
         const user = await getCurrentUser() // Guard Check
         // [AUDIT R1 — HIGH fix #8] Scope the admin check to THIS workspace instead of
@@ -45,49 +105,35 @@ export async function updateTask(id: string, data: any, workspaceId: string) {
 
         if (!task) return { error: 'Not found' }
 
-        // [AUDIT HT-007 fix] Cross-tenant / identity fields are NEVER settable through the
-        // generic updateTask — for ANY caller, INCLUDING a workspace ADMIN. Writing a task's
-        // workspaceId/profileId moves it into another tenant (cross-tenant BOLA); `id` is the
-        // primary key. Admins keep editing status/value/assignee below — only tenancy is locked.
-        delete data.id
-        delete data.workspaceId
-        delete data.profileId
+        // Check Ownership — a non-admin may only touch a task assigned to them.
+        if (!isWorkspaceAdmin && task.assigneeId !== user.id) return { error: 'Forbidden' }
 
-        // Security & Sanitization
-        if (!isWorkspaceAdmin) {
-            // Check Ownership
-            if (task.assigneeId !== user.id) return { error: 'Forbidden' }
+        // Build the write payload by COPYING allowed keys out of the caller's object. Nothing
+        // the caller sends is passed through by reference, so unknown keys and relation-object
+        // payloads (`{ workspace: { connect: … } }`) simply never exist downstream.
+        const allowed = isWorkspaceAdmin ? TASK_FIELDS_ADMIN : TASK_FIELDS_MEMBER
+        const data: Record<string, unknown> = {}
+        for (const key of allowed) {
+            if (input && Object.prototype.hasOwnProperty.call(input, key)) {
+                data[key] = input[key]
+            }
+        }
+        if (Object.keys(data).length === 0) return { error: 'No updatable fields provided' }
 
-            // SANITIZE: Loại bỏ trường nhạy cảm để nhân viên không tự hack lương/deadline
-            // [AUDIT R3 — fix] `value` IS the VND wage (wageVND is synced FROM it in
-            // update-task-details), so omitting it let an assignee self-inflate their
-            // own earnings via updateTask on their own task. Strip ALL money fields.
-            delete data.wageVND
-            delete data.value
-            delete data.jobPriceUSD
-            delete data.profitVND
-            delete data.exchangeRate
-            delete data.invoiceStatus
-            delete data.invoiceId
-            // [AUDIT R5 — fix] Also strip tenancy + ownership + status + lifecycle
-            // fields. Omitting workspaceId/profileId let an assignee MOVE their own task
-            // into another tenant (cross-tenant BOLA); omitting status let them self-set
-            // 'Hoàn tất' to trigger their own salary. Status changes go through the
-            // dedicated FSM-gated updateTaskStatus action, not this generic update.
-            delete data.workspaceId
-            delete data.profileId
-            delete data.status
-            delete data.assignedById
-            delete data.clientId
-            delete data.projectId
-            delete data.isArchived
-            delete data.claimSource
-            delete data.claimedAt
-            delete data.version
-            delete data.deadline
-            delete data.assigneeId
-            delete data.assignedAgencyId
-            delete data.isPenalized
+        // [AUDIT HT-031 fix] Đây là ĐƯỜNG GHI THỨ HAI vào productLink mà bộ vá XSS trước bỏ sót:
+        // nhánh non-admin cho đúng editor được giao task đi qua, rồi ghi thô. `javascript:` lưu
+        // được ở đây sẽ chạy trong phiên của KHÁCH khi khách bấm link trên portal.
+        if (typeof data.productLink === 'string') {
+            data.productLink = sanitizeExternalUrl(data.productLink)
+        }
+
+        // [AUDIT HT-007 fix] An admin may reassign, but only to someone who is actually in this
+        // workspace's profile — otherwise the allowlist would still let a task be handed to an
+        // outsider. Same predicate assignTask/createBatchTasks already use.
+        if (data.assigneeId) {
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const ok = await isAssigneeInWorkspaceProfile(String(data.assigneeId), workspaceId)
+            if (!ok) return { error: 'Người nhận không thuộc workspace này' }
         }
 
         // [Z+1.fix8] Enforce assigneeId ↔ status invariant cho mọi update path.
@@ -155,13 +201,26 @@ export async function assignTask(taskId: string, assignmentId: string | null, wo
             if (assignmentId.startsWith('agency:')) {
                 return { error: 'Agency assignment is no longer supported.' }
             }
-            const latestRank = await workspacePrisma.monthlyRank.findFirst({
-                where: { userId: assignmentId, workspaceId },
-                orderBy: { createdAt: 'desc' }
-            })
-            if (latestRank && latestRank.rank === 'D') {
-                return { error: 'Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D).' }
-            }
+            // [GỠ THẺ ĐỎ 2026-07-31] Chốt "Rank D thì không được giao việc" ĐÃ BỊ GỠ theo quyết
+            // định của chủ dự án. Trước đây chỗ này đọc MonthlyRank mới nhất của người được giao và
+            // từ chối nếu rank === 'D'. Phép chấm hạng (bonus-actions.ts) vẫn chạy nguyên; chỉ việc
+            // DÙNG hạng làm hàng rào giao việc là không còn.
+            //
+            // Bản ghi MonthlyRank giờ chỉ còn được ĐỌC ĐỂ HIỂN THỊ, không còn quyết định gì.
+            // VẼ ra màn hình ở hai chỗ: chấm cảnh báo trên avatar (AssigneeCell) và các màn Mission
+            // Control (/mc/**). NẠP dữ liệu cho hai chỗ đó thì nhiều hơn — ngoài task-detail-loader
+            // và mc-task-drawer-data còn có admin/page.tsx, admin/queue/page.tsx, dashboard/page.tsx,
+            // dashboard/tasks/page.tsx. Đừng tin một con số cứng ở đây; trước khi đụng vào model hãy
+            // tự chạy `grep -rn "monthlyRanks" src/` — danh sách viết tay kiểu này rất dễ lạc hậu.
+            // ⚠️ Trang Phân tích và Leaderboard cũng hiện chữ S/A/B/C/D
+            // nhưng chúng TỰ TÍNH LẠI từ errorRate sống bằng ngưỡng riêng — đó là con số KHÁC, không
+            // phải bản ghi này. Trang /admin/payroll không hiện hạng S/A/B/C/D nào cả (cột "rank" ở
+            // đó là MonthlyBonus.rank kiểu số, tức huy chương Top 1/2/3).
+            //
+            // ⚠️ Đừng cắm lại một mình ở đây. Luật này từng nằm ở 8 điểm chặn phía máy chủ (3 đường
+            // web + 5 tool MCP dùng chung một vị ngữ ở guards.ts) CỘNG 1 chỗ khoá nút ngay trên
+            // trình duyệt trong Mission Control. Thiếu một cửa là một lần hai nút bấm trả lời khác
+            // nhau về cùng một người.
 
             // [AUDIT R14 — fix] The assignee must belong to THIS workspace's profile —
             // don't let an admin assign a task (with its wage/client data + notification)

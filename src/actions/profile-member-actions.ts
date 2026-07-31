@@ -214,6 +214,18 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         prisma.profileAccess.deleteMany({
             where: { userId: targetUserId, profileId, role: { not: 'OWNER' } },
         }),
+        // [AUDIT HT-023 fix] BẤT BIẾN: dấu ProfileAccessRequest APPROVED KHÔNG được sống lâu hơn
+        // quyền ProfileAccess mà nó chứng nhận.
+        // Kể từ HT-023, dấu APPROVED chính là thứ cho phép ADMIN gỡ một người. Đây lại là CỬA
+        // CHÍNH TẮC để gỡ thành viên, nên cũng là đường mà một người du học hay mất quyền nhất.
+        // Nếu ở đây chỉ xoá quyền mà để dấu lại, thì lần sau người đó được mời vào bằng luồng mời
+        // bình thường, dấu cũ vẫn nằm đó và bị nhận vơ cho quyền mới — ADMIN lại gỡ được một thành
+        // viên bình thường, tức HT-023 mở lại mà không cần race nào.
+        // Bốn nơi xoá ProfileAccess đều phải xoá kèm: ở đây, removeCrossTeamAccess, và hai đường
+        // trong member-actions (removeWorkspaceMember + leaveWorkspace).
+        prisma.profileAccessRequest.deleteMany({
+            where: { userId: targetUserId, targetProfileId: profileId },
+        }),
     ])
 
     await audit({

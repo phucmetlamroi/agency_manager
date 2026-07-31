@@ -12,17 +12,16 @@ import {
 } from '@tanstack/react-table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getUserErrorDetails } from '@/actions/analytics-actions'
-import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Eye } from 'lucide-react'
 
+// [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ hai trường `errorRate` và `rank`.
+// Giữ `totalPenalty` = TỔNG SỐ LỖI thô (cột "Tổng Lỗi") — đó không phải hạng, cũng không phải tỉ lệ.
 type UserAnalytics = {
   id: string
   username: string
   completedTasks: number
   totalPenalty: number
-  errorRate: number
-  rank: string
 }
 
 const columnHelper = createColumnHelper<UserAnalytics>()
@@ -48,37 +47,14 @@ const columns = [
     header: 'Tổng Lỗi',
     cell: info => <div className="text-red-400 font-mono font-bold text-center">{info.getValue()}</div>
   }),
-  columnHelper.accessor('errorRate', {
-    header: 'Tỷ lệ lỗi (%)',
-    cell: info => {
-      const val = info.getValue()
-      return (
-        <div className="text-center">
-            <span className={`font-mono px-2 py-1 rounded ${val < 0.5 ? 'bg-green-500/20 text-green-400' : val > 1.5 ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-400'}`}>
-              {val}%
-            </span>
-        </div>
-      )
-    }
-  }),
-  columnHelper.accessor('rank', {
-    header: 'Xếp Hạng',
-    cell: info => {
-      const val = info.getValue()
-      let bg = 'bg-zinc-800 text-zinc-400'
-      if (val === 'S') { bg = 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50' }
-      if (val === 'A') { bg = 'bg-green-500/20 text-green-400 border-green-500/50' }
-      if (val === 'B') { bg = 'bg-blue-500/20 text-blue-400 border-blue-500/50' }
-      if (val === 'C') { bg = 'bg-orange-500/20 text-orange-400 border-orange-500/50' }
-      if (val === 'D') { bg = 'bg-red-500/20 text-red-500 border-red-500/50' }
-      
-      return (
-        <div className="text-center">
-           <Badge variant="outline" className={`${bg} font-bold px-3`}>{val}</Badge>
-        </div>
-      )
-    }
-  }),
+  // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ hai cột: "Tỷ lệ lỗi (%)" và "Xếp Hạng".
+  //
+  // Ghi lại một sai sót của cột cũ để người sau đừng dựng lại y nguyên: nhãn ghi "(%)" và ô in
+  // "{val}%", nhưng con số đó KHÔNG phải phần trăm — nó là ĐIỂM PHẠT TRÊN MỖI TASK. Người ở mức
+  // nặng nhất hiện ra là "1.5%", đọc như gần hoàn hảo. Nếu sau này cần lại chỉ số này thì phải
+  // đặt tên đúng, ví dụ "Điểm phạt / task".
+  //
+  // Bảng nay còn: Nhân sự · Task Hoàn Tất · Tổng Lỗi · Hành Động.
   columnHelper.display({
     id: 'actions',
     header: 'Hành Động',
@@ -96,7 +72,10 @@ const columns = [
 ]
 
 export default function AnalyticsTable({ data, workspaceId }: { data: UserAnalytics[], workspaceId: string }) {
-  const [sorting, setSorting] = useState<SortingState>([ { id: 'errorRate', desc: true } ])
+  // [BỎ HẠNG S/A/B/C/D 2026-07-31] Sắp xếp mặc định trước đây theo `errorRate` — cột đó không còn
+  // tồn tại, để nguyên thì bảng mất luôn thứ tự mặc định. Chuyển sang "Tổng Lỗi" giảm dần: vẫn đưa
+  // người mắc nhiều lỗi nhất lên đầu, đúng ý đồ cũ của trang.
+  const [sorting, setSorting] = useState<SortingState>([ { id: 'totalPenalty', desc: true } ])
   const [globalFilter, setGlobalFilter] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [errorDetails, setErrorDetails] = useState<any[]>([])

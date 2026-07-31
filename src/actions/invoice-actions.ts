@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { sendEmail } from '@/lib/email'
 import { emailTemplates } from '@/lib/email-templates'
-import { getWorkspacePrisma } from '@/lib/prisma-workspace'
+import { getWorkspacePrisma, resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { verifyWorkspaceAccess, verifyFinanceAccess } from '@/lib/security'
 
 // Helper to safely convert Decimal/Number/String to Number
@@ -228,7 +228,14 @@ export async function getUnbilledTasks(clientId: number, workspaceId: string) {
             return { error: 'Forbidden' }
         }
         const { session } = access
-        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        // [PHẢN BIỆN CS 2026-07-31 · CS5-A/B] CÙNG MỘT NGUỒN với createInvoiceRecord.
+        // Để file này có HAI nguồn profileId cho cùng tập hàng Invoice/Client là tự tạo lệch pha:
+        // hoá đơn ghi bằng nguồn này, đọc/huỷ bằng nguồn kia ⇒ hoá đơn vô hình và không huỷ được.
+        const profileId =
+            (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
+        if (!profileId) {
+            return { error: 'Workspace chưa gắn Profile — thao tác hoá đơn bị từ chối.' }
+        }
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children) — skip archived subs
         const subsidiaries = await workspacePrisma.client.findMany({
@@ -363,7 +370,48 @@ export async function createInvoiceRecord(data: {
             return { error: 'Unauthorized' }
         }
         const { session } = access
-        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        // [PHẢN BIỆN 2026-07-30 · CS-5, sửa lại 2026-07-31 · CS5-A/B/C] Profile CỦA WORKSPACE,
+        // không phải claim JWT. `Client` nằm trong bypassModels ⇒ `profileId` là bộ lọc tenant DUY
+        // NHẤT của nó; với claim, transaction bên dưới chạy `tx.client.findUnique/update` với
+        // `where {id, profileId: A}` — trúng khách của TENANT KHÁC — và trừ `depositBalance` của họ.
+        //
+        // ⚠️ ĐÍNH CHÍNH BA ĐIỀU BẢN VÁ ĐẦU (ea9374a) NÓI SAI — vòng phản biện bắt được:
+        // 1. Nó khẳng định 3 chỗ đọc claim còn lại trong file "chỉ chạm Invoice/Task nên vô hại".
+        //    SAI: `voidInvoice` GHI vào `Client.depositBalance` (increment) bằng chính claim đó —
+        //    tức bản vá chặn chiều TRỪ nhưng để hở nguyên chiều CỘNG trên cùng một cột tiền.
+        // 2. Sửa MỘT chỗ trong file làm nó có HAI nguồn profileId cho cùng tập hàng Invoice/Client:
+        //    hoá đơn tạo bằng nguồn này, đọc/huỷ bằng nguồn kia ⇒ hoá đơn vô hình ở tab lịch sử,
+        //    voidInvoice trả "not found", còn task đã bị lật INVOICED nên không xuất lại được.
+        // 3. `?? undefined` KHÔNG phải fail-closed: `getWorkspacePrisma` BỎ QUA việc chèn profileId
+        //    khi tham số rỗng, nên null sẽ tạo hàng Invoice có `profileId = NULL` rồi báo THÀNH CÔNG.
+        //
+        // ⚠️ VÒNG SỬA THỨ BA — VÀ VÒNG THỨ HAI ĐÃ SAI, GHI LẠI ĐỂ KHÔNG AI ĐI LẠI:
+        // a58d244 chuyển cả 4 chỗ sang `resolveActiveProfileId` với lý do "giữ claim cho workspace
+        // legacy". Đó là HỒI QUY, không phải cải tiến: hàm đó chỉ đổi sang profile của workspace khi
+        // người gọi CÓ hàng ProfileAccess ở đó, còn lại GIỮ NGUYÊN CLAIM. Mà cổng
+        // `verifyWorkspaceAccess` có hai nhánh cho qua KHÔNG cần ProfileAccess:
+        //   (a) `workspace.profileId` là NULL ⇒ security.ts:94 không tra ProfileAccess, vai lấy từ
+        //       hàng WorkspaceMember (security.ts:120-131) và ADMIN là đủ cho verifyFinanceAccess;
+        //   (b) "orphan membership" — có WorkspaceMember vai ADMIN nhưng không có ProfileAccess.
+        // Ở cả hai, cổng chấm trên workspace còn dữ liệu vẫn theo claim ⇒ đúng lỗ CS-5 mở lại.
+        //
+        // Nghịch lý đáng nhớ: chính `?? undefined` mà tôi gọi là "không fail-closed" mới là thứ ĐANG
+        // CHẶN được nhánh (a) — undefined làm `getWorkspacePrisma` NÉM LỖI khi chạm `Client`
+        // (prisma-workspace.ts), nên transaction rollback. Thay nó bằng một claim non-null là gỡ
+        // mất chốt đó.
+        //
+        // Nay CẢ 4 chỗ dùng `resolveWorkspaceProfileId` + chốt tường minh, đúng như docblock của
+        // chính hàm đó quy định cho đường GHI: "Profile SỞ HỮU workspace này — nguồn DUY NHẤT cho
+        // các đường GHI… hành vi 'giữ claim' chính là lỗ hổng". Workspace legacy (profileId NULL)
+        // nay bị TỪ CHỐI với thông báo rõ ràng — với một thao tác chạm sổ tiền thì DỪNG LẠI là câu
+        // trả lời đúng, không phải đoán tenant.
+        const profileId =
+            (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
+        if (!profileId) {
+            // [PHẢN BIỆN vòng 4 · INV-R3] Nhánh duy nhất chạm tới đây là workspace CHƯA GẮN PROFILE.
+            // Câu cũ bảo người dùng "đăng nhập lại" — họ đăng nhập bao nhiêu lần cũng không hết.
+            return { error: 'Workspace này chưa gắn Profile — không thể xuất hoá đơn. Báo quản trị viên.' }
+        }
 
         // [AUDIT R7] verifyFinanceAccess replaced getCurrentUser — fetch the actor's
         // contact fields (createdBy + notification email) explicitly, since the JWT
@@ -374,6 +422,34 @@ export async function createInvoiceRecord(data: {
         })
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
+
+        // [PHẢN BIỆN vòng 4 · INV-R1 — HIGH] `data.clientId` TỪNG ĐI THẲNG VÀO `invoice.create`
+        // MÀ KHÔNG QUA MỘT PHÉP KIỂM SỞ HỮU NÀO.
+        //
+        // Bốn vòng vá trước chỉ siết NGUỒN profileId, tức chỉ đóng đường TIỀN (`tx.client.update`
+        // trừ `depositBalance`). Nhưng kẻ tấn công chỉ cần NÉ nhánh tiền: gửi
+        // `clientDepositDeducted: 0` và `taskIds: []` thì không khối nào chạm `Client`, không gì ném
+        // lỗi, và `tx.invoice.create` vẫn ghi một hàng Invoice trỏ `clientId` sang khách của TENANT
+        // KHÁC — khoá ngoại chỉ đòi hàng Client TỒN TẠI, không đòi cùng profile.
+        //
+        // Sink rò dữ liệu: `/api/invoices/[id]/download` đọc `invoice.client.name` qua
+        // `include: { client: true }` — QUAN HỆ LỒNG KHÔNG ĐƯỢC lớp chèn tenancy viết lại (chốt
+        // fail-closed của Client chỉ bắn khi model Ở TẦNG TRÊN là Client). `Client.id` là số tự
+        // tăng ⇒ dò 1..N là quét sạch danh bạ khách của MỌI tenant, kèm oracle tồn tại (id sai →
+        // P2003 → "Failed to save invoice record").
+        //
+        // Tiền đề rẻ nhất trong cả chiến dịch: chỉ cần ĐĂNG KÝ MỘT TÀI KHOẢN MỚI. signup tự tạo
+        // Profile + Workspace + ProfileAccess(OWNER), nên verifyFinanceAccess trên workspace của
+        // chính mình luôn qua. Không cần quan hệ nào với nạn nhân.
+        //
+        // `workspacePrisma` đã mang profileId nên phép kiểm này tự fail-closed.
+        const ownedClient = await workspacePrisma.client.findUnique({
+            where: { id: data.clientId },
+            select: { id: true },
+        })
+        if (!ownedClient) {
+            return { error: 'Khách hàng không thuộc workspace này.' }
+        }
 
         // 0. Verify Tasks are Unbilled (Prevent Double Billing) — fast-fail before tx.
         if (data.taskIds.length > 0) {
@@ -395,12 +471,18 @@ export async function createInvoiceRecord(data: {
                 data: {
                     invoiceNumber: data.invoiceNumber,
                     clientId: data.clientId,
-                    // [Invoice visibility fix 2026-06] The getWorkspacePrisma middleware
-                    // does NOT inject workspaceId/profileId into writes performed inside an
-                    // interactive `$transaction(tx => ...)`, so invoices were being created
-                    // with workspaceId=NULL. getClientInvoices is workspace-scoped → those
-                    // invoices vanished from the client's history tab (looked "never billed",
-                    // inviting double-billing). Set both EXPLICITLY here.
+                    // [Invoice visibility fix 2026-06] Set workspaceId/profileId EXPLICITLY here —
+                    // invoices từng bị tạo với workspaceId=NULL nên biến mất khỏi tab lịch sử của
+                    // khách (trông như "chưa từng xuất hoá đơn", mời gọi xuất trùng).
+                    //
+                    // ⚠️ [AUDIT SWEEP-2026-07-30 · ĐÍNH CHÍNH] Chú thích cũ ở đây giải thích nguyên
+                    // nhân là "middleware getWorkspacePrisma KHÔNG chèn workspaceId/profileId vào
+                    // các phép ghi bên trong interactive $transaction". ĐIỀU ĐÓ SAI — đã đo trực
+                    // tiếp trên đúng Prisma 5.22.0 của repo: lớp chèn CÓ chạy trong interactive
+                    // transaction, cho cả `create` lẫn `updateMany`.
+                    // Việc gán tường minh vẫn GIỮ (nó đúng và rõ ràng), nhưng đừng dựa vào lời giải
+                    // thích cũ để suy ra "trong transaction thì không có lớp chèn tenancy" — suy
+                    // luận đó sẽ dẫn tới bỏ sót bộ lọc ở chỗ khác.
                     workspaceId,
                     profileId: profileId ?? null,
                     createdBy: access.userId,
@@ -457,6 +539,16 @@ export async function createInvoiceRecord(data: {
             // so a stale/oversized client-deposit amount can't drive depositBalance
             // negative. Read inside the tx for isolation.
             if (data.clientDepositDeducted && data.clientDepositDeducted > 0) {
+                // [AUDIT SWEEP-2026-07-30 fix] Đọc-rồi-trừ số dư cọc mà không có lock: hai hoá đơn
+                // xuất song song cho cùng khách đều đọc cùng `available` rồi mỗi bên trừ trọn số dư
+                // → khách được ghi có hai lần từ một lần cọc, số dư có thể âm.
+                // ⚠️ ĐÍNH CHÍNH [PHẢN BIỆN vòng 3 · INV-3]: chú thích cũ ghi "không một dòng nào trong
+                // repo làm TĂNG client.depositBalance" — SAI. `voidInvoice` ngay dưới ~180 dòng có
+                // `depositBalance: { increment: refundAmount }`. Nhánh này KHÔNG bất động: số dư > 0
+                // xuất hiện sau khi huỷ một hoá đơn tiền-migration (`clientDepositDeducted` NULL).
+                // Hẹp, nhưng có thật — đừng đọc chú thích cũ rồi kết luận đây là mã chết.
+                // Dùng đúng khuôn advisory lock mà `voidInvoice` trong CHÍNH file này đã dùng.
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`client-deposit:${data.clientId}`}, 0))`
                 const client = await tx.client.findUnique({
                     where: { id: data.clientId },
                     select: { depositBalance: true }
@@ -541,7 +633,14 @@ export async function getClientInvoices(clientId: number, workspaceId: string) {
         // = agency revenue). Same finance-data-to-non-admin leak class as
         // getBillingProfiles — gate on profile-scoped finance authority, not MEMBER.
         const { session } = await verifyFinanceAccess(workspaceId)
-        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        // [PHẢN BIỆN CS 2026-07-31 · CS5-A/B] CÙNG MỘT NGUỒN với createInvoiceRecord.
+        // Để file này có HAI nguồn profileId cho cùng tập hàng Invoice/Client là tự tạo lệch pha:
+        // hoá đơn ghi bằng nguồn này, đọc/huỷ bằng nguồn kia ⇒ hoá đơn vô hình và không huỷ được.
+        const profileId =
+            (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
+        if (!profileId) {
+            return { error: 'Workspace chưa gắn Profile — thao tác hoá đơn bị từ chối.' }
+        }
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
         // 1. Get all related Client IDs (Parent + Children)
         const subsidiaries = await workspacePrisma.client.findMany({
@@ -594,7 +693,14 @@ export async function voidInvoice(invoiceId: string, workspaceId: string) {
             return { error: 'Unauthorized' }
         }
         const { session } = access
-        const profileId = (session?.user as any)?.sessionProfileId as string | undefined
+        // [PHẢN BIỆN CS 2026-07-31 · CS5-A/B] CÙNG MỘT NGUỒN với createInvoiceRecord.
+        // Để file này có HAI nguồn profileId cho cùng tập hàng Invoice/Client là tự tạo lệch pha:
+        // hoá đơn ghi bằng nguồn này, đọc/huỷ bằng nguồn kia ⇒ hoá đơn vô hình và không huỷ được.
+        const profileId =
+            (await resolveWorkspaceProfileId(workspaceId)) ?? undefined
+        if (!profileId) {
+            return { error: 'Workspace chưa gắn Profile — thao tác hoá đơn bị từ chối.' }
+        }
 
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
 

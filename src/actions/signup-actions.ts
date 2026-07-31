@@ -33,6 +33,7 @@ import { validatePasswordFull } from '@/lib/password-validator'
 import { validateEmailForSignup } from '@/lib/email-validator'
 import { checkBotId } from 'botid/server'
 import { checkSignupIp, checkSignupEmail } from '@/lib/rate-limit-upstash'
+import { getRequestIpFromHeaders } from '@/lib/request-ip'
 import { sendEmail } from '@/lib/email'
 import { buildVerifyEmailEmail } from '@/lib/notification-emails/templates/auth/verify-email'
 
@@ -75,7 +76,9 @@ async function getRequestMeta() {
     let userAgent: string | null = null
     try {
         const h = await headers()
-        ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown-ip'
+        // [AUDIT HT-002 fix] Was x-forwarded-for[0] — attacker-chosen, so rotating the header
+        // opened a fresh rl:signup:ip bucket per request and the 5/h cap did nothing.
+        ip = await getRequestIpFromHeaders()
         userAgent = h.get('user-agent')
     } catch { /* edge */ }
     return { ip, userAgent }

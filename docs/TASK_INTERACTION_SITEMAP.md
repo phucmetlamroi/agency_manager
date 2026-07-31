@@ -497,8 +497,10 @@ Grid 2 cột.
   nhau: MCP đòi hàng `WorkspaceMember` thật (web thì không), nhưng MCP **không** loại CLIENT/LOCKED
   còn web thì có. Hệ quả dựng được: `deactivateUser` đặt `role='LOCKED'` mà **không xoá** hàng
   WorkspaceMember, nên một editor đã bị vô hiệu hoá sẽ bị web từ chối giao việc, trong khi 5 tool
-  MCP vẫn giao được — và gửi thông báo tới một tài khoản không đăng nhập được nữa. Đây là khoảng
-  lệch CÓ TỪ TRƯỚC, không phải hệ quả của việc gỡ thẻ đỏ; ghi lại ở đây để không ai vá nhầm chiều.
+  MCP vẫn giao được. Và MCP **không phát thông báo nào cả** (`grep -rni notif mcp-server/src` = 0;
+  nó chỉ ghi `AuditLog`) — nên task rơi vào một tài khoản không đăng nhập được mà **không ai được
+  báo**, chỉ còn một dòng nhật ký. Đây là khoảng lệch CÓ TỪ TRƯỚC, không phải hệ quả của việc gỡ
+  thẻ đỏ; ghi lại ở đây để không ai vá nhầm chiều.
 
 - **Khi đang chọn nhiều task (bulk)**:
 

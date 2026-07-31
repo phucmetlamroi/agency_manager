@@ -445,6 +445,27 @@ export async function createNextMonthWithRollover(currentWorkspaceId: string) {
     if (!source) return { error: 'Không tìm thấy Workspace nguồn.' }
     profileId = source.profileId
 
+    // [PHẢN BIỆN vòng 4 · REG-5] NGỪNG ĐẺ THÊM WORKSPACE KHÔNG CÓ PROFILE.
+    //
+    // Dòng dưới từng là `profileId: profileId ?? undefined` khi tạo workspace mới — nghĩa là một
+    // workspace nguồn có `profileId = NULL` sẽ sinh ra một workspace MỚI cũng NULL, mỗi lần bấm
+    // "Tạo tháng mới". Đó là lý do tập workspace-không-profile KHÔNG phải "dữ liệu cũ đóng băng":
+    // nó tự lớn lên mỗi tháng.
+    // Và workspace vừa sinh ra đã chết một nửa ngay từ ngày đầu: sau chiến dịch vá lệch nguồn,
+    // 7 chức năng admin (tạo task, xuất/xem/huỷ hoá đơn, ghi thanh toán, đổi vai trò…) đều fail
+    // closed khi thiếu profileId. Một nút được hỗ trợ không được phép tạo ra hàng mà mọi hành động
+    // khác sau đó từ chối đụng tới.
+    //
+    // Chặn ở đây thay vì đoán profile: workspace nguồn cần được backfill trước
+    // (scripts/backfill-workspace-profile-id.ts), rồi thao tác này chạy lại bình thường.
+    if (!profileId) {
+        return {
+            error:
+                'Workspace nguồn chưa gắn Profile nên không thể tạo tháng mới — ' +
+                'nếu tạo, tháng mới cũng sẽ không dùng được. Báo quản trị viên chạy backfill Profile trước.',
+        }
+    }
+
     // Derive next month from the source name ("Tháng 6/2026" → 7/2026).
     const { month, year } = extractPayrollCycle(source.name)
     const nextMonth = month === 12 ? 1 : month + 1

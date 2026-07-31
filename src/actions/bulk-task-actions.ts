@@ -831,11 +831,16 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
             // giao viec khac. Xem chu thich day du o `task-management-actions.ts` (nhanh ASSIGN TO
             // USER): no liet ke con lai nhung gi va nhac dung cam lai mot minh mot ben.
             //
-            // Viet KHONG DAU la co y. File nay TRON hai loi: co comment UTF-8 tho doc binh thuong
-            // (vi du dong 802), va co comment dung escape \uXXXX (vi du dong ngay ben duoi,
-            // "[AUDIT R14 — fix]"). Escape chi duoc giai ma trong chuoi va dinh danh, KHONG
-            // duoc giai ma trong comment `//` — nen o VUNG NAY, khi viet co dau thi chu bi ghi ra
-            // duoi dang escape va thanh mot dong ky tu rac. ASCII tranh han cau hoi do.
+            // Viet KHONG DAU o day la co y. File nay TRON hai loi ghi ky tu ngoai ASCII trong
+            // comment: co dong ghi THO va doc binh thuong (dong 802), co dong ghi bang escape
+            // \uXXXX (dong ngay ben duoi, "AUDIT R14"). Escape chi duoc giai ma trong chuoi va
+            // dinh danh, KHONG duoc giai ma trong comment hai gach cheo -- dong nao ghi kieu do
+            // se hien ra la mot dong ky tu rac.
+            //
+            // LUU Y cho nguoi sau: KHONG phai vung nay "khong mang duoc dau". Mang duoc -- dong
+            // 802 la bang chung. Viet khong dau chi de khoi phai doan minh dang roi vao loi nao.
+            // Muon viet co dau thi cu viet, nhung kiem lai bang mat xem no co bi ghi thanh \uXXXX
+            // hay khong.
 
             // [AUDIT R14 \u2014 fix] Assignee must belong to THIS workspace's profile \u2014 don't
             // let an admin bulk-assign tasks to a foreign-tenant userId passed via RPC.

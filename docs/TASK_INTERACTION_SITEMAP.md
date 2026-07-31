@@ -493,7 +493,12 @@ Grid 2 cột.
   vẫn còn: nó là chỉ dấu hiệu suất, không phải hàng rào.
   Trên đường giao việc vẫn còn chốt khác, không phải chỉ một: `isAssigneeInWorkspaceProfile` —
   người được giao phải thuộc profile của workspace, và bên trong nó loại luôn CLIENT/LOCKED. Phía
-  MCP là `assertWorkspaceMember` (chốt này thì đòi hàng WorkspaceMember thật, chặt hơn bản web).
+  MCP là `assertWorkspaceMember`. ⚠️ Đừng nói gọn "MCP chặt hơn" — hai bên chặt lỏng KHÁC CHIỀU
+  nhau: MCP đòi hàng `WorkspaceMember` thật (web thì không), nhưng MCP **không** loại CLIENT/LOCKED
+  còn web thì có. Hệ quả dựng được: `deactivateUser` đặt `role='LOCKED'` mà **không xoá** hàng
+  WorkspaceMember, nên một editor đã bị vô hiệu hoá sẽ bị web từ chối giao việc, trong khi 5 tool
+  MCP vẫn giao được — và gửi thông báo tới một tài khoản không đăng nhập được nữa. Đây là khoảng
+  lệch CÓ TỪ TRƯỚC, không phải hệ quả của việc gỡ thẻ đỏ; ghi lại ở đây để không ai vá nhầm chiều.
 
 - **Khi đang chọn nhiều task (bulk)**:
 

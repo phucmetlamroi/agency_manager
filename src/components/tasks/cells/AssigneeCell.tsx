@@ -28,9 +28,23 @@ function displayName(user: { username: string; displayName?: string | null; nick
     return user.displayName?.trim() || user.username
 }
 
+// [GỠ THẺ ĐỎ 2026-07-31] Chấm màu này GIỮ LẠI, nhưng chú giải phải đổi.
+//
+// Khi luật thẻ đỏ còn hiệu lực, chữ "Cảnh báo" là mô tả đúng: hạng D thật sự bị máy chặn giao việc.
+// Luật đã bỏ, nên chấm đỏ nay không dẫn tới hậu quả nào. Để nguyên chữ "Cảnh báo" ngay trong danh
+// sách chọn người giao việc là mời admin tự né người đó — tức luật vẫn được thi hành, nhưng bằng
+// phản xạ thay vì bằng code, và lần này KHÔNG có thông báo, không có nhật ký, không ai chịu trách
+// nhiệm. Đó là hình thái tệ hơn cả luật cũ.
+//
+// Nay chú giải nói đúng bản chất: một con số tham khảo, không phải một lệnh cấm.
 function rankFlag(entity: any): string | null {
     const r = entity?.monthlyRanks?.[0]?.rank
     return r === 'C' ? 'bg-yellow-500' : r === 'D' ? 'bg-red-500' : null
+}
+
+/** Chú giải cho chấm hạng — nói rõ đây là tham khảo, không phải hàng rào. */
+function rankFlagTitle(rank: unknown): string {
+    return `Hạng ${String(rank ?? '—')} kỳ gần nhất — chỉ để tham khảo, không chặn giao việc`
 }
 
 export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId, onSelectionCleared }: AssigneeCellProps) {
@@ -131,7 +145,12 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
             onSelectionCleared?.()
             router.refresh()
         } else {
-            toast.error("Giao task thất bại")
+            // [GỠ THẺ ĐỎ 2026-07-31] Trước đây câu này nuốt luôn `assignRes.error`. Khi còn luật thẻ
+            // đỏ thì admin ít nhất còn đoán được ("chắc người này bị phạt"); nay lý do từ chối DUY
+            // NHẤT còn lại là chốt tenant ("Editor được chọn không thuộc workspace/profile này"), mà
+            // nó thì không đoán nổi — admin bấm lại mãi vẫn thất bại, không hiểu vì sao.
+            // Đường giao HÀNG LOẠT ngay phía trên vốn đã hiện `res.error`; hai nhánh nay nói giống nhau.
+            toast.error(assignRes?.error || "Giao task thất bại")
         }
     }
 
@@ -147,7 +166,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                             <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
                         </Avatar>
                         {flagColor && (
-                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${(task.assignee as any).monthlyRanks?.[0]?.rank}`} />
+                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={rankFlagTitle((task.assignee as any).monthlyRanks?.[0]?.rank)} />
                         )}
                     </div>
                     <span className="text-sm">{displayName(task.assignee)}</span>
@@ -269,7 +288,7 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                                 <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
                                             </Avatar>
                                             {flagColor && (
-                                                <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-surface-1 ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${(u as any).monthlyRanks?.[0]?.rank}`} />
+                                                <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-surface-1 ${flagColor} shadow-sm`} title={rankFlagTitle((u as any).monthlyRanks?.[0]?.rank)} />
                                             )}
                                         </div>
                                         <span className="truncate">{displayName(u)}</span>

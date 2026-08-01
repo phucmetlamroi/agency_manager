@@ -127,7 +127,7 @@ function Menu({ items, at, onClose }: { items: MenuItem[]; at: { x: number; y: n
 
 /* ── the surface ─────────────────────────────────────────────────────────── */
 
-export default function Library({ actions, wsScope = 'all', clientScope = 'all' }: {
+export default function Library({ actions, wsScope = 'all', clientScope = 'all', focus = null }: {
     actions: DeliverableActions
     /** [A1] The masthead period tab. Previously the Library ignored it entirely — the
      *  mount carried a remount `key` but no prop, so switching period changed nothing on
@@ -136,12 +136,19 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
     wsScope?: string | 'all'
     /** The rail's channel/brand filter, same story. */
     clientScope?: number | 'all'
+    /** [Báo cáo 2026-08-02] Yêu cầu mở sẵn một thư mục, đến từ ngoài Library. `n` tăng dần
+     *  để cùng một thư mục vẫn mở lại được ở lần bấm thứ hai. */
+    focus?: { id: string; n: number } | null
 }) {
     const toast = useToast()
     const [snap, setSnap] = useState<DocumentsSnapshot | null>(null)
     const [loading, setLoading] = useState(true)
     const [failed, setFailed] = useState(false)          // C9 — a real error state
     const [folderId, setFolderId] = useState<string | null>(null)
+    /* [Báo cáo 2026-08-02] Mở thẳng một thư mục theo yêu cầu từ ngoài (khay việc, hoặc nút
+       "về thư mục" trong phòng chiếu). `focus` là một OBJECT MỚI mỗi lần yêu cầu — bấm lại
+       cùng thư mục vẫn mở lại được, thay vì prop không đổi nên effect im lặng. */
+    useEffect(() => { if (focus) setFolderId(focus.id) }, [focus])
     const [sel, setSel] = useState<Set<string>>(new Set())
     /** Ticked FOLDERS. Staff can select folders and files together, so a client can too —
      *  the zip route expands each selected folder's whole subtree server-side, which also

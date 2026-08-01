@@ -341,14 +341,28 @@ export async function getShareSnapshot(token: string) {
                 deletedAt: null,
                 currentVersion: { is: { pipelineStatus: 'READY', muxPlaybackId: { not: null }, deletedAt: null } },
             },
-            select: { id: true, taskId: true, workspaceId: true, createdById: true },
+            // [Báo cáo 2026-08-02] `folderId` mới thêm: khách cần biết video nằm ở THƯ MỤC nào
+            // để cổng khách mở đúng chỗ thay vì mở trơ một video. Cùng bảng, cùng truy vấn.
+            select: { id: true, taskId: true, workspaceId: true, createdById: true, folderId: true },
             orderBy: { createdAt: 'desc' }, // newest live stack per task wins
         })
         : []
     // taskId → the live READY asset (the deliverable to review). First (newest) per task.
-    const readyAssetByTask = new Map<string, { id: string; taskId: string | null; workspaceId: string; createdById: string }>()
+    const readyAssetByTask = new Map<string, { id: string; taskId: string | null; workspaceId: string; createdById: string; folderId: string | null }>()
+    /* [Báo cáo chủ sản phẩm 2026-08-02] "khi mà bấm vào watch and decide thì nó sẽ chỉ hiện ra
+       đúng một video thôi… đáng lẽ nó cũng sẽ phải nhảy trực tiếp tới cái folder".
+
+       Vòng lặp dưới CỐ Ý chỉ giữ asset mới nhất mỗi task — `reviewUrl` là MỘT bảng duyệt nên
+       phải chọn một. Nhưng hệ quả là ba video còn lại của task nhiều-hook KHÔNG BAO GIỜ rời khỏi
+       máy chủ, nên cổng khách không có cách nào biết là còn video khác để mà mở thư mục.
+
+       Đếm thêm ở đây (cùng vòng lặp, không thêm truy vấn) để DTO nói được "task này có N video".
+       `reviewUrl` giữ nguyên nghĩa cũ — không đụng gì tới bề mặt đang chạy. */
+    const readyCountByTask = new Map<string, number>()
     for (const a of reviewAssets) {
-        if (a.taskId && !readyAssetByTask.has(a.taskId)) readyAssetByTask.set(a.taskId, a)
+        if (!a.taskId) continue
+        readyCountByTask.set(a.taskId, (readyCountByTask.get(a.taskId) ?? 0) + 1)
+        if (!readyAssetByTask.has(a.taskId)) readyAssetByTask.set(a.taskId, a)
     }
 
     const guestBase = guestAppBaseUrl()
@@ -440,6 +454,10 @@ export async function getShareSnapshot(token: string) {
         clientPath: formatClientHierarchy(task.client),
         workspaceName: task.workspaceId ? wsNameById.get(task.workspaceId) ?? null : null,
         reviewUrl,
+        // [Báo cáo 2026-08-02] Chỉ có nghĩa khi reviewUrl có mặt (task đang ở pha khách xem).
+        // reviewCount > 1 => cổng khách mở THƯ MỤC thay vì mở trơ một video.
+        reviewCount: reviewUrl ? (readyCountByTask.get(task.id) ?? 1) : 0,
+        reviewFolderId: reviewUrl ? (asset?.folderId ?? null) : null,
         }
     }))
 

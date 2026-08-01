@@ -62,6 +62,15 @@ export default function YourDesk({
     const outstanding = invoices
         .filter(i => { const s = mapInvoiceStatus(i.status); return s === 'Overdue' || s === 'Due' })
         .reduce((sum, i) => sum + Number(i.totalDue || 0), 0)
+    /* [Khách hỏi 02/08 — Daniel Oni] "I paid for all of the previous videos, shouldn't that
+       balance be zero, or at the very least shouldn't it say the total of what's already
+       been paid?"
+       Bảng này chỉ có OUTSTANDING và không có gì đối chiếu, nên một con số nợ đứng trơ trọi
+       đọc thành "hệ thống nói tôi còn nợ" chứ không thành "còn cái này chưa đánh dấu đã trả".
+       Thêm dòng ĐÃ THANH TOÁN để khách tự đối chiếu được và biết mà hỏi đúng chỗ. */
+    const paid = invoices
+        .filter(i => mapInvoiceStatus(i.status) === 'Paid')
+        .reduce((sum, i) => sum + Number(i.totalDue || 0), 0)
 
     const trayEmpty = cuts.length === 0 && overdue.length === 0
     const headline = trayEmpty
@@ -182,7 +191,18 @@ export default function YourDesk({
                     <GlanceRow label="In production" value={String(inProduction)} />
                     <GlanceRow label="Awaiting you" value={String(needsYouCount)} accent={needsYouCount > 0 ? 'var(--ochre)' : undefined} />
                     <GlanceRow label="Delivered" value={String(delivered)} />
+                    <GlanceRow label="Paid" value={fmtMoney(paid)} onClick={paid > 0 ? goStatements : undefined} />
                     <GlanceRow label="Outstanding" value={fmtMoney(outstanding)} accent={outstanding > 0 ? 'var(--brick)' : undefined} onClick={outstanding > 0 ? goStatements : undefined} />
+                    {outstanding > 0 && (
+                        /* Nói thẳng con số này nghĩa là gì. "Outstanding" đứng một mình bị đọc
+                           thành phán quyết về việc khách đã trả hay chưa; thật ra nó chỉ là
+                           tổng các hoá đơn CHƯA ĐƯỢC ĐÁNH DẤU đã thanh toán. Khách vừa chuyển
+                           khoản mà chưa ai đánh dấu thì vẫn thấy số này. */
+                        <span style={{ fontSize: '0.72rem', lineHeight: 1.5, color: 'var(--ink-3)', marginTop: -2 }}>
+                            Invoices not yet marked paid. Just settled one? It clears once we log it —
+                            tell us if it looks wrong.
+                        </span>
+                    )}
                 </div>
 
                 {actions.notifyGet && <GetUpdates actions={actions} />}

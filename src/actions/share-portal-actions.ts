@@ -262,6 +262,17 @@ export async function getShareSnapshot(token: string) {
             where: {
                 clientId: { in: scope.clientIds },
                 workspaceId: { in: scope.workspaceIds },
+                // [Khách hỏi 02/08] Hoá đơn NHÁP là bản admin đang soạn, CHƯA gửi cho ai.
+                // Trước đây truy vấn này không lọc trạng thái, mà mapInvoiceStatus lại gộp
+                // `DRAFT` chung với `SENT` thành "Due" (xem chú thích `default:` trong
+                // portal/calm/format.ts). Hệ quả: vừa bấm tạo nháp là khách đã thấy một hoá
+                // đơn và số nợ nhảy lên — với số tiền còn đang gõ dở. Không phải nguyên nhân
+                // của ca $270 (cái đó là SENT thật, chưa ai ghi nhận đã thu), nhưng là mìn
+                // hẹn giờ nằm ngay cạnh, nên gỡ luôn.
+                // VOID thì GIỮ LẠI: khách đã nhận hoá đơn đó rồi, cho họ thấy nó đã bị huỷ
+                // vẫn tử tế hơn là để nó biến mất không lời giải thích. Nó đã được gắn nhãn
+                // "Void" và đã bị loại khỏi phép tính số nợ.
+                status: { not: 'DRAFT' },
             },
             orderBy: { createdAt: 'desc' },
             select: {

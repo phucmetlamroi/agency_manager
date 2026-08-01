@@ -84,7 +84,12 @@ function DeskInner({
     const [openInv, setOpenInv] = useState<string | null>(null)
     const [newReqOpen, setNewReqOpen] = useState(false)
     const [searchOpen, setSearchOpen] = useState(false)
-    const [screening, setScreening] = useState<{ url: string; title: string; id: string } | null>(null)
+    const [screening, setScreening] = useState<{ url: string; title: string; id: string; folderId: string | null } | null>(null)
+    /* [Báo cáo 2026-08-02] Yêu cầu mở một thư mục cụ thể trong Tệp, đến từ ngoài Library
+       (khay việc, hoặc nút "về thư mục" trong phòng chiếu). Mang theo `n` tăng dần vì bấm
+       LẠI cùng một thư mục phải mở lại được — nếu chỉ truyền id thì lần thứ hai prop không
+       đổi, effect không chạy, và nút im lặng không làm gì. */
+    const [libFocus, setLibFocus] = useState<{ id: string; n: number } | null>(null)
     // Mirrored into a ref so the (mount-once) postMessage listener below reads the CURRENT room
     // instead of closing over the null it saw on mount.
     const screeningRef = useRef<typeof screening>(null)
@@ -120,9 +125,19 @@ function DeskInner({
     // moment the player loads instead of hitting a second name+email prompt. It must
     // finish BEFORE the iframe mounts, or the frame loads without the cookie. Failure
     // is non-fatal — the player then shows its own identity modal, as it always did.
-    const openReview = async (url: string, title: string, deliverableId: string) => {
+    const openReview = async (url: string, title: string, deliverableId: string, folderId: string | null = null) => {
         try { await actions.prepareScreening?.(url) } catch { /* non-fatal */ }
-        setScreening({ url, title, id: deliverableId })
+        setScreening({ url, title, id: deliverableId, folderId })
+    }
+
+    /* Mở Tệp ngay tại một thư mục. Đóng phòng chiếu trước — nếu không thì lớp phủ vẫn nằm
+       đè lên và khách bấm "về thư mục" xong tưởng nút hỏng. */
+    const openFolder = (id: string) => {
+        setScreening(null)
+        setLibFocus(f => ({ id, n: (f?.n ?? 0) + 1 }))
+        setSurface('files')
+        setOpenInv(null)
+        setNavOpen(false)
     }
 
     // [Client escalation 2026-07-21] Adopt a decision the client made INSIDE the screening room.
@@ -286,6 +301,7 @@ function DeskInner({
                             needsYouCount={needsYouCount}
                             openDeliverable={openDeliverable}
                             openReview={openReview}
+                            openFolder={openFolder}
                             goStatements={() => go('statements')}
                             openInvoice={openInvoice}
                         />
@@ -308,7 +324,7 @@ function DeskInner({
                         // it refetched the identical payload and rendered the identical grid.
                         // A client switching to "T6" saw July's files and concluded work had
                         // gone missing. Pass the scope; drop the pointless remount.
-                        <Library actions={actions} wsScope={wsScope} clientScope={scope} />
+                        <Library actions={actions} wsScope={wsScope} clientScope={scope} focus={libFocus} />
                     )}
                     {surface === 'statements' && (
                         <Statements
@@ -347,7 +363,16 @@ function DeskInner({
                     openInvoice={(id) => { setSearchOpen(false); openInvoice(id) }}
                 />
             )}
-            {screening && <ScreeningRoom url={screening.url} title={screening.title} onClose={() => setScreening(null)} />}
+            {screening && (
+                <ScreeningRoom
+                    url={screening.url}
+                    title={screening.title}
+                    onClose={() => setScreening(null)}
+                    // [Báo cáo 2026-08-02] "khi mà bấm vào thì tôi không hề có lúc quay lại…
+                    // quay lại là ra ngoài luôn". Có thư mục thì cho hẳn đường về đó.
+                    onBackToFolder={screening.folderId ? () => openFolder(screening.folderId!) : undefined}
+                />
+            )}
         </div>
     )
 }

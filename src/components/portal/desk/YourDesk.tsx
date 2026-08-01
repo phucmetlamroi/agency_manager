@@ -12,7 +12,7 @@ import type { Deliverable, Invoice, DeliverableActions } from '../calm/types'
 
 export default function YourDesk({
     deliverables, invoices, actions, accountName, periodLabel, needsYouCount,
-    openDeliverable, openReview, goStatements, openInvoice,
+    openDeliverable, openReview, openFolder, goStatements, openInvoice,
 }: {
     deliverables: Deliverable[]
     invoices: Invoice[]
@@ -21,7 +21,8 @@ export default function YourDesk({
     periodLabel: string
     needsYouCount: number
     openDeliverable: (id: string) => void
-    openReview: (url: string, title: string, deliverableId: string) => void
+    openReview: (url: string, title: string, deliverableId: string, folderId?: string | null) => void
+    openFolder: (folderId: string) => void
     goStatements: () => void
     openInvoice: (id: string) => void
 }) {
@@ -61,6 +62,15 @@ export default function YourDesk({
     const outstanding = invoices
         .filter(i => { const s = mapInvoiceStatus(i.status); return s === 'Overdue' || s === 'Due' })
         .reduce((sum, i) => sum + Number(i.totalDue || 0), 0)
+    /* [Khách hỏi 02/08 — Daniel Oni] "I paid for all of the previous videos, shouldn't that
+       balance be zero, or at the very least shouldn't it say the total of what's already
+       been paid?"
+       Bảng này chỉ có OUTSTANDING và không có gì đối chiếu, nên một con số nợ đứng trơ trọi
+       đọc thành "hệ thống nói tôi còn nợ" chứ không thành "còn cái này chưa đánh dấu đã trả".
+       Thêm dòng ĐÃ THANH TOÁN để khách tự đối chiếu được và biết mà hỏi đúng chỗ. */
+    const paid = invoices
+        .filter(i => mapInvoiceStatus(i.status) === 'Paid')
+        .reduce((sum, i) => sum + Number(i.totalDue || 0), 0)
 
     const trayEmpty = cuts.length === 0 && overdue.length === 0
     const headline = trayEmpty
@@ -99,6 +109,20 @@ export default function YourDesk({
                     {cuts.map(d => {
                         const rel = relDeadline(d.deadline)
                         const on = picked.has(d.id)
+                        /* [Báo cáo chủ sản phẩm 2026-08-02] "khi mà bấm vào watch and decide thì
+                           nó sẽ chỉ hiện ra đúng một video thôi… đáng lẽ nó cũng sẽ phải nhảy trực
+                           tiếp tới cái folder".
+                           Một dòng ở đây = một TASK. Task nhiều-hook có N video nhưng `reviewUrl`
+                           chỉ trỏ tới MỘT bảng duyệt, nên bấm vào là khách chỉ thấy một cái và
+                           không biết còn ba cái nữa. Nhiều hơn một thì mở THƯ MỤC; đúng một thì
+                           vào thẳng phòng chiếu như cũ — bắt khách đi qua trình duyệt file để xem
+                           một video duy nhất là thêm bước vô ích. */
+                        const many = (d.reviewCount ?? 0) > 1 && !!d.reviewFolderId
+                        const openCut = () => {
+                            if (many) return openFolder(d.reviewFolderId!)
+                            if (d.reviewUrl) return openReview(d.reviewUrl, d.title, d.id, d.reviewFolderId ?? null)
+                            return openDeliverable(d.id)
+                        }
                         return (
                             <div key={d.id} className="desk-tray-card" style={{ display: 'flex', gap: 18, alignItems: 'center', background: on ? 'var(--accent-tint)' : 'var(--paper-raised)', border: '1px solid ' + (on ? 'var(--accent)' : 'var(--hairline)'), borderLeft: '3px solid var(--accent)', padding: '16px 20px', borderRadius: 4 }}>
                                 {actions.approveMany && cuts.length > 1 && (
@@ -110,7 +134,7 @@ export default function YourDesk({
                                         style={{ flex: 'none', width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }}
                                     />
                                 )}
-                                <button onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title, d.id) : openDeliverable(d.id))} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
+                                <button onClick={openCut} className="desk-tray-thumb" style={{ position: 'relative', width: 132, height: 76, background: '#09090b', borderRadius: 3, overflow: 'hidden', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
                                     <Play size={18} fill="#f7f2e9" color="#f7f2e9" />
                                     {d.duration && <span className="desk-mono" style={{ position: 'absolute', right: 6, bottom: 5, fontSize: '0.56rem', color: '#eae5d9', background: 'rgba(9,9,11,.65)', padding: '1px 5px' }}>{d.duration}</span>}
                                 </button>
@@ -122,9 +146,15 @@ export default function YourDesk({
                                     <p className="desk-mono" style={{ fontSize: '0.64rem', letterSpacing: '0.08em', color: 'var(--ink-3)', margin: '5px 0 0', textTransform: 'uppercase' }}>
                                         {(d.client?.name || 'Production')}{d.deadline ? ` · ${rel.text || 'Target ' + fmtDate(d.deadline, false)}` : ''}
                                     </p>
-                                    <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>A new video is ready for your review.</p>
+                                    <p style={{ fontSize: '0.84rem', color: 'var(--ink-2)', margin: '6px 0 0' }}>
+                                        {many
+                                            ? `${d.reviewCount} videos are ready for your review.`
+                                            : 'A new video is ready for your review.'}
+                                    </p>
                                 </span>
-                                <Button variant="primary" size="sm" className="desk-tray-cta" onClick={() => (d.reviewUrl ? openReview(d.reviewUrl, d.title, d.id) : openDeliverable(d.id))} style={{ flex: 'none' }}>Watch &amp; decide</Button>
+                                <Button variant="primary" size="sm" className="desk-tray-cta" onClick={openCut} style={{ flex: 'none' }}>
+                                    {many ? <>Open {d.reviewCount} videos</> : <>Watch &amp; decide</>}
+                                </Button>
                             </div>
                         )
                     })}
@@ -161,7 +191,18 @@ export default function YourDesk({
                     <GlanceRow label="In production" value={String(inProduction)} />
                     <GlanceRow label="Awaiting you" value={String(needsYouCount)} accent={needsYouCount > 0 ? 'var(--ochre)' : undefined} />
                     <GlanceRow label="Delivered" value={String(delivered)} />
+                    <GlanceRow label="Paid" value={fmtMoney(paid)} onClick={paid > 0 ? goStatements : undefined} />
                     <GlanceRow label="Outstanding" value={fmtMoney(outstanding)} accent={outstanding > 0 ? 'var(--brick)' : undefined} onClick={outstanding > 0 ? goStatements : undefined} />
+                    {outstanding > 0 && (
+                        /* Nói thẳng con số này nghĩa là gì. "Outstanding" đứng một mình bị đọc
+                           thành phán quyết về việc khách đã trả hay chưa; thật ra nó chỉ là
+                           tổng các hoá đơn CHƯA ĐƯỢC ĐÁNH DẤU đã thanh toán. Khách vừa chuyển
+                           khoản mà chưa ai đánh dấu thì vẫn thấy số này. */
+                        <span style={{ fontSize: '0.72rem', lineHeight: 1.5, color: 'var(--ink-3)', marginTop: -2 }}>
+                            Invoices not yet marked paid. Just settled one? It clears once we log it —
+                            tell us if it looks wrong.
+                        </span>
+                    )}
                 </div>
 
                 {actions.notifyGet && <GetUpdates actions={actions} />}

@@ -54,6 +54,12 @@ export interface Deliverable {
      *  watches the cut, leaves timecode comments, annotates and approves. Present ONLY for
      *  client-phase tasks with a live READY task-linked asset (R5-gated). */
     reviewUrl?: string | null
+    /** [Báo cáo 2026-08-02] Số video ĐÃ SẴN SÀNG của task này. `reviewUrl` chỉ trỏ tới MỘT bảng
+     *  duyệt, nên nếu không có con số này thì cổng khách tưởng task nhiều-hook chỉ có một video.
+     *  0 = task chưa tới pha khách xem. */
+    reviewCount?: number
+    /** Thư mục Tệp chứa các video đó — để cổng khách mở đúng chỗ khi `reviewCount > 1`. */
+    reviewFolderId?: string | null
 }
 
 export interface Invoice {

@@ -127,7 +127,7 @@ function Menu({ items, at, onClose }: { items: MenuItem[]; at: { x: number; y: n
 
 /* ── the surface ─────────────────────────────────────────────────────────── */
 
-export default function Library({ actions, wsScope = 'all', clientScope = 'all' }: {
+export default function Library({ actions, wsScope = 'all', clientScope = 'all', focus = null }: {
     actions: DeliverableActions
     /** [A1] The masthead period tab. Previously the Library ignored it entirely — the
      *  mount carried a remount `key` but no prop, so switching period changed nothing on
@@ -136,12 +136,19 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
     wsScope?: string | 'all'
     /** The rail's channel/brand filter, same story. */
     clientScope?: number | 'all'
+    /** [Báo cáo 2026-08-02] Yêu cầu mở sẵn một thư mục, đến từ ngoài Library. `n` tăng dần
+     *  để cùng một thư mục vẫn mở lại được ở lần bấm thứ hai. */
+    focus?: { id: string; n: number } | null
 }) {
     const toast = useToast()
     const [snap, setSnap] = useState<DocumentsSnapshot | null>(null)
     const [loading, setLoading] = useState(true)
     const [failed, setFailed] = useState(false)          // C9 — a real error state
     const [folderId, setFolderId] = useState<string | null>(null)
+    /* [Báo cáo 2026-08-02] Mở thẳng một thư mục theo yêu cầu từ ngoài (khay việc, hoặc nút
+       "về thư mục" trong phòng chiếu). `focus` là một OBJECT MỚI mỗi lần yêu cầu — bấm lại
+       cùng thư mục vẫn mở lại được, thay vì prop không đổi nên effect im lặng. */
+    useEffect(() => { if (focus) setFolderId(focus.id) }, [focus])
     const [sel, setSel] = useState<Set<string>>(new Set())
     /** Ticked FOLDERS. Staff can select folders and files together, so a client can too —
      *  the zip route expands each selected folder's whole subtree server-side, which also
@@ -260,7 +267,42 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
             const list = files.get(a.folderId)
             if (list) list.push(a); else files.set(a.folderId, [a])
         }
-        return { subfolders, files }
+
+        /* [Báo cáo chủ sản phẩm 2026-08-02] "ở phần file Master này nó lại không có một cái
+           hình nhỏ hiển thị nào".
+           Nguyên nhân: mosaic ở trên chỉ soi CON TRỰC TIẾP. Một thư mục cấp trên như
+           "August/2026" chỉ chứa thư mục con, không chứa video — nên nó không có ảnh nào để
+           vẽ và rơi về ô rỗng, đúng cái "folder mù" mà bản trước định chữa.
+           Cách chữa: đi XUỐNG CẢ CÂY CON tìm ảnh thật, gần nhất trước. Vẫn không tốn thêm
+           truy vấn nào: allFolders/allAssets đã là toàn bộ thư viện nằm sẵn trong bộ nhớ. */
+        const deepPosters = new Map<string, string[]>()
+        const resolve = (id: string, seen: Set<string>): string[] => {
+            const cached = deepPosters.get(id)
+            if (cached) return cached
+            if (seen.has(id)) return []   // chặn vòng lặp nếu dữ liệu thư mục bị trỏ vòng
+            seen.add(id)
+
+            const out: string[] = []
+            for (const a of files.get(id) ?? []) {
+                const p = a.currentVersion?.posterUrl
+                if (p) out.push(p)
+                if (out.length >= 2) break
+            }
+            if (out.length < 2) {
+                for (const s of subfolders.get(id) ?? []) {
+                    for (const p of resolve(s.id, seen)) {
+                        out.push(p)
+                        if (out.length >= 2) break
+                    }
+                    if (out.length >= 2) break
+                }
+            }
+            deepPosters.set(id, out)
+            return out
+        }
+        for (const f of allFolders) resolve(f.id, new Set())
+
+        return { subfolders, files, deepPosters }
     }, [allFolders, allAssets])
 
     const shown = searching ? results : assets
@@ -560,7 +602,11 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                     {folders.length > 0 && !searching && (
                         <>
                             <Kicker style={{ marginBottom: 10 }}>Folders · {folders.length}</Kicker>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 26 }}>
+                            {/* [Báo cáo 2026-08-02] 220px là quá hẹp: thẻ có 44px đệm trái (chừa chỗ ô
+                                tick), 52px ảnh, 14px mũi tên + 26px lề (chừa chỗ nút tải), 18px đệm
+                                phải — tức ~170px đã bị chiếm, tên thư mục chỉ còn ~50px nên cụt thành
+                                "Augu…" và dòng "1 item · 547 MB" tràn đè lên nhau. 280px trả lại chỗ. */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14, marginBottom: 26 }}>
                                 {folders.map(f => {
                                     // C8 — a client-root folder reads differently from a plain folder.
                                     const Glyph = f.kind === 'client' ? Building2 : Folder
@@ -569,13 +615,20 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                                     /* Videos first — a delivered cut is what the client came for; sub-folders
                                        fill the remaining slot(s). Two real tiles max, per the owner's
                                        "trên 3 video thì nó sẽ hiển thị cố định là dạng 2 video". */
-                                    const picks: { key: string; poster: string | null; folder: boolean }[] = [
-                                        ...kidFiles.slice(0, 2).map(a => ({ key: 'a' + a.id, poster: a.currentVersion?.posterUrl ?? null, folder: false })),
-                                        ...(kidFiles.length < 2
-                                            ? kidFolders.slice(0, 2 - kidFiles.length).map(s => ({ key: 'f' + s.id, poster: null, folder: true }))
-                                            : []),
-                                    ]
-                                    const rest = kidFiles.length + kidFolders.length - picks.length
+                                    /* Ảnh thật lấy đệ quy từ cả cây con (xem previewIndex). Có ảnh thì
+                                       dùng ảnh; hoàn toàn không có ảnh nào trong cây thì mới rơi về ô
+                                       biểu tượng như cũ — trường hợp đó là thư mục chỉ chứa ảnh tĩnh
+                                       hoặc video Mux chưa dựng xong hình. */
+                                    const deep = previewIndex.deepPosters.get(f.id) ?? []
+                                    const picks: { key: string; poster: string | null; folder: boolean }[] = deep.length > 0
+                                        ? deep.map((p, i) => ({ key: 'p' + i, poster: p, folder: false }))
+                                        : [
+                                            ...kidFiles.slice(0, 2).map(a => ({ key: 'a' + a.id, poster: null, folder: false })),
+                                            ...(kidFiles.length < 2
+                                                ? kidFolders.slice(0, 2 - kidFiles.length).map(s => ({ key: 'f' + s.id, poster: null, folder: true }))
+                                                : []),
+                                        ]
+                                    const rest = Math.max(0, kidFiles.length + kidFolders.length - picks.length)
                                     return (
                                         <div key={f.id} style={{ position: 'relative' }} onContextMenu={e => openMenu(e, folderMenu(f))}>
                                             {/* [Owner review 2026-07-22, 02:17-02:55] Single click TICKS, double click OPENS.
@@ -619,7 +672,10 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all' 
                                                 )}
                                                 <span style={{ minWidth: 0, flex: 1 }}>
                                                     <p className="desk-truncate" style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem' }}>{f.name}</p>
-                                                    <p className="desk-mono" style={{ fontSize: '0.6rem', color: 'var(--ink-3)', margin: '2px 0 0' }}>{f.itemCount} item{f.itemCount === 1 ? '' : 's'} · {fmtBytes(f.totalBytes)}</p>
+                                                    {/* whiteSpace:nowrap + truncate: dù thẻ có bị bóp hẹp
+                                                        (màn nhỏ, tên dài) thì dòng này cũng cắt gọn chứ
+                                                        KHÔNG xuống dòng đè lên chính nó như trước. */}
+                                                    <p className="desk-mono desk-truncate" style={{ fontSize: '0.6rem', color: 'var(--ink-3)', margin: '2px 0 0', whiteSpace: 'nowrap' }}>{f.itemCount} item{f.itemCount === 1 ? '' : 's'} · {fmtBytes(f.totalBytes)}</p>
                                                 </span>
                                                 <ChevronRight size={14} style={{ color: 'var(--ink-3)', flexShrink: 0, marginRight: 26 }} />
                                             </button>

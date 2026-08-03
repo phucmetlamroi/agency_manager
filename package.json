@@ -19,7 +19,8 @@
     "test:portal-notify": "tsx scripts/test-portal-notify.ts",
     "test:offline-message": "npx tsx scripts/test-offline-message.ts",
     "test:linkify": "tsx scripts/test-linkify.ts",
-    "test:comment-markdown": "tsx scripts/test-comment-markdown.ts"
+    "test:comment-markdown": "tsx scripts/test-comment-markdown.ts",
+    "test:entitlements": "tsx scripts/billing/test-entitlements.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

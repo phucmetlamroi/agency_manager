@@ -1,10 +1,14 @@
 // [BILLING P4] Webhook SePay — POST /api/webhooks/sepay
 //
 // SePay nhìn tài khoản ngân hàng của owner và bắn payload mỗi khi có tiền vào.
-// Hợp đồng (docs/billing/SCHEMA-DE-XUAT.md §5–§7 + tài liệu SePay):
-//   • Auth: header "Authorization: Apikey <SEPAY_WEBHOOK_API_KEY>" (cấu hình trong dashboard
-//     SePay). KHÔNG có chữ ký theo timestamp → chống phát lại KHÔNG nằm ở đây mà ở unique
-//     [provider, providerTxnId] trên SubscriptionPayment.
+// Hợp đồng (docs/billing/SCHEMA-DE-XUAT.md §5–§7 + developer.sepay.vn):
+//   • Auth 2 chế độ, theo "Phương thức xác thực" chọn trên dashboard SePay:
+//       HMAC-SHA256 (env SEPAY_WEBHOOK_HMAC_SECRET) — SePay ký `${timestamp}.${rawBody}`,
+//         gửi X-SePay-Signature: sha256=<hex> + X-SePay-Timestamp; verify ở sepay-hmac.ts
+//         (kèm cửa sổ ±5 phút chống phát lại tầng vận chuyển).
+//       API Key (env SEPAY_WEBHOOK_API_KEY) — "Authorization: Apikey <key>", không chữ ký.
+//     Cả hai chế độ: chống trùng GIAO DỊCH vẫn ở unique [provider, providerTxnId]
+//     trên SubscriptionPayment.
 //   • Phải trả 200 {"success":true} nhanh; fail thì SePay retry tới 7 lần trong ~5h,
 //     nên MỌI nhánh xử lý đều phải idempotent.
 //   • SỔ TRƯỚC, KHỚP SAU: tiền vào là ghi SubscriptionPayment ngay, khớp được order hay không
@@ -20,6 +24,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { audit } from '@/lib/audit-log'
 import { getSepayConfig, type SepayWebhookPayload } from '@/lib/billing/sepay'
+import { verifySepayHmac } from '@/lib/billing/sepay-hmac'
 import { getPlan, monthlyPriceVND, type BillingCycle, type PlanCode } from '@/lib/billing/plans'
 import { sendEmail } from '@/lib/email'
 import { buildPaymentReceivedEmail } from '@/lib/notification-emails/templates/billing/payment-received'
@@ -66,12 +71,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'not configured' }, { status: 500 })
     }
 
-    const auth = req.headers.get('authorization') ?? ''
-    if (!safeEqual(auth, `Apikey ${cfg.webhookApiKey}`)) {
-        return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    // Payload SePay thật chỉ vài trăm byte — chặn body quá khổ TRƯỚC khi buffer vào RAM,
+    // vì HMAC buộc phải đọc raw body trước auth (request vô danh cũng được đọc body).
+    const contentLength = Number(req.headers.get('content-length') ?? '0')
+    if (!Number.isFinite(contentLength) || contentLength > 100_000) {
+        return NextResponse.json({ error: 'payload too large' }, { status: 413 })
     }
 
+    // Raw body đọc TRƯỚC khi xác thực — HMAC ký trên đúng từng byte của body,
+    // parse trước là hết đường verify.
     const rawBody = await req.text()
+
+    if (cfg.webhookHmacSecret) {
+        const ok = verifySepayHmac(
+            rawBody,
+            req.headers.get('x-sepay-signature'),
+            req.headers.get('x-sepay-timestamp'),
+            cfg.webhookHmacSecret,
+            Date.now(),
+        )
+        if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    } else {
+        const auth = req.headers.get('authorization') ?? ''
+        if (!safeEqual(auth, `Apikey ${cfg.webhookApiKey ?? ''}`)) {
+            return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+        }
+    }
+
     let payload: SepayWebhookPayload
     try {
         payload = JSON.parse(rawBody)

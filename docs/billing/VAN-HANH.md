@@ -17,8 +17,8 @@
 
 | # | Việc | Ở đâu |
 |---|---|---|
-| 1 | Đặt 3 biến SePay trên Vercel: `SEPAY_ACCOUNT_NUMBER`, `SEPAY_BANK` (tên bank chuẩn SePay, vd `MBBank`), `SEPAY_WEBHOOK_API_KEY` (chuỗi bí mật tự đặt, dài ≥ 32 ký tự) | Vercel → Settings → Environment Variables |
-| 2 | Trong dashboard SePay: tạo webhook trỏ `https://hustlytasker.xyz/api/webhooks/sepay`, kiểu xác thực **Api Key**, dán đúng chuỗi ở bước 1 | my.sepay.vn → Webhooks |
+| 1 | Trong dashboard SePay: tạo webhook trỏ `https://hustlytasker.xyz/api/webhooks/sepay` — Loại giao dịch **Tiền vào**, định dạng **JSON**, tài khoản: chọn ĐÚNG tài khoản nhận tiền (Tuỳ chọn), bật "Dùng để xác thực thanh toán" (server đã trả `{"success":true}` đúng chuẩn), Bảo mật chọn **HMAC-SHA256** → SePay SINH Secret Key, **chỉ hiện MỘT LẦN — copy ngay** (sau đó chỉ còn ****4 ký tự cuối) | my.sepay.vn → Webhooks |
+| 2 | Đặt 3 biến SePay trên Vercel: `SEPAY_ACCOUNT_NUMBER`, `SEPAY_BANK` (tên bank chuẩn SePay, vd `MBBank`), `SEPAY_WEBHOOK_HMAC_SECRET` (dán Secret Key vừa copy ở bước 1). *(Nếu dashboard chọn API Key thay vì HMAC thì thay biến thứ ba bằng `SEPAY_WEBHOOK_API_KEY` — hệ thống hỗ trợ cả hai, HMAC an toàn hơn vì có chữ ký + chống phát lại 5 phút.)* | Vercel → Settings → Environment Variables |
 | 3 | Chạy cấp ngoại lệ cho 5 org đang dùng (D4): `DATABASE_URL="<prod>" npx tsx scripts/billing/grant-overrides.ts` xem trước → thêm `APPLY=1` để ghi | máy anh |
 | 4 | Kiểm bằng `npx tsx scripts/billing/measure-usage.ts` — 5 org phải hết cảnh "sẽ bị khoá" | máy anh |
 | 5 | Gửi email báo 30 ngày cho toàn bộ người dùng (mẫu ở mục 6) — **ghi lại ngày gửi** | tay anh |
@@ -95,5 +95,8 @@
 - Multi-org chung 1 subscription (Agency 3 org / Scale 5 org): schema sẵn sàng
   (`Profile.subscriptionId`), UI gán org phụ + cộng dồn usage làm khi có khách cần.
 - Đo phút video thật (fair-use hiện là điều khoản mềm).
+- Harness webhook end-to-end (`test-sepay-webhook.ts`) chạy ở chế độ API Key; chế độ HMAC
+  (production dùng) mới có test THUẦN cho verifier (`npm run test:sepay-hmac`, 16 case) —
+  wiring header trong route đã review tay + lần checkout 10k thật là bằng chứng end-to-end.
 - Bản build này **chưa qua Codex** (khả dụng 2026-08-04) và trang billing/ops **chưa
   soi trên trình duyệt thật** — xem mục Verify của kế hoạch.

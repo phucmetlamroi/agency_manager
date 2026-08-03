@@ -7,6 +7,10 @@
  *                    npx tsx scripts/billing/test-sepay-webhook.ts
  *
  *  TỰ BẢO VỆ: từ chối chạy nếu DATABASE_URL trỏ production (ep-autumn-flower) — harness GHI dữ liệu.
+ *
+ *  LƯU Ý: harness này test chế độ API KEY — dev server KHÔNG được đặt SEPAY_WEBHOOK_HMAC_SECRET
+ *  (có biến đó là route đòi chữ ký HMAC và mọi case ở đây 401 hết). Lớp HMAC có bộ test thuần
+ *  riêng, không cần server: npm run test:sepay-hmac.
  */
 import { PrismaClient } from '@prisma/client'
 

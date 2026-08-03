@@ -1718,6 +1718,92 @@ html {
   margin-top: 1rem;
 }
 
+/* Ba gói trả phí (v2 2026-08 — bỏ gói Free, số đọc từ plans.ts) */
+.htl .price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.4rem;
+  align-items: stretch;
+  margin-top: 2.6rem;
+  text-align: left;
+}
+
+.htl .price-card--tier {
+  margin: 0;
+  max-width: none;
+  padding: 2rem 1.8rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.htl .price-card--tier .price-card__amount {
+  font-size: clamp(1.9rem, 3vw, 2.5rem);
+  text-align: left;
+}
+
+.htl .price-card--tier .price-card__list {
+  margin: 1.5rem 0 1.7rem;
+  flex: 1;
+}
+
+.htl .price-card--tier .price-card__list li {
+  font-size: 0.92rem;
+}
+
+.htl .price-card--featured {
+  border-color: rgba(229, 162, 74, 0.55);
+  box-shadow:
+    0 40px 90px -40px rgba(0, 0, 0, 0.9),
+    0 0 90px -24px rgba(229, 162, 74, 0.5),
+    var(--glass-edge);
+}
+
+.htl .price-card__flag {
+  position: absolute;
+  top: -0.72rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--espresso);
+  background: rgb(229, 162, 74);
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+}
+
+.htl .price-card__name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--ivory);
+  line-height: 1.1;
+}
+
+.htl .price-card__desc {
+  color: var(--sand);
+  font-size: 0.9rem;
+  margin: 0.35rem 0 1.25rem;
+}
+
+.htl .price-card__annual {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--sand);
+  margin-top: 0.55rem;
+}
+
+@media (max-width: 960px) {
+  .htl .price-grid {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+    margin-inline: auto;
+  }
+}
+
 /* ---------------------------------------------------------------
    Footer
 --------------------------------------------------------------- */

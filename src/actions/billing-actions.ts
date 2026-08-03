@@ -430,6 +430,149 @@ export async function revokeRedemptionCode(codeId: string): Promise<{ success: t
     }
 }
 
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  Vận hành /billing-ops (GLOBAL admin)                                      */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+/** Tiền vào chưa khớp đơn nào — "màn đối chiếu tay" của SCHEMA-DE-XUAT §5. */
+export async function listUnmatchedPayments(): Promise<
+    | { success: true; payments: Array<{ id: string; providerTxnId: string; amountVND: number; gateway: string; transferCode: string | null; content: string; transactionDate: string; createdAt: string }> }
+    | { error: string }
+> {
+    try {
+        await requireGlobalAdmin()
+        const rows = await prisma.subscriptionPayment.findMany({
+            where: { orderId: null, matchedAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        })
+        return {
+            success: true,
+            payments: rows.map((r) => ({
+                id: r.id,
+                providerTxnId: r.providerTxnId,
+                amountVND: r.amountVND,
+                gateway: r.gateway,
+                transferCode: r.transferCode,
+                content: r.content,
+                transactionDate: r.transactionDate.toISOString(),
+                createdAt: r.createdAt.toISOString(),
+            })),
+        }
+    } catch {
+        return { error: 'Không đọc được danh sách chờ đối soát.' }
+    }
+}
+
+/** Owner đã xử lý tay (hoàn tiền / kích hoạt qua override / bỏ qua) → rút khỏi hàng chờ.
+ *  matchedAt đặt, orderId GIỮ null — sổ vẫn nói thật rằng nó chưa từng khớp đơn nào. */
+export async function resolveUnmatchedPayment(paymentId: string): Promise<{ success: true } | { error: string }> {
+    try {
+        const { userId } = await requireGlobalAdmin()
+        const r = await prisma.subscriptionPayment.updateMany({
+            where: { id: paymentId, orderId: null, matchedAt: null },
+            data: { matchedAt: new Date() },
+        })
+        if (r.count === 0) return { error: 'Khoản này không còn trong hàng chờ.' }
+        void audit({ workspaceId: null, actorUserId: userId, action: 'billing.payment_unmatched', targetType: 'SubscriptionPayment', targetId: paymentId, after: { resolvedManually: true } })
+        return { success: true }
+    } catch {
+        return { error: 'Không đánh dấu được.' }
+    }
+}
+
+/** Toàn cảnh subscription cho ops — trạng thái là bản DẪN XUẤT (đúng nguồn sự thật),
+ *  không phải cột status thô. */
+export async function listSubscriptionsOps(): Promise<
+    | { success: true; subscriptions: Array<{ profileName: string; profileId: string; planCode: string; derivedStatus: string; periodEnd: string | null; overrideSeats: number | null; overrideUntil: string | null; overrideNote: string | null }> }
+    | { error: string }
+> {
+    try {
+        await requireGlobalAdmin()
+        const { deriveEntitlements } = await import('@/lib/billing/derive')
+        const rows = await prisma.subscription.findMany({
+            orderBy: { updatedAt: 'desc' },
+            take: 200,
+            include: { ownerProfile: { select: { name: true } } },
+        })
+        return {
+            success: true,
+            subscriptions: rows.map((s) => ({
+                profileName: s.ownerProfile.name,
+                profileId: s.ownerProfileId,
+                planCode: s.planCode,
+                derivedStatus: deriveEntitlements(s.ownerProfileId, s).status,
+                periodEnd: s.currentPeriodEnd?.toISOString() ?? null,
+                overrideSeats: s.overrideSeats,
+                overrideUntil: s.overrideUntil?.toISOString() ?? null,
+                overrideNote: s.overrideNote,
+            })),
+        }
+    } catch {
+        return { error: 'Không đọc được danh sách subscription.' }
+    }
+}
+
+/** Cấp/sửa ngoại lệ (D4). `note` BẮT BUỘC — ngoại lệ không ghi lý do thì 6 tháng sau
+ *  không ai dám gỡ (SCHEMA-DE-XUAT §2). */
+export async function grantOverride(input: {
+    profileId: string
+    planCode: string
+    overrideSeats: number
+    overrideStorageGB: number
+    months: number | null
+    note: string
+}): Promise<{ success: true } | { error: string }> {
+    try {
+        const { userId } = await requireGlobalAdmin()
+        if (!input.note?.trim() || input.note.trim().length < 10) return { error: 'Ghi rõ LÝ DO cấp ngoại lệ (tối thiểu 10 ký tự).' }
+        if (!isSellablePlan(input.planCode) && input.planCode !== 'ENTERPRISE') return { error: 'Gói không hợp lệ.' }
+        const seats = Math.floor(input.overrideSeats)
+        const storageGB = Math.floor(input.overrideStorageGB)
+        if (seats < 1 || seats > 1000 || storageGB < 1 || storageGB > 100_000) return { error: 'Ghế 1–1000, dung lượng 1–100.000 GB.' }
+        const profile = await prisma.profile.findUnique({ where: { id: input.profileId }, select: { id: true, name: true } })
+        if (!profile) return { error: 'Không tìm thấy tổ chức.' }
+
+        const overrideUntil = input.months === null ? null : new Date(Date.now() + Math.max(1, Math.floor(input.months)) * 30 * 24 * 60 * 60 * 1000)
+        const sub = await prisma.subscription.upsert({
+            where: { ownerProfileId: profile.id },
+            create: {
+                ownerProfileId: profile.id,
+                planCode: input.planCode,
+                status: 'ACTIVE',
+                billingCycle: 'MONTHLY',
+                overrideSeats: seats,
+                overrideStorageBytes: BigInt(storageGB) * BigInt(1_000_000_000),
+                overrideNote: input.note.trim(),
+                overrideUntil,
+            },
+            update: {
+                planCode: input.planCode,
+                status: 'ACTIVE',
+                graceEndsAt: null,
+                overrideSeats: seats,
+                overrideStorageBytes: BigInt(storageGB) * BigInt(1_000_000_000),
+                overrideNote: input.note.trim(),
+                overrideUntil,
+            },
+            select: { id: true },
+        })
+        await prisma.profile.update({ where: { id: profile.id }, data: { subscriptionId: sub.id } })
+        void audit({
+            workspaceId: null,
+            actorUserId: userId,
+            action: 'billing.override_granted',
+            targetType: 'Subscription',
+            targetId: sub.id,
+            after: { profileId: profile.id, planCode: input.planCode, seats, storageGB, months: input.months, note: input.note.trim() },
+        })
+        return { success: true }
+    } catch (e) {
+        console.error('[billing] grantOverride:', e)
+        return { error: 'Không cấp được ngoại lệ.' }
+    }
+}
+
 export async function listRedemptionCodes(): Promise<
     | { success: true; codes: Array<{ id: string; code: string; planCode: string; durationDays: number; maxUses: number; usedCount: number; redeemExpiresAt: string | null; note: string | null; revokedAt: string | null; createdAt: string; redemptions: Array<{ profileName: string; redeemedAt: string }> }> }
     | { error: string }

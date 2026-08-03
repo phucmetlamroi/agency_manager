@@ -139,12 +139,12 @@ export default function DeliverableSheet({ d, actions, onClose, onUpdated, onOpe
                             arrive. */}
                         <div style={{ minWidth: 0 }}>
                             <div className="desk-serif" style={{ fontSize: '1rem', color: 'var(--ink)' }}>
-                                {closed ? 'This project was closed' : d.clientFeedback ? 'Your changes are being made' : 'Not uploaded yet'}
+                                {closed ? 'This project was closed' : (d.reviewPending || d.clientFeedback) ? 'Your new cut is with our team' : 'Not uploaded yet'}
                             </div>
                             <div style={{ fontSize: '0.82rem', color: 'var(--ink-3)', marginTop: 2 }}>
                                 {closed
                                     ? 'It is kept here for your records. Nothing further is in progress — message us if that looks wrong.'
-                                    : d.clientFeedback
+                                    : (d.reviewPending || d.clientFeedback)
                                         ? 'The new video appears here as soon as it clears our check.'
                                         : 'The screening link appears here once editing begins.'}
                             </div>

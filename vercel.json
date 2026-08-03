@@ -49,6 +49,10 @@
         {
             "path": "/api/cron/review-janitor",
             "schedule": "0 20 * * *"
+        },
+        {
+            "path": "/api/cron/billing-sweep",
+            "schedule": "0 1 * * *"
         }
     ]
 }

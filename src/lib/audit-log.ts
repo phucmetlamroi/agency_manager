@@ -120,6 +120,14 @@ export type AuditAction =
     | 'share_link.revoked'      // link revoked — effective immediately
     | 'share_link.accessed'     // public page opened with a valid token (page-level, not per action)
     | 'share_link.invoice_downloaded' // client pulled an invoice PDF through their share link
+    // [BILLING P3] Thu phí Velox↔người dùng qua SePay (docs/billing/SCHEMA-DE-XUAT.md)
+    | 'billing.order_created'    // profile admin bấm nâng gói → SubscriptionOrder PENDING
+    | 'billing.order_paid'       // webhook SePay khớp lệnh → order PAID + subscription kích hoạt
+    | 'billing.payment_unmatched' // tiền vào không khớp order nào → chờ đối soát tay
+    | 'billing.code_created'     // global admin phát hành RedemptionCode
+    | 'billing.code_revoked'     // global admin thu hồi code
+    | 'billing.code_redeemed'    // profile nhập code → subscription tạo/gia hạn
+    | 'billing.override_granted' // global admin cấp ngoại lệ seats/storage (D4)
     // [Video Review] Frame.io-style review portal on Cloudflare Stream
     | 'video.version_uploaded'   // editor uploaded a new cut (V1/V2/V3) → VideoVersion row
     | 'video.review_approved'    // client approved a version via the token portal

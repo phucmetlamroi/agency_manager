@@ -413,6 +413,31 @@ export async function createInvoiceRecord(data: {
             return { error: 'Workspace này chưa gắn Profile — không thể xuất hoá đơn. Báo quản trị viên.' }
         }
 
+        // [BILLING P6] Xuất hoá đơn cho khách của agency = tính năng gói (INVOICING, Studio
+        // trở lên) + trần invoicesPerMonth (Studio 5/tháng; Agency+ không giới hạn).
+        // Đây là tiền agency↔khách-của-agency — gói chỉ quyết CÓ ĐƯỢC DÙNG máy xuất hay không,
+        // không bao giờ chạm vào con số trên hoá đơn.
+        {
+            const { requireFeature, billingErrorMessage } = await import('@/lib/billing/entitlements')
+            try {
+                const ent = await requireFeature(profileId, 'INVOICING')
+                if (ent.enforced && ent.limits.invoicesPerMonth !== null) {
+                    const monthStart = new Date()
+                    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+                    const issued = await prisma.invoice.count({
+                        where: { profileId, createdAt: { gte: monthStart } },
+                    })
+                    if (issued >= ent.limits.invoicesPerMonth) {
+                        return { error: `Gói hiện tại chỉ xuất được ${ent.limits.invoicesPerMonth} hoá đơn/tháng (đã dùng ${issued}). Nâng gói trong mục "Gói cước".` }
+                    }
+                }
+            } catch (e) {
+                const msg = billingErrorMessage(e)
+                if (msg) return { error: msg }
+                throw e
+            }
+        }
+
         // [AUDIT R7] verifyFinanceAccess replaced getCurrentUser — fetch the actor's
         // contact fields (createdBy + notification email) explicitly, since the JWT
         // session payload doesn't reliably carry nickname/username/email.

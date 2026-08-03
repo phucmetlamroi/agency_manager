@@ -40,9 +40,24 @@ import {
 } from './r2'
 import { mintPlaybackTokens } from './mux-jwt'
 import { buildMediaLinks } from './media-links'
+import { checkStorageCap, BillingError } from '@/lib/billing/entitlements'
 
 const UPLOAD_TTL_MS = 24 * 60 * 60 * 1000 // 24h presigned + session window
 const MAX_VERSION_RETRIES = 5
+
+/** [BILLING P6] Trần dung lượng gói (D5 — liveBytes). Chuyển BillingError sang `fail()` của
+ *  file này để route trả JSON lỗi đúng khuôn. Workspace mồ côi (profileId null, dữ liệu
+ *  legacy) thì KHÔNG đoán — cho qua, các gate khác vẫn đứng. Chưa cưỡng chế = no-op. */
+async function assertStorageWithinPlan(workspaceId: string, incomingBytes: bigint): Promise<void> {
+    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+    if (!ws?.profileId) return
+    try {
+        await checkStorageCap(ws.profileId, incomingBytes)
+    } catch (e) {
+        if (e instanceof BillingError) fail(402, 'PLAN_LIMIT', e.message)
+        throw e
+    }
+}
 
 // ── Public types (mirror API-SPEC §2.1) ──────────────────────────────────────
 
@@ -241,6 +256,12 @@ export async function initiateUpload(input: InitiateInput): Promise<InitiateResu
         })
         versionNumber = (maxV._max.versionNumber ?? 0) + 1
     }
+
+    // [BILLING P6] Trần dung lượng GÓI (D5 — liveBytes) — điểm hợp lưu của cả hai nhánh
+    // folder/asset, workspaceId đã resolve và authz đã qua. Advisory theo sizeBytes khai báo
+    // (presigned PUT không ghim Content-Length — [C1] ở complete mới đo bytes THẬT, và mức
+    // vượt tối đa chỉ là một file). checkStorageCap tự cho qua khi chưa cưỡng chế.
+    await assertStorageWithinPlan(workspaceId, input.sizeBytes)
 
     // 4. create the version row (race-safe on @@unique([assetId, versionNumber]))
     const partSize = computePartSize(input.sizeBytes)
@@ -791,6 +812,10 @@ export async function initiateTaskUpload(input: {
     if (!access.isAdmin && task.assigneeId !== access.userId) {
         fail(403, 'FORBIDDEN', 'Bạn không có quyền bàn giao bản dựng cho task ngoài phạm vi được giao.')
     }
+
+    // [BILLING P6] Cửa upload thứ hai (bàn giao theo task) — cùng trần dung lượng gói với
+    // initiateUpload; thiếu một cửa là gate kia thành trang trí.
+    await assertStorageWithinPlan(workspaceId, input.sizeBytes)
 
     const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
     const clientIdStr = task.clientId != null ? String(task.clientId) : null

@@ -243,7 +243,10 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
     let rawToken: string
     try {
         const result = await prisma.$transaction(async (tx) => {
-            // [Sprint B] Tạo Profile mới — free + full features (bỏ trial/subscription)
+            // [Sprint B] Tạo Profile mới. [BILLING P6 · D1] KHÔNG tạo Subscription — không có
+            // bản ghi = LOCKED khi BILLING_ENFORCEMENT_START bật: người mới đăng nhập lần đầu
+            // gặp màn chọn gói (trả SePay hoặc nhập trial/gift code) trong BillingLockGate.
+            // Trước ngày cưỡng chế thì vẫn dùng đủ như cũ, chỉ thấy banner đếm ngược.
             const profile = await tx.profile.create({
                 data: {
                     name: `${displayName}'s Profile`,

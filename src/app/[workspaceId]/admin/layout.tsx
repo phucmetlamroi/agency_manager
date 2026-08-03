@@ -8,6 +8,10 @@ import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import BillingStatusBanner from '@/components/billing/BillingStatusBanner'
+import BillingLockGate from '@/components/billing/BillingLockGate'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
+import { getEntitlements } from '@/lib/billing/entitlements'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
 // (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
@@ -83,10 +87,26 @@ export default async function AdminLayout({
     const isImpersonating = (session.user as any).isImpersonating === true
     const impersonationExpiresAt = (session.user as any).impersonationExpiresAt as string | undefined
 
+    // [BILLING P6] LOCKED (đã cưỡng chế) → thay children bằng màn khoá; trang Gói cước
+    // được chừa lối trong BillingLockGate (client biết pathname — layout server thì không,
+    // và redirect ở đây là vòng lặp vì billing nằm dưới chính layout này). React.cache nên
+    // lời gọi getEntitlements này + của BillingStatusBanner chỉ tốn một query.
+    let billingLocked = false
+    try {
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            const ent = await getEntitlements(pid)
+            billingLocked = ent.enforced && ent.status === 'LOCKED'
+        }
+    } catch { /* đọc gói lỗi thì không khoá nhầm — các gate server vẫn đứng */ }
+
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
         <AppShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
+            {/* [BILLING P5] Trạng thái gói: đếm ngược trước ngày thu phí / chỉ-đọc GRACE / LOCKED.
+                ACTIVE thì render null — không tốn pixel nào. */}
+            <BillingStatusBanner workspaceId={workspaceId} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
             )}
@@ -97,7 +117,9 @@ export default async function AdminLayout({
                     workspaceId={workspaceId}
                 />
             )}
-            {children}
+            <BillingLockGate locked={billingLocked} workspaceId={workspaceId} canManageBilling={navAccess.profileAdmin}>
+                {children}
+            </BillingLockGate>
         </AppShell>
     )
 }

@@ -60,6 +60,10 @@ export interface Deliverable {
     reviewCount?: number
     /** Thư mục Tệp chứa các video đó — để cổng khách mở đúng chỗ khi `reviewCount > 1`. */
     reviewFolderId?: string | null
+    /** [Báo cáo 2026-08-03] Bản dựng ĐÃ xong nhưng bảng duyệt đang tắt chờ studio duyệt lại
+     *  (thu hồi theo R5 khi bản cắt mới lên). Phân biệt với "chưa dựng gì" — hai thứ này trước
+     *  đây cùng ra `reviewUrl == null` nên khách bị báo sai là "Not uploaded yet". */
+    reviewPending?: boolean
 }
 
 export interface Invoice {

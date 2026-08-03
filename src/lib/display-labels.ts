@@ -40,7 +40,13 @@ const SHORT_STATUS_LABEL: Record<string, string> = {
   'Đã sửa feedback (nội bộ)': 'Đã sửa (nội bộ)',
   'Đã gửi video (khách)': 'Đã gửi (khách)',
   'Đã nhận feedback (khách)': 'Nhận feedback (khách)',
-  'Đã sửa feedback (khách)': 'Đã sửa (khách)',
+  /* [Báo cáo chủ sản phẩm 2026-08-03] Nhãn cũ 'Đã sửa (khách)' đọc thành "đã gửi cho khách rồi",
+     và vì A7 nằm ở tab "Khách duyệt" nên cả quản lý lẫn chủ sản phẩm đều tin là khách đang xem.
+     Thực tế A7 chỉ nghĩa là EDITOR sửa xong; bản cắt mới vẫn bị giữ (R5 thu hồi bảng duyệt khi
+     bản mới lên) cho tới khi admin bấm "Duyệt & gửi khách" trong trình xem. Hai task Alpine đứng
+     ở đây từ 29/07 mà không ai biết. Nhãn phải nói ra ai đang cầm bóng. Chỉ đổi CHỮ HIỂN THỊ —
+     giá trị lưu trong CSDL, FSM, lương, phase đều nguyên vẹn. */
+  'Đã sửa feedback (khách)': 'Đã sửa · chờ gửi khách',
 }
 
 /** Compact status label for narrow board pills. Falls through to statusLabel() for every

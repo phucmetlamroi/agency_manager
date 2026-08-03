@@ -469,6 +469,20 @@ export async function getShareSnapshot(token: string) {
         // reviewCount > 1 => cổng khách mở THƯ MỤC thay vì mở trơ một video.
         reviewCount: reviewUrl ? (readyCountByTask.get(task.id) ?? 1) : 0,
         reviewFolderId: reviewUrl ? (asset?.folderId ?? null) : null,
+        /* [Báo cáo chủ sản phẩm 2026-08-03] "nó đang ở trạng thái Đã sửa (khách) … khi tôi bấm vào
+           thì nó lại hiện là [không xem được]".
+
+           Bản dựng ĐÃ có (asset READY + Mux xong) nhưng bảng duyệt của khách đang bị thu hồi —
+           revokeClientExposureOnNewVersion thu hồi khi bản cắt mới lên, và getOrCreateClientReviewSlug
+           từ chối đúc lại (công tắc ngắt R5) cho tới khi admin bấm "Duyệt & gửi khách". Đó là CHỦ Ý.
+           Cái sai là câu chữ: cổng khách nói "Not uploaded yet — link sẽ hiện khi bắt đầu dựng",
+           trong khi thực tế đã dựng xong 3 phiên bản. Khách đọc thành "video của tôi biến mất".
+
+           Cờ này phân biệt HAI trạng thái mà `reviewUrl === null` đang gộp làm một:
+             • chưa có gì để xem  → reviewPending = false  → "Not uploaded yet" (đúng như cũ)
+             • có bản mới, đang chờ studio duyệt → reviewPending = true → câu chữ trung thực
+           Không đụng cổng bảo mật: reviewUrl vẫn null, khách vẫn không xem được. */
+        reviewPending: !task.isArchived && !!asset && !reviewUrl,
         }
     }))
 

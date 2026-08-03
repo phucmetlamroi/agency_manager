@@ -31,7 +31,9 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     "Đã sửa feedback (nội bộ)":   { label: "Đã sửa (nội bộ)",       color: "#14B8A6" },
     "Đã gửi video (khách)":       { label: "Đã gửi (khách)",        color: "#06B6D4" },
     "Đã nhận feedback (khách)":   { label: "Nhận feedback (khách)", color: "#EF4444" },
-    "Đã sửa feedback (khách)":    { label: "Đã sửa (khách)",        color: "#8B5CF6" },
+    // [Báo cáo 2026-08-03] Xem chú thích trong display-labels.ts: A7 = editor sửa xong, KHÁCH CHƯA
+    // xem được cho tới khi admin "Duyệt & gửi khách". Nhãn phải nói ra điều đó.
+    "Đã sửa feedback (khách)":    { label: "Đã sửa · chờ gửi khách", color: "#8B5CF6" },
     // [L18a] value stays 'Revision' (load-bearing); only the VN display label changes.
     "Revision":            { label: "Sửa lại",             color: "#EF4444" },
     "Hoàn tất":     { label: "Hoàn tất",     color: "#10B981" },

@@ -398,7 +398,31 @@ export default function Library({ actions, wsScope = 'all', clientScope = 'all',
             setSel(new Set())
         } else toast('err', res.error || 'Could not prepare the download.')
     }
-    const downloadOne = (a: DocumentAsset) => {
+    /* [Báo cáo chủ sản phẩm 2026-08-03] "tải tải thì lại tải file zip là sao nhỉ… giải nén ra
+       thì nó đệ quy file rất là sâu."
+
+       Đúng. MỘT file mà đi qua đường zip hàng loạt thì khách nhận về `Harrison (1 files).zip`,
+       bên trong là `July 2026/Harrison/Alpine/Alpine EP 2.mp4` — bốn lớp thư mục để lấy một
+       video, cộng thêm bước giải nén. Đường tải một-file (presigned URL thẳng từ R2) đã có sẵn
+       ở `downloadDocuments`; thẻ file chỉ đơn giản là chưa gọi nó.
+
+       Zip chỉ còn là ĐƯỜNG LÙI khi cổng không cấp adapter một-file. Tải nhiều file / cả thư mục
+       vẫn đi zip như cũ — đó là chỗ zip đúng việc. */
+    const downloadOne = async (a: DocumentAsset) => {
+        if (actions.downloadDocuments) {
+            const res = await actions.downloadDocuments([a.currentVersion.id])
+            if (res.success && res.files?.length) {
+                for (const f of res.files) {
+                    const el = document.createElement('a')
+                    el.href = f.url; el.download = f.fileName; el.rel = 'noopener'
+                    document.body.appendChild(el); el.click(); el.remove()
+                }
+                toast('ok', 'Your file is downloading.')
+                return
+            }
+            // Không lấy được link thẳng → rơi xuống zip thay vì bỏ khách đứng im.
+            if (!actions.zipUrlForAssets) { toast('err', res.error || 'Could not prepare the download.'); return }
+        }
         if (actions.zipUrlForAssets) { window.location.href = actions.zipUrlForAssets([a.id]); toast('ok', 'Preparing your file…') }
     }
 

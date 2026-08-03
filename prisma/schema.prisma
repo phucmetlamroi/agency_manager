@@ -17,7 +17,16 @@ model Profile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // [Sprint B] Trial/subscription columns dropped — tất cả profile đều free + full features.
+  // [Sprint B] Trial/subscription columns dropped. [BILLING P1 · 2026-08-03] Quay lại dưới
+  // hình dạng mới: gói nằm ở bảng Subscription riêng, Profile chỉ giữ con trỏ. Rỗng = chưa
+  // gắn gói → LOCKED khi BILLING_ENFORCEMENT_START bật (D1 — không còn gói Free, khỏi backfill).
+  // Nhiều Profile được phép trỏ chung 1 Subscription (Agency 3 org / Scale 5 org dùng chung
+  // pool ghế + dung lượng — SCHEMA-DE-XUAT.md §3); hiện tại luôn 1:1.
+  subscriptionId    String?
+  subscription      Subscription? @relation("SubscriptionMembers", fields: [subscriptionId], references: [id], onDelete: SetNull)
+  // Chiều "đứng tên trả tiền" — khác chiều "được gắn vào gói" ở trên.
+  ownedSubscription Subscription? @relation("SubscriptionOwner")
+  codeRedemptions   CodeRedemption[]
 
   // [Sprint Z+1] Soft-delete pattern (match Workspace).
   // status: "ACTIVE" | "SOFT_DELETED". hardDeleteAfter set khi soft-delete (NOW + 30d).
@@ -238,6 +247,9 @@ model User {
 
   // [Trial P3] Web-push subscriptions (one per browser/device that opted in).
   pushSubscriptions PushSubscription[]
+
+  // [BILLING P1] Trial/gift code do global admin này phát hành (/billing-ops).
+  redemptionCodesCreated RedemptionCode[]
 
   profile Profile? @relation(fields: [profileId], references: [id])
 
@@ -2053,4 +2065,146 @@ model RateLimitBucket {
   key         String   @id // e.g. "share:unlock:{slug}:{ip}"
   windowStart DateTime
   count       Int      @default(0)
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// [BILLING P1 · 2026-08-03] Thu phí Velox↔người dùng qua SePay.
+// Thiết kế + lý do từng cột: docs/billing/SCHEMA-DE-XUAT.md (v2, đã duyệt D1–D7).
+// TÁCH BIỆT HOÀN TOÀN với Invoice/Payment/BillingProfile — đó là tầng
+// agency-thu-tiền-khách-của-agency. Trộn vào là trộn tiền mình với tiền khách của khách.
+// ══════════════════════════════════════════════════════════════════════════
+
+/// Một tổ chức đang có quyền dùng (trả tiền / nhập code / được cấp ngoại lệ).
+/// KHÔNG có bản ghi = LOCKED khi BILLING_ENFORCEMENT_START bật (D1 — không còn gói Free).
+model Subscription {
+  id             String  @id @default(uuid())
+  ownerProfileId String  @unique
+  ownerProfile   Profile @relation("SubscriptionOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+
+  // planCode: "STUDIO" | "AGENCY" | "SCALE" | "ENTERPRISE" — String theo nếp Workspace.status
+  // (đổi enum Postgres qua db push rất phiền). Nguồn sự thật: src/lib/billing/plans.ts.
+  planCode     String
+  // status: "ACTIVE" | "GRACE" | "EXPIRED" | "CANCELED". Trial là code nên vẫn ACTIVE
+  // (nguồn ghi ở CodeRedemption); không auto-charge nên không có PAST_DUE.
+  status       String @default("ACTIVE")
+  // billingCycle: "MONTHLY" | "ANNUAL"
+  billingCycle String @default("MONTHLY")
+  extraSeats   Int    @default(0)
+
+  trialStartedAt     DateTime? // giữ theo đề xuất v1 — không dùng trong luồng chính (trial = code)
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime? // hết hạn kỳ → cron billing-sweep chuyển GRACE
+  graceEndsAt        DateTime? // hết GRACE (chỉ-đọc 30 ngày, D6) → EXPIRED
+  canceledAt         DateTime?
+
+  // Ngoại lệ (D4 — 5 org đang dùng vượt trần ngày một). overrideNote BẮT BUỘC khi cấp:
+  // một ngoại lệ không ghi lý do thì 6 tháng sau không ai dám gỡ.
+  overrideSeats        Int?
+  overrideStorageBytes BigInt?
+  overrideNote         String?
+  overrideUntil        DateTime? // rỗng = vĩnh viễn
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Các org được gắn vào gói này (Agency 3 org / Scale 5 org chung pool — §3).
+  profiles    Profile[]             @relation("SubscriptionMembers")
+  orders      SubscriptionOrder[]
+  redemptions CodeRedemption[]
+
+  // Cron sweep quét: (ACTIVE, currentPeriodEnd < now) và (GRACE, graceEndsAt < now).
+  @@index([status, currentPeriodEnd])
+}
+
+/// Một lần yêu cầu thanh toán — nối MÃ trong nội dung chuyển khoản với GÓI khách định mua.
+model SubscriptionOrder {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  // Mã khách gõ vào nội dung CK: "VELOX" + 8 ký tự A-Z2-9 (bỏ 0/O/1/I/L — gõ tay).
+  // Tiền tố cố định để SePay tự tách vào trường `code` của webhook.
+  paymentCode  String @unique
+  planCode     String
+  billingCycle String
+  extraSeats   Int    @default(0)
+  // Chốt tại thời điểm tạo, KHÔNG tính lại lúc đối chiếu — giá đúng là giá khách nhìn thấy.
+  amountVND    Int
+
+  // status: "PENDING" | "PAID" | "EXPIRED" | "CANCELED"
+  status    String    @default("PENDING")
+  expiresAt DateTime
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  payments SubscriptionPayment[]
+
+  @@index([subscriptionId, status])
+}
+
+/// Một giao dịch tiền-vào SePay đã nhận — sổ cái, ghi TRƯỚC khi khớp lệnh.
+model SubscriptionPayment {
+  id            String  @id @default(uuid())
+  provider      String  @default("sepay")
+  providerTxnId String // trường `id` trong payload SePay
+
+  // Rỗng = chưa khớp được đơn nào (quên mã / sai mã / sai số tiền) → màn "chờ đối chiếu tay".
+  // SetNull: order bị dọn thì SỔ TIỀN vẫn phải còn.
+  orderId String?
+  order   SubscriptionOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  amountVND       Int // transferAmount
+  gateway         String // tên ngân hàng
+  accountNumber   String
+  transferCode    String? // trường `code` SePay tự tách
+  content         String // nội dung CK, nguyên văn
+  transactionDate DateTime
+  matchedAt       DateTime?
+  rawPayload      Json
+  createdAt       DateTime  @default(now())
+
+  // Lớp chống ghi trùng + chống phát lại DUY NHẤT — SePay không ký timestamp,
+  // và retry tới 7 lần trong ~5h nên trùng là chắc chắn, không phải hiếm.
+  @@unique([provider, providerTxnId])
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+/// [D2] Trial/gift code — cửa duy nhất vào hệ thống mà không chuyển tiền.
+/// Mỗi code = gói X trong Y ngày. Không có code giảm % (giá đơn nhờ vậy bất biến).
+model RedemptionCode {
+  id   String @id @default(uuid())
+  // Chuỗi khách gõ. A-Z + 2-9, bỏ 0/O/1/I/L — cùng lý do với paymentCode.
+  code String @unique
+
+  planCode        String // STUDIO | AGENCY | SCALE (isSellablePlan)
+  durationDays    Int
+  maxUses         Int       @default(1) // 1 = code cá nhân, N = code chiến dịch
+  usedCount       Int       @default(0)
+  redeemExpiresAt DateTime? // hạn chót ĐƯỢC NHẬP (khác hạn dùng gói); rỗng = không hết hạn
+  note            String? // phát cho ai / chiến dịch nào — 6 tháng sau còn biết
+  revokedAt       DateTime? // thu hồi: code chưa nhập vô hiệu, lượt ĐÃ nhập không bị rút lại
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  redemptions CodeRedemption[]
+}
+
+/// Một lượt nhập code — sổ như SubscriptionPayment: nhập code là giao dịch tiền thật.
+model CodeRedemption {
+  id             String         @id @default(uuid())
+  codeId         String
+  code           RedemptionCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  redeemedAt     DateTime       @default(now())
+
+  // Một tổ chức không nhập lại cùng một code (chặn cộng dồn maxUses của code chiến dịch).
+  @@unique([codeId, profileId])
+  @@index([profileId])
 }

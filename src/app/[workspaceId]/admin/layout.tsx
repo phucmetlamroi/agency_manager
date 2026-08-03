@@ -8,6 +8,7 @@ import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import BillingStatusBanner from '@/components/billing/BillingStatusBanner'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
 // (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
@@ -87,6 +88,9 @@ export default async function AdminLayout({
     return (
         <AppShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
+            {/* [BILLING P5] Trạng thái gói: đếm ngược trước ngày thu phí / chỉ-đọc GRACE / LOCKED.
+                ACTIVE thì render null — không tốn pixel nào. */}
+            <BillingStatusBanner workspaceId={workspaceId} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
             )}

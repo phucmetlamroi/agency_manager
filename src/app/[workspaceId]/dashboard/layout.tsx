@@ -6,6 +6,7 @@ import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import BillingStatusBanner from '@/components/billing/BillingStatusBanner'
 import { deriveNavAccess } from '@/lib/nav-access'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
@@ -86,6 +87,9 @@ export default async function UserLayout({
     return (
         <AppShell user={user} workspaceId={workspaceId} viewRole="USER" workspaceRole={workspaceRole} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole={dbUserRole} isTreasurer={dbUser.isTreasurer ?? false} />
+            {/* [BILLING P5] Editor không sửa được billing nhưng PHẢI hiểu vì sao nút ghi từ chối
+                khi tổ chức hết hạn — banner là lời giải thích, link trỏ trang Gói cước (admin xử lý). */}
+            <BillingStatusBanner workspaceId={workspaceId} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
             )}

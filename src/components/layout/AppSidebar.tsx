@@ -26,7 +26,8 @@ import {
     ScrollText,
     LifeBuoy,
     Clapperboard,
-    LayoutGrid
+    LayoutGrid,
+    CreditCard
 } from "lucide-react"
 
 import {
@@ -118,6 +119,9 @@ const getNavItems = (workspaceId: string, viewRole: ViewRole, navAccess?: NavAcc
         // [Merge: one membership menu] The per-workspace "Members" entry was merged into the
         // org-level membership page below (ProfileAccess, org-wide). Single roster + invite path.
         { label: "Thành viên", href: `/${workspaceId}/admin/profile-members`, icon: UsersRound, roles: ['ADMIN', 'USER'], gate: 'profileAdmin' },
+        // [BILLING P5] Gói cước — subscription thuộc PROFILE (billing/page.tsx gác đúng
+        // verifyProfileAdminAccess), nên gate 'profileAdmin' khớp cổng thật của trang.
+        { label: "Gói cước", href: `/${workspaceId}/admin/billing`, icon: CreditCard, roles: ['ADMIN', 'USER'], gate: 'profileAdmin' },
         // [Sprint Z+1 → sửa chú thích, kiểm toán 2026-07 F-10] KHÔNG có cổng "Owner only" nào
         // ở trang này: nó chỉ đòi có phiên đăng nhập. Chính DỮ LIỆU mới giới hạn —
         // getMyTrashedProfiles chỉ liệt kê profile mà bạn là OWNER, nên người khác thấy

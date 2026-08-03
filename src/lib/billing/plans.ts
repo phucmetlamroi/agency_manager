@@ -4,8 +4,9 @@
 // màn hình "bạn đã dùng bao nhiêu", và sau này là cổng thanh toán. Nếu để mỗi nơi tự ghi
 // số của mình thì ba nơi sẽ lệch nhau, và nơi lệch sẽ là nơi tính tiền sai.
 //
-// Nguồn số: docs/pricing/DE-XUAT-GOI-SUBSCRIPTION-2026.md §1 (bảng giá chốt sau vòng phản biện
-// 15/07/2026, chủ sản phẩm duyệt). Sửa số ở đây thì PHẢI sửa tài liệu đó, và ngược lại.
+// Nguồn số: bảng giá chốt sau vòng phản biện 15/07/2026 + phiên duyệt 2026-08-03 (D1–D7,
+// ghi trong docs/billing/SCHEMA-DE-XUAT.md §0). Chủ sản phẩm đã duyệt ma trận này nguyên trạng.
+// (Tham chiếu cũ docs/pricing/DE-XUAT-GOI-SUBSCRIPTION-2026.md không nằm trong repo — đừng tìm.)
 //
 // File này CỐ Ý thuần dữ liệu: không import Prisma, không chạm DB, không async. Nhờ vậy nó
 // dùng được ở cả server, client component, script, và test mà không kéo theo gì.
@@ -143,6 +144,12 @@ const AGENCY_FEATURES = [
 ] as const satisfies readonly PlanFeature[]
 
 export const PLANS: Readonly<Record<PlanCode, Plan>> = {
+    /* [v2 2026-08-03 · D1] KHÔNG CÒN LÀ GÓI BÁN. Chủ sản phẩm bỏ hẳn gói Free: đăng ký mới
+       không có code → khoá ngay (màn chọn gói: trả SePay hoặc nhập trial/gift code).
+       Bản ghi FREE giữ lại làm SÀN NỘI BỘ cho tầng entitlements — trạng thái LOCKED/GRACE
+       cần một bộ limits để trả về thay vì undefined, và mọi hạn mức ở đây đều đọc là
+       "trần cho tài khoản không trả tiền" (tức là trần của dữ liệu chỉ-đọc). KHÔNG bày
+       lên trang giá, KHÔNG gán được qua code hay order — SELLABLE_PLANS mới là bảng bán. */
     FREE: {
         code: 'FREE',
         label: 'Free',
@@ -161,7 +168,6 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
             profiles: 1,
             retentionDays: 7,
         },
-        // Free nhận task từ chợ được, nhưng không ĐĂNG được. Xem PlanFeature.MARKETPLACE_PUBLISH.
         features: [],
     },
 
@@ -254,32 +260,44 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     },
 } as const
 
-/** Thứ tự bày trên trang giá và thứ tự "cao hơn / thấp hơn" khi nâng-hạ gói. */
+/** Thứ tự "cao hơn / thấp hơn" khi nâng-hạ gói (FREE giữ vị trí sàn để comparePlans đúng). */
 export const PLAN_ORDER: readonly PlanCode[] = ['FREE', 'STUDIO', 'AGENCY', 'SCALE', 'ENTERPRISE'] as const
 
 /** Các gói TRẢ TIỀN. Dùng cho những quyền lợi mô tả là "mọi gói trả phí" (vd white-label). */
 export const PAID_PLANS: readonly PlanCode[] = ['STUDIO', 'AGENCY', 'SCALE', 'ENTERPRISE'] as const
 
+/** [v2 · D1] Các gói BÀY BÁN trên trang giá + được phép xuất hiện trong SubscriptionOrder
+ *  và RedemptionCode. KHÔNG có FREE (bỏ hẳn — chỉ là sàn nội bộ) và KHÔNG có ENTERPRISE
+ *  (giá thoả thuận, chốt tay qua override chứ không qua giỏ hàng). */
+export const SELLABLE_PLANS: readonly PlanCode[] = ['STUDIO', 'AGENCY', 'SCALE'] as const
+
+export function isSellablePlan(code: string): code is (typeof SELLABLE_PLANS)[number] {
+    return (SELLABLE_PLANS as readonly string[]).includes(code)
+}
+
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Dùng thử                                                                  */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-// Tài liệu giá §1 "Cơ chế launch". Trial cố ý có trần dung lượng và phút RIÊNG, thấp hơn
-// Agency thật — nếu cho trial full Agency không trần thì mỗi lần đăng ký là một hoá đơn Mux
-// mở, và không cần thẻ nghĩa là lập tài khoản mới không tốn gì.
+// [v2 2026-08-03 · D2] Trial KHÔNG còn tự phát khi đăng ký. Trial giờ là MỘT LOẠI GIFT CODE
+// (RedemptionCode) do owner phát tay — đăng ký mới không có code thì khoá ngay ở màn chọn gói.
+// Object này chỉ còn là BẢN MẪU khi owner bấm "tạo trial code" trong /billing-ops, cộng với
+// hai hằng vòng đời (readOnlyGraceDays) mà tầng entitlements vẫn đọc.
+// Trần dung lượng/phút riêng thấp hơn Agency thật vẫn giữ nguyên lý do cũ: trial full Agency
+// không trần = mỗi code phát ra là một hoá đơn Mux mở.
 export const TRIAL = {
-    /** Ngày dùng thử, tính từ lúc bắt đầu. */
+    /** Số ngày mặc định khi tạo trial code. */
     days: 14,
-    /** Trial cho dùng bộ tính năng của gói này… */
+    /** Trial code mặc định cấp bộ tính năng của gói này… */
     planCode: 'AGENCY' as PlanCode,
     /** …nhưng với trần dung lượng riêng, thấp hơn Agency thật (1TB). */
     storageBytes: gb(100),
     /** …và trần phút video riêng, thấp hơn Agency thật (1.500). */
     videoMinutes: 300,
-    /** Bắt buộc xác minh email trước khi được trial — chặn lập tài khoản hàng loạt. */
+    /** Bắt buộc xác minh email trước khi nhập code — chặn lập tài khoản hàng loạt. */
     requiresEmailVerification: true,
-    /** Hết trial mà không trả tiền: dữ liệu chuyển CHỈ-ĐỌC trong ngần này ngày rồi mới dọn.
-     *  KHÔNG xoá ngay — mất dữ liệu của người đang cân nhắc trả tiền là mất luôn khách. */
+    /** Hết hạn gói (trial hay trả tiền như nhau): dữ liệu chuyển CHỈ-ĐỌC trong ngần này ngày
+     *  rồi mới dọn. KHÔNG xoá ngay — mất dữ liệu của người đang cân nhắc trả tiền là mất luôn khách. */
     readOnlyGraceDays: 30,
 } as const
 
@@ -329,8 +347,8 @@ export function effectiveSeatLimit(code: PlanCode, purchasedExtraSeats = 0): Lim
 
 // ── NỢ ĐÃ BIẾT, chưa làm ở bước này ─────────────────────────────────────────
 // 1. Tỷ giá USD_VND_RATE phải được ghi trong Điều khoản sử dụng kèm cơ chế điều chỉnh
-//    theo quý (tài liệu giá §1). Điều khoản hiện tại chưa có một chữ nào về giá.
-// 2. Chưa có nơi lưu gói của từng tổ chức — cột đó cần đổi prisma/schema.prisma và
-//    phải được chủ sản phẩm duyệt riêng vì repo này dùng `db push` thủ công, không migrate.
+//    theo quý. Điều khoản hiện tại chưa có một chữ nào về giá. (→ BILL-P8)
+// 2. [v2] Nơi lưu gói = 5 bảng trong docs/billing/SCHEMA-DE-XUAT.md, kế hoạch đã duyệt
+//    2026-08-03; bước push production vẫn dừng hỏi riêng. (→ BILL-P1)
 // 3. fairUseMinutesPerMonth hiện chỉ là con số để hiển thị và để viết vào ToS. Muốn đo thật
 //    phải lưu thời lượng video lúc tạo asset — hiện DB không lưu.

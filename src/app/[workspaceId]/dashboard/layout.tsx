@@ -7,6 +7,9 @@ import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
 import BillingStatusBanner from '@/components/billing/BillingStatusBanner'
+import BillingLockGate from '@/components/billing/BillingLockGate'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
+import { getEntitlements } from '@/lib/billing/entitlements'
 import { deriveNavAccess } from '@/lib/nav-access'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
@@ -83,6 +86,17 @@ export default async function UserLayout({
     const isImpersonating = (sessionUser as any).isImpersonating === true
     const impersonationExpiresAt = (sessionUser as any).impersonationExpiresAt as string | undefined
 
+    // [BILLING P6] LOCKED → màn khoá thay children (xem chú thích ở admin/layout.tsx —
+    // cùng cơ chế, editor chỉ nhận lời giải thích vì không có quyền vào trang Gói cước).
+    let billingLocked = false
+    try {
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            const ent = await getEntitlements(pid)
+            billingLocked = ent.enforced && ent.status === 'LOCKED'
+        }
+    } catch { /* đọc gói lỗi thì không khoá nhầm */ }
+
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
         <AppShell user={user} workspaceId={workspaceId} viewRole="USER" workspaceRole={workspaceRole} navAccess={navAccess} handleLogout={handleLogout}>
@@ -100,7 +114,9 @@ export default async function UserLayout({
                     workspaceId={workspaceId}
                 />
             )}
-            {children}
+            <BillingLockGate locked={billingLocked} workspaceId={workspaceId} canManageBilling={navAccess.profileAdmin}>
+                {children}
+            </BillingLockGate>
         </AppShell>
     )
 }

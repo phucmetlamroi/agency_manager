@@ -40,6 +40,17 @@ async function gateShareLinkAdmin(workspaceId: string) {
     if (!allowed) {
         return { error: 'Chỉ OWNER/ADMIN của profile mới được quản lý link chia sẻ.' as const }
     }
+    // [BILLING P6] Cổng khách hàng (The Desk) = tính năng gói CLIENT_PORTAL (Studio trở lên).
+    // Gate ở helper này nên cả ba action (create/revoke/list) thừa hưởng — đúng ý đồ ban đầu
+    // của gateShareLinkAdmin. Chưa cưỡng chế thì requireFeature tự cho qua.
+    {
+        const { requireFeature, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        try { await requireFeature(ws.profileId, 'CLIENT_PORTAL') } catch (e) {
+            const msg = billingErrorMessage(e)
+            if (msg) return { error: msg }
+            throw e
+        }
+    }
     return { ok: true as const, userId: session.user.id, profileId: ws.profileId }
 }
 

@@ -124,6 +124,17 @@ export async function inviteToProfileAction(
         return { error: 'Bạn không có quyền mời thành viên vào Profile này.' }
     }
 
+    // [BILLING P6] Trần ghế gói — cửa mời thứ hai (org-level). Gate sớm cho UX;
+    // chokepoint thật vẫn là acceptProfileInvitation/acceptWorkspaceInvitation.
+    {
+        const { checkSeatCap, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        try { await checkSeatCap(profileId) } catch (e) {
+            const msg = billingErrorMessage(e)
+            if (msg) return { error: msg }
+            throw e
+        }
+    }
+
     // [AUDIT R5 — fix] Privilege-escalation: canInviteMember allows OWNER *or* ADMIN,
     // but the requested `role` was applied verbatim → an ADMIN could mint another
     // ADMIN. Only a profile OWNER may grant the ADMIN role (mirrors the OWNER-only

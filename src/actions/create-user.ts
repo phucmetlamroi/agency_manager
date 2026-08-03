@@ -37,6 +37,22 @@ export async function createUser(formData: FormData, workspaceId: string) {
 
     if (!username || !password) return { error: 'Missing fields' }
 
+    // [BILLING P6] Cửa tạo tài khoản TRỰC TIẾP — bỏ qua toàn bộ luồng lời mời, mint User
+    // với profileId ngay lập tức (usage.ts:33-43 ghi rõ lỗ này ở phía ĐẾM; đây là phía CHẶN).
+    // Ghế tiêu ngay tại đây nên phải soát ngay tại đây.
+    {
+        const { checkSeatCap, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        const { resolveWorkspaceProfileId } = await import('@/lib/prisma-workspace')
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            try { await checkSeatCap(pid) } catch (e) {
+                const msg = billingErrorMessage(e)
+                if (msg) return { error: msg }
+                throw e
+            }
+        }
+    }
+
     // [AUDIT R12 — fix] Constrain to non-privileged roles — never let this path mint the
     // legacy global ADMIN (or CLIENT/LOCKED). Mirrors ASSIGNABLE_ROLES in updateUserRole.
     const ASSIGNABLE_ROLES: UserRole[] = [UserRole.USER, UserRole.AGENCY_ADMIN]

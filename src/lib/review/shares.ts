@@ -234,6 +234,25 @@ export async function createShareLink(input: CreateShareInput): Promise<{ share:
     const expiresAt = parseExpiry(input.expiresAt)
     const passwordHash = await hashPassword(input.password)
 
+    // [BILLING P6] BẢO VỆ link (mật khẩu / hết hạn / chỉ-tải-khi-duyệt) = tính năng gói
+    // SHARE_LINK_PROTECTION (Studio trở lên). Chỉ gate khi người dùng THẬT SỰ bật một trong
+    // ba núm — share thường (mặc định) gói nào cũng tạo được, vì đó là dòng máu của review.
+    // Lưu ý downloadOnlyWhenApproved mặc định true nên chỉ tính khi được ĐẶT TƯỜNG MINH.
+    const wantsProtection =
+        !!passwordHash || !!expiresAt || input.downloadOnlyWhenApproved === true
+    if (wantsProtection) {
+        const ws = await prisma.workspace.findUnique({ where: { id: input.workspaceId }, select: { profileId: true } })
+        if (ws?.profileId) {
+            const { requireFeature, BillingError } = await import('@/lib/billing/entitlements')
+            try {
+                await requireFeature(ws.profileId, 'SHARE_LINK_PROTECTION')
+            } catch (e) {
+                if (e instanceof BillingError) throw apiError(402, 'PLAN_LIMIT', e.message)
+                throw e
+            }
+        }
+    }
+
     // Single-asset share created from a task's deliverable inherits the taskId —
     // powers the drawer's share table + "Copy link khách".
     const taskId = assets.length === 1 && folders.length === 0 ? assets[0].taskId : null

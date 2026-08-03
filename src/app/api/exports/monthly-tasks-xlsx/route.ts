@@ -117,6 +117,16 @@ export async function GET(req: NextRequest) {
             return new NextResponse('Workspace not found', { status: 404 })
         }
 
+        // [BILLING P6] Xuất XLSX = tính năng gói PAYROLL_EXPORT (Agency trở lên).
+        if (workspace.profileId) {
+            const { requireFeature, billingErrorMessage } = await import('@/lib/billing/entitlements')
+            try { await requireFeature(workspace.profileId, 'PAYROLL_EXPORT') } catch (e) {
+                const msg = billingErrorMessage(e)
+                if (msg) return new NextResponse(msg, { status: 402 })
+                throw e
+            }
+        }
+
         if (!user.profileId || workspace.profileId !== user.profileId) {
             return new NextResponse('Forbidden: Cross-profile export is not allowed', { status: 403 })
         }

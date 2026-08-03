@@ -120,6 +120,24 @@ export async function POST(req: Request) {
     }
 
     // ---------------------------------------------------------------------------
+    // 3a-bis. [BILLING P6] Velox scan = tính năng gói (VELOX, Studio trở lên) — đây là
+    //         endpoint đắt nhất hệ thống (đệ quy provider 300s), đúng thứ phải trả tiền.
+    //         requireFeature tự cho qua khi BILLING_ENFORCEMENT_START chưa bật.
+    // ---------------------------------------------------------------------------
+    {
+        const { requireFeature, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        const { resolveWorkspaceProfileId } = await import('@/lib/prisma-workspace')
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            try { await requireFeature(pid, 'VELOX') } catch (e) {
+                const msg = billingErrorMessage(e)
+                if (msg) return NextResponse.json({ error: msg }, { status: 402 })
+                throw e
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     // 3b. Rate limit — [AUDIT HT-017 fix] this endpoint runs a 300s recursive provider scan
     //     (expensive). Throttle per user+workspace so it can't be spammed to exhaust compute (DoS).
     // ---------------------------------------------------------------------------

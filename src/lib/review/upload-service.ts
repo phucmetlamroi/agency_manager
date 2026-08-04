@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto'
 import { requireReviewAccess, type ReviewAccessContext } from './access'
 import { getFolderScope, assertVersionInScope, assertAssetInScope, assertFolderPathMutable } from './folder-scope'
 import { apiError } from './errors'
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from './upload-maintenance'
 import { inngest, REVIEW_EVENTS } from './inngest'
 import { reviewLog } from './logger'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
@@ -157,6 +158,11 @@ function partUrlsFor(r2Key: string, r2UploadId: string, partsTotal: number, mime
 // ── initiate ─────────────────────────────────────────────────────────────────
 
 export async function initiateUpload(input: InitiateInput): Promise<InitiateResult> {
+    // [Tệp maintenance 2026-08-04] Chốt THẬT của toàn bộ đường upload — mọi cửa
+    // (uploads/initiate, task-upload/initiate, share-document) đều đi qua đây.
+    // 503 để client nào retry cũng chỉ nhận lại đúng thông báo bảo trì.
+    if (REVIEW_UPLOAD_MAINTENANCE) fail(503, 'MAINTENANCE', REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+
     // 1. content validation (independent of scope)
     if (!input.fileName || input.fileName.length > 255) {
         fail(400, 'VALIDATION_ERROR', 'Tên tệp phải từ 1–255 ký tự.')
@@ -790,6 +796,11 @@ export async function initiateTaskUpload(input: {
      *  choice is authoritative and no guessing happens at all. */
     targetAssetId?: string
 }): Promise<TaskInitiateResult> {
+    // [Tệp maintenance 2026-08-04] Chặn NGAY TRƯỚC mọi side-effect (ensureTaskFolderPath
+    // tạo cây thư mục trước khi gọi initiateUpload — để lọt tới đó là bảo trì xong vẫn
+    // còn rác thư mục rỗng).
+    if (REVIEW_UPLOAD_MAINTENANCE) fail(503, 'MAINTENANCE', REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+
     const kind = mediaKindFromMime(input.mimeType, input.fileName)
     if (kind !== 'VIDEO') fail(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ nhận file video ở mục bàn giao.')
     const isBatch = (input.batchSize ?? 1) > 1

@@ -31,6 +31,7 @@ import {
   type VersionRow,
 } from "@/lib/review/team-actions";
 import { uploadEngine, validateFileMeta } from "@/lib/review/upload-engine";
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from "@/lib/review/upload-maintenance";
 import { fetchDownloadUrl } from "@/lib/review/player-api";
 import { REVIEW_MODULE_LABEL } from "@/lib/review/labels";
 import { canAutoTransition } from "@/lib/task-statuses";
@@ -591,6 +592,11 @@ function ReviewPlayerShellInner({
   const uploadNewVersion = useCallback(
     (file: File | null | undefined) => {
       if (!file) return;
+      // [Tệp maintenance 2026-08-04] Khoá tải phiên bản mới (nút + kéo thả vào player).
+      if (REVIEW_UPLOAD_MAINTENANCE) {
+        toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE);
+        return;
+      }
       const meta = validateFileMeta(
         file.name,
         file.size,
@@ -855,7 +861,11 @@ function ReviewPlayerShellInner({
 
           {/* KHÔNG nằm trong điều kiện phiên bản ở trên — xem cảnh báo tại đó. */}
           <button
-            onClick={() => versionInputRef.current?.click()}
+            onClick={() =>
+              REVIEW_UPLOAD_MAINTENANCE
+                ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                : versionInputRef.current?.click()
+            }
             className="hidden h-8 w-8 shrink-0 place-items-center rounded-md text-white/65 transition hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:focus-visible:ring-violet-300 sm:grid"
             aria-label="Tải phiên bản mới"
             title="Tải phiên bản mới"

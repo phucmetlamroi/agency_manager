@@ -58,6 +58,7 @@ import {
 } from '@/lib/review/view-prefs'
 import { useFolderUploads, useUploadItems } from '@/lib/review/use-upload-store'
 import { uploadEngine } from '@/lib/review/upload-engine'
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from '@/lib/review/upload-maintenance'
 import { collectDropFiles, fromFileList, filterValid, enqueueFolderTree, UPLOAD_ACCEPT, type DroppedFile } from '@/lib/review/team-upload'
 import {
     type ItemKind,
@@ -474,6 +475,12 @@ export function TeamBrowser({
 
     const ingest = useCallback(
         async (dropped: DroppedFile[]) => {
+            // [Tệp maintenance 2026-08-04] Chặn TRƯỚC enqueueFolderTree — hàm đó tạo cây
+            // thư mục qua API trước khi enqueue, để lọt là còn rác thư mục rỗng.
+            if (REVIEW_UPLOAD_MAINTENANCE) {
+                toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                return
+            }
             const { valid, skipped } = filterValid(dropped)
             if (skipped > 0) toast(`Đã bỏ qua ${skipped} file không phải ảnh/video`)
             if (valid.length === 0) return
@@ -1028,6 +1035,10 @@ export function TeamBrowser({
 
     const onDropFilesOnAsset = useCallback(
         (assetId: string, dt: DataTransfer) => {
+            if (REVIEW_UPLOAD_MAINTENANCE) {
+                toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                return
+            }
             const asset = assetById.get(assetId)
             void collectDropFiles(dt).then((dropped) => {
                 const { valid, skipped } = filterValid(dropped)
@@ -1253,8 +1264,16 @@ export function TeamBrowser({
         if (!menuTarget) {
             return (
                 <CanvasMenuContent
-                    onUploadFiles={() => filesInputRef.current?.click()}
-                    onUploadFolder={() => folderInputRef.current?.click()}
+                    onUploadFiles={() =>
+                        REVIEW_UPLOAD_MAINTENANCE
+                            ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                            : filesInputRef.current?.click()
+                    }
+                    onUploadFolder={() =>
+                        REVIEW_UPLOAD_MAINTENANCE
+                            ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                            : folderInputRef.current?.click()
+                    }
                     onNewFolder={startNewFolder}
                 />
             )
@@ -1384,6 +1403,22 @@ export function TeamBrowser({
                         )}
                     </div>
 
+                    {/* [Tệp maintenance 2026-08-04] Nói TRƯỚC khi người dùng thử kéo thả,
+                        không đợi họ vấp lỗi. Panel + dữ liệu vẫn nguyên, chỉ khoá tải lên. */}
+                    {REVIEW_UPLOAD_MAINTENANCE && (
+                        <div className="flex items-start gap-2.5 border-b border-amber-500/20 bg-amber-500/[0.07] px-4 py-2.5">
+                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-300" />
+                            <div className="min-w-0 text-[12px] leading-relaxed text-amber-100/90">
+                                <span className="font-semibold text-amber-200">Tải video lên đang tạm bảo trì</span>{' '}
+                                để nâng cấp trải nghiệm. Video hiện có vẫn xem và tải về bình thường —{' '}
+                                <span className="font-medium text-amber-200">
+                                    hãy tải các video quan trọng về máy để sao lưu
+                                </span>
+                                . Bàn giao task dùng ô “Link” như cũ.
+                            </div>
+                        </div>
+                    )}
+
                     {/* toolbar */}
                     <div className="flex items-center justify-between gap-2 border-b border-white/5 px-4 py-2.5">
                         <div className="flex items-center gap-2">
@@ -1414,8 +1449,16 @@ export function TeamBrowser({
                                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                             </button>
                             <NewMenu
-                                onUploadFiles={() => filesInputRef.current?.click()}
-                                onUploadFolder={() => folderInputRef.current?.click()}
+                                onUploadFiles={() =>
+                                    REVIEW_UPLOAD_MAINTENANCE
+                                        ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                                        : filesInputRef.current?.click()
+                                }
+                                onUploadFolder={() =>
+                                    REVIEW_UPLOAD_MAINTENANCE
+                                        ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                                        : folderInputRef.current?.click()
+                                }
                                 onNewFolder={startNewFolder}
                             />
                         </div>
@@ -1439,7 +1482,11 @@ export function TeamBrowser({
                                 <EmptyState
                                     atRoot={folderId === null}
                                     scopeEmpty={data?.scopeEmpty}
-                                    onUpload={() => filesInputRef.current?.click()}
+                                    onUpload={() =>
+                                        REVIEW_UPLOAD_MAINTENANCE
+                                            ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                                            : filesInputRef.current?.click()
+                                    }
                                     onNewFolder={startNewFolder}
                                 />
                             ) : prefs.layout === 'list' ? (
@@ -1997,7 +2044,9 @@ function EmptyState({ atRoot, scopeEmpty, onUpload, onNewFolder }: { atRoot: boo
                     {scopeEmpty ? 'Bạn chưa được giao task nào' : atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
                 </p>
                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
-                    {scopeEmpty
+                    {REVIEW_UPLOAD_MAINTENANCE
+                        ? 'Tải video lên đang tạm bảo trì để nâng cấp trải nghiệm — bàn giao task dùng ô “Link” như cũ.'
+                        : scopeEmpty
                         ? 'Video sẽ hiện ở đây khi bạn nhận task. Câu này không nói gì về việc workspace có dữ liệu hay không — chỉ nói phần được giao cho bạn đang trống.'
                         : atRoot
                         ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng, hoặc kéo thả file vào đây.'

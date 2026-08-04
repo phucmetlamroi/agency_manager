@@ -58,7 +58,11 @@ import {
 } from '@/lib/review/view-prefs'
 import { useFolderUploads, useUploadItems } from '@/lib/review/use-upload-store'
 import { uploadEngine } from '@/lib/review/upload-engine'
-import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from '@/lib/review/upload-maintenance'
+import {
+    REVIEW_UPLOAD_MAINTENANCE,
+    REVIEW_UPLOAD_MAINTENANCE_MESSAGE,
+    REVIEW_SERVICE_CLOSE_DATE_LABEL,
+} from '@/lib/review/upload-maintenance'
 import { collectDropFiles, fromFileList, filterValid, enqueueFolderTree, UPLOAD_ACCEPT, type DroppedFile } from '@/lib/review/team-upload'
 import {
     type ItemKind,
@@ -1403,18 +1407,20 @@ export function TeamBrowser({
                         )}
                     </div>
 
-                    {/* [Tệp maintenance 2026-08-04] Nói TRƯỚC khi người dùng thử kéo thả,
-                        không đợi họ vấp lỗi. Panel + dữ liệu vẫn nguyên, chỉ khoá tải lên. */}
+                    {/* [Tệp closure 2026-08-04] Lời báo 30 ngày — nói TRƯỚC khi người dùng thử
+                        kéo thả hay bấm play. Panel + dữ liệu vẫn nguyên tới ngày đóng. */}
                     {REVIEW_UPLOAD_MAINTENANCE && (
                         <div className="flex items-start gap-2.5 border-b border-amber-500/20 bg-amber-500/[0.07] px-4 py-2.5">
                             <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-300" />
                             <div className="min-w-0 text-[12px] leading-relaxed text-amber-100/90">
-                                <span className="font-semibold text-amber-200">Tải video lên đang tạm bảo trì</span>{' '}
-                                để nâng cấp trải nghiệm. Video hiện có vẫn xem và tải về bình thường —{' '}
-                                <span className="font-medium text-amber-200">
-                                    hãy tải các video quan trọng về máy để sao lưu
-                                </span>
-                                . Bàn giao task dùng ô “Link” như cũ.
+                                <span className="font-semibold text-amber-200">
+                                    Tính năng Tệp sẽ ngừng hoạt động vào {REVIEW_SERVICE_CLOSE_DATE_LABEL}.
+                                </span>{' '}
+                                Từ nay không thể tải video lên hoặc xem trực tuyến — chỉ có thể{' '}
+                                <span className="font-semibold text-amber-200">TẢI VỀ</span>.{' '}
+                                Hãy tải toàn bộ video cần giữ về máy trước{' '}
+                                {REVIEW_SERVICE_CLOSE_DATE_LABEL}. Dữ liệu không bị xoá trước ngày đóng; bàn giao
+                                task dùng ô “Link” như cũ.
                             </div>
                         </div>
                     )}
@@ -2045,7 +2051,7 @@ function EmptyState({ atRoot, scopeEmpty, onUpload, onNewFolder }: { atRoot: boo
                 </p>
                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
                     {REVIEW_UPLOAD_MAINTENANCE
-                        ? 'Tải video lên đang tạm bảo trì để nâng cấp trải nghiệm — bàn giao task dùng ô “Link” như cũ.'
+                        ? `Tính năng Tệp sẽ ngừng hoạt động vào ${REVIEW_SERVICE_CLOSE_DATE_LABEL} — chỉ còn tải video về. Bàn giao task dùng ô “Link” như cũ.`
                         : scopeEmpty
                         ? 'Video sẽ hiện ở đây khi bạn nhận task. Câu này không nói gì về việc workspace có dữ liệu hay không — chỉ nói phần được giao cho bạn đang trống.'
                         : atRoot

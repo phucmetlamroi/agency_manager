@@ -418,17 +418,10 @@ export function TaskReviewUploadSection({
                     onStart={startUpload}
                 />
             ) : REVIEW_UPLOAD_MAINTENANCE ? (
-                // [Tệp maintenance 2026-08-04 — yêu cầu chủ sản phẩm] Không còn nút tải video;
-                // bàn giao dùng ô "Link" của khối Bàn giao. Video đã tải trước đó (các card
-                // bên trên) vẫn xem/tải bình thường.
-                <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-2.5">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" />
-                    <p className="text-[11.5px] leading-relaxed text-amber-100/90">
-                        Tải video lên đang <span className="font-semibold text-amber-200">tạm bảo trì</span> để nâng
-                        cấp trải nghiệm — bàn giao bằng ô <span className="font-semibold text-amber-200">Link</span>{' '}
-                        phía trên. Video đã tải trước đó vẫn xem và tải về bình thường; hãy tải về máy để sao lưu.
-                    </p>
-                </div>
+                // [Tệp closure 2026-08-04 — yêu cầu chủ sản phẩm] Task detail KHÔNG hiển thị
+                // phần up video nữa (không nút, không note) — bàn giao dùng ô "Link" của khối
+                // Bàn giao. Card video đã bàn giao trước đó (bên trên) vẫn hiện để tải về.
+                null
             ) : hasCards ? (
                 <button
                     type="button"

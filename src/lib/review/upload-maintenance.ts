@@ -1,21 +1,40 @@
-// [Tệp maintenance 2026-08-04] CÔNG TẮC khoá đường TẢI LÊN của module Tệp/review.
+// [Tệp closure 2026-08-04] CÔNG TẮC đóng dần module Tệp/review theo quyết định chủ sản phẩm.
 //
-// Chủ sản phẩm yêu cầu (04/08/2026): tính năng Tệp chưa ổn định → khoá upload lại,
-// panel vẫn hiện, dữ liệu GIỮ NGUYÊN 100% (xem + tải về + bình luận + duyệt vẫn chạy),
-// bàn giao task chỉ còn "Cập nhật link". Cổng khách (/share, /r) KHÔNG đổi.
+// Quyết định (04/08/2026, sau quyết định bỏ R2/Mux): dịch vụ Tệp ĐÓNG vào 03/09/2026
+// (= hôm nay + 30 ngày báo trước). Từ BÂY GIỜ:
+//   · KHÔNG tải lên  (upload = tốn lưu trữ mới)
+//   · KHÔNG xem trực tuyến (mỗi lượt phát = tiền delivery Mux)
+//   · CHỈ TẢI VỀ — panel vẫn hiện, dữ liệu GIỮ NGUYÊN, không xoá gì trước ngày đóng.
 //
-// Phạm vi khoá — chỉ đường ghi byte mới vào R2/Mux:
-//   · server: initiateUpload + initiateTaskUpload (upload-service.ts) — chốt thật
-//   · client: uploadEngine.enqueue (lưới an toàn cho mọi UI kể cả chỗ quên vá)
-//   · UI: TeamBrowser (banner + chặn picker/drop), TaskReviewUploadSection (ẩn nút),
-//     ReviewPlayerShell (chặn tải phiên bản mới)
-// KHÔNG khoá: tải về, xem, đính kèm ảnh trong bình luận, thao tác thư mục/trạng thái.
+// Phạm vi từng công tắc:
+//   REVIEW_UPLOAD_MAINTENANCE — chặn ghi byte mới (server: initiateUpload/initiateTaskUpload;
+//     client: uploadEngine.enqueue + các UI). Đã bật từ commit 383d7a8.
+//   REVIEW_PLAYBACK_DISABLED — chặn mint token phát Mux (2 route playback-token: nội bộ + /r)
+//     + short-circuit useHlsPlayer (mọi trình phát: Tệp, task drawer, /r khách, So sánh).
+//     Poster/thumbnail GIỮ (ảnh tĩnh, phí không đáng kể — panel "vẫn hiện" cần nó).
+//     Ảnh (IMAGE) xem qua presigned R2 — egress R2 miễn phí — KHÔNG chặn.
+// KHÔNG khoá: tải về (download-url, download-zip, tải thư mục), bình luận, trạng thái,
+// thư mục, thùng rác.
 //
-// Mở lại: đổi hằng dưới thành false (một dòng, một chỗ).
+// Mở lại (nếu đổi ý): đặt cả hai cờ về false — một chỗ duy nhất.
 
 export const REVIEW_UPLOAD_MAINTENANCE = true
+export const REVIEW_PLAYBACK_DISABLED = true
 
+/** Ngày dịch vụ đóng — 30 ngày kể từ ngày công bố 04/08/2026. */
+export const REVIEW_SERVICE_CLOSE_DATE_LABEL = '03/09/2026'
+
+/** Toast/lỗi khi cố TẢI LÊN. */
 export const REVIEW_UPLOAD_MAINTENANCE_MESSAGE =
-    'Tính năng tải video lên đang tạm bảo trì để nâng cấp trải nghiệm. ' +
-    'Toàn bộ video và dữ liệu hiện có được giữ nguyên — bạn vẫn xem và tải về bình thường. ' +
-    'Vui lòng tải các video quan trọng về máy để sao lưu.'
+    `Tính năng Tệp sẽ ngừng hoạt động vào ${REVIEW_SERVICE_CLOSE_DATE_LABEL} — không thể tải video lên nữa. ` +
+    `Hãy tải các video hiện có về máy để lưu trữ trước ngày đó.`
+
+/** Thông báo thay chỗ trình phát khi cố XEM (nội bộ, tiếng Việt). */
+export const REVIEW_CLOSURE_MESSAGE =
+    `Xem trực tuyến đã tắt — tính năng Tệp sẽ ngừng hoạt động vào ${REVIEW_SERVICE_CLOSE_DATE_LABEL}. ` +
+    `Hãy TẢI VIDEO VỀ MÁY để xem và lưu trữ. Dữ liệu không bị xoá trước ngày đóng.`
+
+/** Bản tiếng Anh cho khách xem qua link chia sẻ (/r — UI tiếng Anh). */
+export const REVIEW_CLOSURE_MESSAGE_EN =
+    `Online playback has been turned off — this review service is closing on Sep 3, 2026. ` +
+    `Please DOWNLOAD the video to watch and keep a copy. Nothing is deleted before that date.`

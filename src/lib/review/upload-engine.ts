@@ -28,6 +28,7 @@ import {
     type PausedReason,
 } from './upload-store'
 import type { UploadStatusDto, VersionDto } from './dto'
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from './upload-maintenance'
 
 // ── Tunables (UPLOAD-PIPELINE §3.1 / §11.2) ──────────────────────────────────
 
@@ -104,7 +105,7 @@ export function nextSpeedEma(prev: number | null, deltaBytes: number, deltaMs: n
     return 0.7 * prev + 0.3 * inst
 }
 
-export type ValidationCode = 'EMPTY' | 'UNSUPPORTED_TYPE' | 'TOO_LARGE' | 'BAD_CONTENT'
+export type ValidationCode = 'EMPTY' | 'UNSUPPORTED_TYPE' | 'TOO_LARGE' | 'BAD_CONTENT' | 'MAINTENANCE'
 export type MetaValidation =
     | { ok: true; kind: MediaKind }
     | { ok: false; code: ValidationCode; message: string }
@@ -315,7 +316,12 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         // server's own classifier fall back to the extension for it. Sending '' would 400 at initiate
         // — defeating the very VIDEO_EXT_FALLBACK the client + server were built to honor.
         const mimeType = file.type || 'application/octet-stream'
-        const meta = validateFileMeta(file.name, file.size, mimeType)
+        // [Tệp maintenance 2026-08-04] Lưới an toàn CUỐI phía client: mọi UI đều đi qua
+        // enqueue, nên kể cả đường nào quên chặn ở component thì item cũng nằm lại tray
+        // với đúng thông báo bảo trì, không một byte nào rời máy. Chốt thật vẫn ở server.
+        const meta: MetaValidation = REVIEW_UPLOAD_MAINTENANCE
+            ? { ok: false, code: 'MAINTENANCE', message: REVIEW_UPLOAD_MAINTENANCE_MESSAGE }
+            : validateFileMeta(file.name, file.size, mimeType)
         const now = Date.now()
         const base: UploadItem = {
             id,
@@ -489,6 +495,13 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
     function handleInitiateError(id: string, e: unknown) {
         activeFiles.delete(id)
         if (e instanceof ApiError) {
+            // [Tệp maintenance 2026-08-04] Bundle CŨ (mở tab trước lúc deploy khoá) không có
+            // guard client → server 503 MAINTENANCE. Không rơi vào nhánh retry chung: message
+            // bảo trì của server phải tới mắt người dùng, và Thử lại chỉ lặp lại đúng 503 đó.
+            if (e.code === 'MAINTENANCE') {
+                failFile(id, e.code, e.message)
+                return
+            }
             if (e.code === 'UNSUPPORTED_MEDIA_TYPE' || e.code === 'FILE_TOO_LARGE' || e.code === 'VALIDATION_ERROR') {
                 failFile(id, e.code, e.message)
                 return

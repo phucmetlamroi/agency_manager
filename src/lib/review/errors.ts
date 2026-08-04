@@ -22,6 +22,7 @@ export type ApiErrorCode =
     | 'SHARE_REVOKED'
     | 'SHARE_EXPIRED'
     | 'UPLOAD_EXPIRED'
+    | 'MAINTENANCE'
     | 'FILE_TOO_LARGE'
     | 'UNSUPPORTED_MEDIA_TYPE'
     | 'RATE_LIMITED'

@@ -30,6 +30,7 @@ import {
     CheckCheck,
 } from 'lucide-react'
 import { uploadEngine, validateFileMeta } from '@/lib/review/upload-engine'
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from '@/lib/review/upload-maintenance'
 import { useTaskUploads } from '@/lib/review/use-upload-store'
 import { formatBytes, type UploadItem } from '@/lib/review/upload-store'
 import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
@@ -127,6 +128,12 @@ export function TaskReviewUploadSection({
     // file in a batch never swallows the good ones.
     const onPick = (files: File[]) => {
         if (!files.length) return
+        // [Tệp maintenance 2026-08-04] Chặn cả kéo-thả lẫn picker; nút tải lên bên dưới
+        // đã ẩn nhưng onDrop vẫn dẫn về đây nên đây là chốt của khối này.
+        if (REVIEW_UPLOAD_MAINTENANCE) {
+            toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+            return
+        }
         const accepted: File[] = []
         for (const file of files) {
             const mime = file.type || 'application/octet-stream'
@@ -410,6 +417,11 @@ export function TaskReviewUploadSection({
                     onCancel={() => setPendingFiles([])}
                     onStart={startUpload}
                 />
+            ) : REVIEW_UPLOAD_MAINTENANCE ? (
+                // [Tệp closure 2026-08-04 — yêu cầu chủ sản phẩm] Task detail KHÔNG hiển thị
+                // phần up video nữa (không nút, không note) — bàn giao dùng ô "Link" của khối
+                // Bàn giao. Card video đã bàn giao trước đó (bên trên) vẫn hiện để tải về.
+                null
             ) : hasCards ? (
                 <button
                     type="button"

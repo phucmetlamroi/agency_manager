@@ -13,10 +13,57 @@
  * no perpetual animation loop. Full reduced-motion fallback.
  */
 import { useEffect, useRef } from 'react'
+import { PLANS, TRIAL, GB, TB } from '@/lib/billing/plans'
 import './landing.css'
 
 /** Custom-property inline styles (TS needs the cast for `--x` keys). */
 const cssVars = (vars: Record<string, string>) => vars as React.CSSProperties
+
+/* ---- Bảng giá: đọc thẳng từ plans.ts — nguồn sự thật duy nhất, landing không
+   được tự ghi số riêng (v2 2026-08: bỏ hẳn gói Free, trial = mã 14 ngày). ---- */
+const vnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`
+const storageLabel = (b: bigint) => (b >= TB ? `${Number(b / TB)} TB` : `${Number(b / GB)} GB`)
+
+const PRICE_TIERS = [
+  {
+    plan: PLANS.STUDIO,
+    tagline: 'Team nhỏ vào guồng chuyên nghiệp',
+    featured: false,
+    bullets: [
+      `${PLANS.STUDIO.limits.seatsIncluded} ghế — thêm được tới ${PLANS.STUDIO.limits.seatCap}`,
+      `${storageLabel(PLANS.STUDIO.limits.storageBytes!)} lưu trữ · video 1080p`,
+      'Velox + quy trình 11 trạng thái',
+      'Cổng khách + link duyệt có mật khẩu',
+      'Tính lương VNĐ + hoá đơn cho khách',
+      'White-label — không dấu HustlyTasker',
+    ],
+  },
+  {
+    plan: PLANS.AGENCY,
+    tagline: 'Agency nhiều khách, nhiều guồng',
+    featured: true,
+    bullets: [
+      'Mọi thứ của Studio, cộng thêm:',
+      `${PLANS.AGENCY.limits.seatsIncluded} ghế — thêm được tới ${PLANS.AGENCY.limits.seatCap}`,
+      `${storageLabel(PLANS.AGENCY.limits.storageBytes!)} lưu trữ · ${PLANS.AGENCY.limits.profiles} tổ chức chung hạn mức`,
+      'Bộ tài chính: P&L, sổ thu, xuất lương XLSX',
+      'Khách tự gửi yêu cầu qua cổng riêng',
+      'KPI, phân tích + máy chủ MCP cho AI',
+    ],
+  },
+  {
+    plan: PLANS.SCALE,
+    tagline: 'Xưởng lớn chạy hết công suất',
+    featured: false,
+    bullets: [
+      'Mọi thứ của Agency, cộng thêm:',
+      `${PLANS.SCALE.limits.seatsIncluded} ghế — thêm được tới ${PLANS.SCALE.limits.seatCap}`,
+      `${storageLabel(PLANS.SCALE.limits.storageBytes!)} lưu trữ · ${PLANS.SCALE.limits.profiles} tổ chức`,
+      'Video 4K tới độ phân giải gốc',
+      `Giữ nhật ký & thùng rác ${PLANS.SCALE.limits.retentionDays} ngày`,
+    ],
+  },
+] as const
 
 /* ---- The Velox scan demo: folder scan → tasks materialise ---- */
 function setVeloxFinal(app: HTMLElement) {
@@ -262,7 +309,7 @@ export default function LandingPage({ fontVars = '' }: { fontVars?: string }) {
           <a href="#pricing">Bảng giá</a>
         </nav>
         <a className="btn btn--cta site-header__cta" href="/signup">
-          Dùng thử miễn phí
+          Dùng thử {TRIAL.days} ngày
         </a>
       </header>
 
@@ -303,14 +350,14 @@ export default function LandingPage({ fontVars = '' }: { fontVars?: string }) {
               </p>
               <div className="hero__actions" data-reveal>
                 <a className="btn btn--cta" href="/signup">
-                  Dùng thử miễn phí
+                  Dùng thử {TRIAL.days} ngày
                 </a>
                 <a className="btn btn--ghost" href="#velox">
                   Xem Velox quét
                 </a>
               </div>
               <p className="hero__micro" data-reveal>
-                Miễn phí để bắt đầu, không cần thẻ.
+                {TRIAL.days} ngày đầy đủ tính năng — không cần thẻ.
               </p>
             </div>
 
@@ -869,30 +916,45 @@ export default function LandingPage({ fontVars = '' }: { fontVars?: string }) {
               <source src="/media/htl-deskcalm.mp4" type="video/mp4" />
             </video>
           </div>
-          <div className="container narrow center">
+          <div className="container center">
             <p className="eyebrow eyebrow--amber" data-reveal>
               Bảng giá
             </p>
             <h2 className="display display--lg" data-reveal>
-              Miễn phí để bắt đầu. Cả team, chung một tab.
+              Ba gói, giá VNĐ rõ ràng. Cả team, chung một tab.
             </h2>
-            <div className="price-card" data-reveal>
-              <div className="price-card__amount">
-                Miễn phí<span className="price-card__period">để bắt đầu</span>
-              </div>
-              <ul className="price-card__list">
-                <li>Velox: từ link folder ra cả bảng task</li>
-                <li>Quy trình sản xuất 11 trạng thái</li>
-                <li>Cổng khách duyệt, không cần đăng nhập</li>
-                <li>Tính lương VNĐ tự động, minh bạch</li>
-                <li>Phiên Chợ: chợ nhận task</li>
-                <li>Cả team gọn trong một tab</li>
-              </ul>
-              <a className="btn btn--cta btn--block" href="/signup">
-                Dùng thử miễn phí
-              </a>
-              <p className="price-card__micro">Miễn phí để bắt đầu, không cần thẻ.</p>
+            <div className="price-grid">
+              {PRICE_TIERS.map(({ plan, tagline, featured, bullets }) => (
+                <div
+                  key={plan.code}
+                  className={`price-card price-card--tier${featured ? ' price-card--featured' : ''}`}
+                  data-reveal
+                >
+                  {featured && <span className="price-card__flag">Phổ biến nhất</span>}
+                  <h3 className="price-card__name">{plan.label}</h3>
+                  <p className="price-card__desc">{tagline}</p>
+                  <div className="price-card__amount">
+                    {vnd(plan.pricing.monthlyVND!)}
+                    <span className="price-card__period">/tháng</span>
+                  </div>
+                  <p className="price-card__annual">
+                    Trả năm còn {vnd(plan.pricing.annualMonthlyVND!)}/tháng
+                  </p>
+                  <ul className="price-card__list">
+                    {bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                  <a className="btn btn--cta btn--block" href="/signup">
+                    Dùng thử {TRIAL.days} ngày
+                  </a>
+                </div>
+              ))}
             </div>
+            <p className="price-card__micro" data-reveal>
+              Mọi gói dùng thử {TRIAL.days} ngày đầy đủ tính năng — không cần thẻ. Thanh toán chuyển
+              khoản QR ngay trong ứng dụng, kích hoạt tự động.
+            </p>
           </div>
         </section>
       </main>

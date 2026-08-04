@@ -18,6 +18,7 @@ import {
 import { assertVersionInShare } from '@/lib/review/share-guest'
 import { readThrottle, recordAssetViewed, throttleAllows, THROTTLE_COOKIE_TTL_SEC } from '@/lib/review/share-tracking'
 import { mintPlaybackTokens } from '@/lib/review/mux-jwt'
+import { REVIEW_PLAYBACK_DISABLED, REVIEW_CLOSURE_MESSAGE_EN } from '@/lib/review/upload-maintenance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,11 @@ type Ctx = { params: Promise<{ slug: string }> }
 const schema = z.object({ versionId: z.string().min(1) }).strict()
 
 export const POST = withShareRoute<Ctx>(async (req: NextRequest, { params }) => {
+    // [Tệp closure 2026-08-04] Guest playback also bills Mux delivery — same shutdown
+    // as the internal route. English copy: the /r surface is the English guest UI.
+    if (REVIEW_PLAYBACK_DISABLED) {
+        return apiError(503, 'MAINTENANCE', REVIEW_CLOSURE_MESSAGE_EN)
+    }
     const { slug } = await params
     const rl = await limitDb(`r:ptoken:${slug}:${getClientIp(req)}`, 30, 60)
     if (!rl.success) {

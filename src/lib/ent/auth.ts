@@ -37,7 +37,21 @@ function cookieSecret(): Uint8Array {
     // thêm một biến môi trường nữa chỉ tăng chỗ để quên khi deploy.
     const raw = process.env.REVIEW_COOKIE_SECRET
     if (!raw || raw.length < 16) {
-        throw new Error('[ent/auth] REVIEW_COOKIE_SECRET thiếu hoặc quá ngắn (cần 32+ byte ngẫu nhiên)')
+        // NÓI THẲNG nguyên nhân thay vì ném Error trần.
+        // Ném Error trần thì withReviewRoute nuốt thành "Lỗi hệ thống." — người vận
+        // hành nhìn màn hình đó không tài nào biết là thiếu một biến môi trường.
+        // Đây là lỗi CẤU HÌNH, không phải lỗi của người nhập mã, nên phải chỉ rõ.
+        //
+        // Vì sao dễ lọt tới tận đây: biến này chỉ còn một nơi khác dùng tới là JWT
+        // mở khoá link chia sẻ có MẬT KHẨU — tính năng gần như không ai bật, nên
+        // thiếu biến vẫn im lặng cho tới khi kho phim gọi vào.
+        throw apiError(
+            500,
+            'INTERNAL',
+            'Máy chủ chưa cấu hình REVIEW_COOKIE_SECRET (chuỗi ngẫu nhiên ≥ 32 ký tự) — ' +
+                'chưa có biến này thì không cấp được phiên vào kho phim. Hãy thêm vào biến môi trường rồi deploy lại.',
+            { missingEnv: 'REVIEW_COOKIE_SECRET' },
+        )
     }
     return new TextEncoder().encode(raw)
 }

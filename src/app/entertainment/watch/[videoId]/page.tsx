@@ -11,6 +11,7 @@ import { ReviewPipelineStatus } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { signMuxToken } from '@/lib/review/mux-jwt'
 import { resolveEntSession } from '@/lib/ent/auth'
+import { isEntCodeManager } from '@/lib/ent/is-global-admin'
 import EntCodeGate from '@/components/ent/EntCodeGate'
 import EntPlayer from '@/components/ent/player/EntPlayer'
 import EntProcessingScreen from '@/components/ent/EntProcessingScreen'
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function WatchPage({ params }: { params: Promise<{ videoId: string }> }) {
     const session = await resolveEntSession(await cookies())
-    if (!session) return <EntCodeGate />
+    if (!session) return <EntCodeGate canManageCodes={await isEntCodeManager()} />
 
     const { videoId } = await params
     const video = await prisma.entVideo.findUnique({

@@ -5,6 +5,7 @@
 
 import { cookies } from 'next/headers'
 import { resolveEntSession } from '@/lib/ent/auth'
+import { isEntCodeManager } from '@/lib/ent/is-global-admin'
 import EntCodeGate from '@/components/ent/EntCodeGate'
 import EntLibrary from '@/components/ent/EntLibrary'
 
@@ -12,7 +13,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function EntertainmentPage() {
     const session = await resolveEntSession(await cookies())
-    if (!session) return <EntCodeGate />
+    // Chưa có mã: nếu người đang đăng nhập là chủ hệ thống thì chỉ luôn đường tới
+    // trang tạo mã — lần chạy đầu tiên sổ mã TRỐNG, không chỉ thì bế tắc.
+    if (!session) return <EntCodeGate canManageCodes={await isEntCodeManager()} />
 
     return <EntLibrary role={session.role} />
 }

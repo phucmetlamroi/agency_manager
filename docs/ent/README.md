@@ -118,6 +118,34 @@ Nên lưu tệp bằng mã **UTF-8**; bảng mã cũ sẽ ra chữ hỏng.
 Một phim gắn được nhiều phụ đề; người xem chọn trong menu **CC** của trình phát
 (menu chỉ hiện khi phim thực sự có phụ đề).
 
+### Chữ hiện lên trông thế nào
+
+Dựng lại đúng mặc định của VLC, số lấy từ mã nguồn `text_renderer/freetype`:
+
+| Thứ | Trị số | Nguồn |
+|---|---|---|
+| Phông | **Arial** (dự phòng: Liberation Sans → Arimo → Roboto → Noto Sans) | `SYSTEM_DEFAULT_FAMILY` trên Windows |
+| Chữ | trắng đặc | `freetype-color 0xFFFFFF`, `opacity 255` |
+| Viền | đen đặc, bán kính **4% cỡ chữ** | `outline-thickness 4` ÷ 100 |
+| Bóng đổ | đen **50%**, chếch **xuống-phải**, xa **0,06 × cỡ chữ** | `shadow-opacity 128`, `angle −45`, `distance 0.06` |
+| Nền | **không có hộp nền** | `background-opacity 0` |
+
+Mọi phông dự phòng đều được chọn vì **có đủ dấu tiếng Việt** — thiếu glyph thì
+trình duyệt tụt phông theo từng ký tự và câu thoại sẽ lẫn hai kiểu chữ.
+
+Hai chỗ cố ý lệch khỏi VLC, có lý do:
+- **Độ nhoè bóng.** VLC chép cả glyph ĐÃ CÓ VIỀN rồi dịch đi; CSS chỉ chép nét
+  chữ và không có tham số spread, nên bóng dịch 0,042em bị lớp viền 0,04em che
+  gần hết. Dùng độ nhoè 0,11em thay vào — trị số chọn bằng mắt sau khi dựng bản
+  thử so ba mức cạnh nhau.
+- **Cỡ chữ.** VLC mặc định 1/16 chiều cao khung hình (≈6,25%) — to hơn hẳn các
+  trang xem phim. Mặc định ở đây là **4,2%** (1080p ≈ 45px); nấc "Rất lớn" 6,4%
+  chính là cỡ của VLC.
+
+Cỡ chữ chỉnh trong menu **CC** (5 nấc, nhớ theo máy chứ không theo phim) và tính
+theo **chiều cao khung hình thật**, không theo cửa sổ — phim 2.39:1 có dải đen
+dày vẫn ra đúng cỡ, và phóng to hay bật toàn màn hình thì chữ to theo đúng tỉ lệ.
+
 ## 7. Phím tắt khi xem
 
 | Phím | Tác dụng |

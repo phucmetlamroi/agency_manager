@@ -63,11 +63,23 @@ export const DELETE = withReviewRoute<Ctx>(async (req: NextRequest, { params }) 
         if (s.r2UploadId) await abortMultipart(s.r2Key, s.r2UploadId).catch(() => {})
     }
 
-    await teardownEntVideoExternal({
+    const { failed } = await teardownEntVideoExternal({
         muxAssetId: video.muxAssetId,
         r2Key: video.r2Key,
         subtitleKeys: video.subtitles.map((s) => s.r2Key),
     })
+
+    // Xoá được BÊN NGOÀI thì mới xoá hàng DB. Xoá hàng trước khi Mux/R2 chịu xoá
+    // là để lại thứ tính tiền mãi mà không còn khoá nào tìm ra — cứ giữ hàng lại,
+    // người dùng bấm gỡ lần nữa (hoặc janitor đêm) sẽ dọn tiếp.
+    if (failed.length) {
+        reviewLog('error', 'ent.video.delete_partial', { videoId, failed })
+        throw apiError(
+            502,
+            'UPSTREAM_ERROR',
+            'Chưa xoá được dữ liệu trên kho lưu trữ. Phim vẫn còn trong danh sách — hãy thử gỡ lại sau ít phút.',
+        )
+    }
 
     // Cascade dọn EntSubtitle + EntUploadSession. Webhook Mux tới sau sẽ không tìm
     // thấy phim ⇒ consumer trả 'gone' và nuốt sự kiện (không retry vô hạn).

@@ -43,6 +43,11 @@ export default function EntUploadManager({
     const [subsFor, setSubsFor] = useState<EntVideoCard | null>(null)
     const [busy, setBusy] = useState<string | null>(null)
 
+    // [rà soát 05/08] Đếm nhịp riêng: trước đây vòng poll móc vào chính `videos`,
+    // nên MỘT lần fetch lỗi (mạng chớp) là danh sách không đổi ⇒ effect không chạy
+    // lại ⇒ vòng poll CHẾT VĨNH VIỄN, phim treo "Đang chuyển mã" tới khi tải trang.
+    const [tick, setTick] = useState(0)
+
     const load = useCallback(async () => {
         try {
             const res = await fetch('/api/ent/videos')
@@ -50,20 +55,20 @@ export default function EntUploadManager({
             const body = await res.json()
             setVideos(body.videos)
         } catch {
-            /* để lần poll sau lo */
+            /* để nhịp sau lo */
         }
     }, [])
 
     useEffect(() => {
         load()
-    }, [load])
+    }, [load, tick])
 
     // Còn phim đang xử lý thì hỏi lại mỗi 5 giây, hết thì thôi.
     useEffect(() => {
         if (!videos?.some((v) => v.status === 'PROCESSING' || v.status === 'UPLOADED')) return
-        const t = setTimeout(load, 5000)
+        const t = setTimeout(() => setTick((n) => n + 1), 5000)
         return () => clearTimeout(t)
-    }, [videos, load])
+    }, [videos, tick])
 
     const saveTitle = async (id: string) => {
         const title = draftTitle.trim()

@@ -12,7 +12,7 @@ import { ReviewPipelineStatus } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { inngest, REVIEW_EVENTS } from '@/lib/review/inngest'
 import { reviewLog } from '@/lib/review/logger'
-import { getObjectRange, presignGetObject, deleteObject } from '@/lib/review/r2'
+import { getObjectRange, presignGetObject, deleteObject, headObject } from '@/lib/review/r2'
 import { looksLikeMedia } from '@/lib/review/upload-helpers'
 import { createMuxAsset, getMuxAsset, deleteMuxAsset, extractReadyMeta, MuxError, type MuxAsset } from '@/lib/review/mux'
 import { ENT_EVENTS, entPassthrough, parseEntPassthrough } from './events'
@@ -254,27 +254,54 @@ export const entJanitor = inngest.createFunction(
     { id: 'ent-janitor', retries: 2, triggers: [{ event: REVIEW_EVENTS.JANITOR_REQUESTED }] },
     async ({ step }) => {
         // (a) Phiên tải lên dở dang quá hạn — R2 vẫn tính tiền phần đã ghi của multipart bỏ rơi.
+        // [rà soát 05/08] Lọc thêm theo trạng thái video: abortEntUpload chỉ huỷ được
+        // phiên của video còn UPLOADING. Không lọc thì các phiên "xác sống" (video đã
+        // FAILED/READY nhưng phiên chưa đóng sổ) quay lại mỗi đêm, ăn hết hạn ngạch 50
+        // và multipart THẬT không bao giờ tới lượt được dọn.
         const expired = await step.run('expire-sessions', async () => {
             const rows = await prisma.entUploadSession.findMany({
-                where: { completedAt: null, abortedAt: null, expiresAt: { lt: new Date() } },
+                where: {
+                    completedAt: null,
+                    abortedAt: null,
+                    expiresAt: { lt: new Date() },
+                    video: { pipelineStatus: ReviewPipelineStatus.UPLOADING },
+                },
                 select: { id: true },
                 take: 50,
             })
             let n = 0
-            for (const r of rows) if ((await expireEntInflightUpload(r.id)) === 'expired') n++
+            for (const r of rows) {
+                // try/catch TỪNG phần tử: một hàng hỏng không được giết cả lượt chạy,
+                // nếu không các bước sau (b)(c) sẽ không bao giờ tới lượt.
+                try {
+                    if ((await expireEntInflightUpload(r.id)) === 'expired') n++
+                } catch (e) {
+                    reviewLog('warn', 'ent.janitor.expire_failed', { sessionId: r.id, error: String(e) })
+                }
+            }
             return n
         })
 
         // (b) Phim kẹt PROCESSING — webhook Mux rơi mất thì đây là lưới đỡ.
+        // Chừa 15 phút ân hạn: phim vừa vào PROCESSING vài giây mà bị bắn thêm một
+        // lượt UPLOAD_COMPLETED sẽ tạo asset Mux THỨ HAI ⇒ trả tiền encode hai lần.
         const reconciled = await step.run('reconcile-processing', async () => {
             const rows = await prisma.entVideo.findMany({
-                where: { pipelineStatus: ReviewPipelineStatus.PROCESSING },
+                where: {
+                    pipelineStatus: ReviewPipelineStatus.PROCESSING,
+                    updatedAt: { lt: new Date(Date.now() - 15 * 60_000) },
+                },
                 select: { id: true, muxAssetId: true, updatedAt: true },
                 take: 50,
             })
             const out: Record<string, string> = {}
             for (const r of rows) {
-                out[r.id] = await reconcileEntVideo(r.id, r.muxAssetId, Date.now() - r.updatedAt.getTime() > STALE_MS)
+                try {
+                    out[r.id] = await reconcileEntVideo(r.id, r.muxAssetId, Date.now() - r.updatedAt.getTime() > STALE_MS)
+                } catch (e) {
+                    out[r.id] = 'error'
+                    reviewLog('warn', 'ent.janitor.reconcile_failed', { videoId: r.id, error: String(e) })
+                }
             }
             return out
         })
@@ -283,17 +310,37 @@ export const entJanitor = inngest.createFunction(
         const redriven = await step.run('redrive-uploaded', async () => {
             const rows = await prisma.entVideo.findMany({
                 where: { pipelineStatus: ReviewPipelineStatus.UPLOADED, updatedAt: { lt: new Date(Date.now() - 10 * 60_000) } },
-                select: { id: true },
+                select: { id: true, r2Key: true },
                 take: 50,
             })
+            let n = 0
             for (const r of rows) {
-                await prisma.entVideo.updateMany({
-                    where: { id: r.id, pipelineStatus: ReviewPipelineStatus.UPLOADED },
-                    data: { pipelineStatus: ReviewPipelineStatus.PROCESSING },
-                })
-                await inngest.send({ name: ENT_EVENTS.UPLOAD_COMPLETED, data: { videoId: r.id } })
+                try {
+                    // Kiểm vật thể CÓ THẬT trên R2 trước khi giao cho Mux — giao một URL
+                    // 404 thì Mux vẫn nhận việc, vẫn tính công, rồi mới báo lỗi.
+                    if (!r.r2Key || !(await headObject(r.r2Key))) {
+                        await prisma.entVideo.updateMany({
+                            where: { id: r.id, pipelineStatus: ReviewPipelineStatus.UPLOADED },
+                            data: {
+                                pipelineStatus: ReviewPipelineStatus.FAILED,
+                                errorMessage: 'Không tìm thấy tệp gốc trên kho lưu trữ.',
+                            },
+                        })
+                        continue
+                    }
+                    const flip = await prisma.entVideo.updateMany({
+                        where: { id: r.id, pipelineStatus: ReviewPipelineStatus.UPLOADED },
+                        data: { pipelineStatus: ReviewPipelineStatus.PROCESSING },
+                    })
+                    if (flip.count > 0) {
+                        await inngest.send({ name: ENT_EVENTS.UPLOAD_COMPLETED, data: { videoId: r.id } })
+                        n++
+                    }
+                } catch (e) {
+                    reviewLog('warn', 'ent.janitor.redrive_failed', { videoId: r.id, error: String(e) })
+                }
             }
-            return rows.length
+            return n
         })
 
         reviewLog('info', 'ent.janitor.done', { expired, redriven, reconciled: Object.keys(reconciled).length })
@@ -302,14 +349,34 @@ export const entJanitor = inngest.createFunction(
 )
 
 /** Dọn sạch dấu vết ngoài DB của một phim (Mux asset + vật thể R2). */
+/**
+ * Trả về danh sách thứ KHÔNG xoá được, để người gọi quyết định có nên xoá hàng DB
+ * hay không. [rà soát 05/08] Trước đây nuốt mọi lỗi rồi vẫn xoá hàng ⇒ asset Mux
+ * và vật thể R2 mồ côi, TÍNH TIỀN MÃI mà không còn khoá nào trong DB tìm ra nó.
+ */
 export async function teardownEntVideoExternal(v: {
     muxAssetId: string | null
     r2Key: string | null
     subtitleKeys: string[]
-}): Promise<void> {
-    if (v.muxAssetId) await deleteMuxAsset(v.muxAssetId).catch(() => {})
-    if (v.r2Key) await deleteObject(v.r2Key).catch(() => {})
-    for (const key of v.subtitleKeys) await deleteObject(key).catch(() => {})
+}): Promise<{ failed: string[] }> {
+    const failed: string[] = []
+    if (v.muxAssetId) {
+        try {
+            await deleteMuxAsset(v.muxAssetId)
+        } catch (e) {
+            failed.push(`mux:${v.muxAssetId}`)
+            reviewLog('error', 'ent.teardown.mux_failed', { muxAssetId: v.muxAssetId, error: String(e) })
+        }
+    }
+    for (const key of [v.r2Key, ...v.subtitleKeys].filter((k): k is string => !!k)) {
+        try {
+            await deleteObject(key)
+        } catch (e) {
+            failed.push(`r2:${key}`)
+            reviewLog('error', 'ent.teardown.r2_failed', { key, error: String(e) })
+        }
+    }
+    return { failed }
 }
 
 export const entFunctions = [entMuxWebhook, entProcessUpload, entJanitor]

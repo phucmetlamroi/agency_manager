@@ -3,8 +3,7 @@
 
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { getSession } from '@/lib/auth'
-import { apiError, apiJson, parseBody } from '@/lib/review/errors'
+import { apiJson, parseBody } from '@/lib/review/errors'
 import { withReviewRoute } from '@/lib/review/route-auth'
 import { requireEntSession } from '@/lib/ent/auth'
 import { initiateEntUpload } from '@/lib/ent/upload-service'
@@ -26,9 +25,8 @@ const schema = z
     .strict()
 
 export const POST = withReviewRoute(async (req: NextRequest) => {
-    const session = await getSession()
-    if (!session?.user?.id) throw apiError(401, 'UNAUTHORIZED', 'Cần đăng nhập.')
-    await requireEntSession(req.cookies, { role: 'ENT_ADMIN' })
+    // requireEntSession gác CẢ phiên đăng nhập lẫn mã truy cập (xem ent/auth.ts).
+    const ent = await requireEntSession(req.cookies, { role: 'ENT_ADMIN' })
 
     const parsed = await parseBody(req, schema)
     if (!parsed.ok) return parsed.res
@@ -40,7 +38,7 @@ export const POST = withReviewRoute(async (req: NextRequest) => {
         title: parsed.data.title ?? null,
         quality: parsed.data.quality,
         idempotencyKey: parsed.data.idempotencyKey ?? null,
-        uploadedById: session.user.id,
+        uploadedById: ent.userId!,
     })
     return apiJson(result.body, { status: result.status })
 })

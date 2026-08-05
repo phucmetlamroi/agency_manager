@@ -90,6 +90,15 @@ async function replayEntSession(sessionId: string): Promise<EntInitiateResult> {
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     if (session.abortedAt) fail(409, 'STATE_INVALID', 'Phiên tải lên đã bị hủy.')
+    // [rà soát 05/08] Phiên ĐÃ HOÀN TẤT thì multipart trên R2 đã đóng — ký lại URL
+    // part cho nó là đưa client vào chỗ chết (R2 trả 404 NoSuchUpload, không nằm
+    // trong nhóm lỗi đáng thử lại, và người dùng KHÔNG BAO GIỜ up lại được tệp đó).
+    // Dùng completedAt chứ KHÔNG dùng pipelineStatus: có cửa sổ ngắn giữa lúc
+    // claim UPLOADING→UPLOADED và lúc ghi completedAt, lấy pipelineStatus sẽ chặn
+    // nhầm một lần tiếp-tục hợp lệ đang chạy song song.
+    if (session.completedAt) {
+        fail(409, 'STATE_INVALID', 'Tệp này đã tải lên xong rồi — hãy tải lên như một phim mới.')
+    }
     // URL ký lại từ đầu: phát lại thường xảy ra nhiều giờ sau, URL cũ có thể đã hết hạn.
     const parts = await partUrlsFor(session.r2Key, session.r2UploadId, session.partsTotal, session.video.mimeType)
     return {
@@ -284,7 +293,12 @@ export async function completeEntUpload(
         },
     })
     if (promoted.count > 0) {
-        await inngest.send({ name: ENT_EVENTS.UPLOAD_COMPLETED, data: { videoId: video.id } })
+        // Gửi hỏng KHÔNG được làm cả yêu cầu 500: video đã ở PROCESSING rồi, mọi
+        // lần thử lại chỉ vọng lại trạng thái đó. Nuốt lỗi + ghi log; janitor đêm
+        // sẽ bơm lại (bước redrive) nếu Inngest thật sự không nhận được.
+        await inngest
+            .send({ name: ENT_EVENTS.UPLOAD_COMPLETED, data: { videoId: video.id } })
+            .catch((e) => reviewLog('error', 'ent.upload.enqueue_failed', { videoId: video.id, error: String(e) }))
     }
     reviewLog('info', 'ent.upload.complete', { uploadSessionId, videoId: video.id })
     return { videoId: video.id, pipelineStatus: ReviewPipelineStatus.PROCESSING }

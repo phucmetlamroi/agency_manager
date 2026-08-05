@@ -14,6 +14,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import type { EntCodeRole } from '@prisma/client'
 import { prisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 import { apiError } from '@/lib/review/errors'
 
 /** Khớp cả NextRequest.cookies lẫn cookies() của next/headers. */
@@ -27,6 +28,8 @@ export const ENT_COOKIE_TTL_SEC = 30 * 24 * 60 * 60 // 30 ngày
 export interface EntSession {
     codeId: string
     role: EntCodeRole
+    /** Chỉ có ở bản requireEntSession (đã xác thực phiên đăng nhập). */
+    userId?: string
 }
 
 function cookieSecret(): Uint8Array {
@@ -77,17 +80,23 @@ export async function resolveEntSession(cookies: CookieReader): Promise<EntSessi
 }
 
 /**
- * Bản NÉM LỖI cho route API. `opts.role` yêu cầu đúng vai trò — hiện chỉ dùng
- * 'ENT_ADMIN' cho mọi thao tác ghi (up/sửa/gỡ/phụ đề).
+ * Bản NÉM LỖI cho route API — gác CẢ HAI lớp.
+ * `opts.role` yêu cầu đúng vai trò (hiện chỉ dùng 'ENT_ADMIN' cho mọi thao tác ghi).
  *
- * Lưu ý: hàm này KHÔNG kiểm tra phiên đăng nhập — route nào cũng phải tự gọi
- * `getSession()` trước. Tách ra vì hai lớp trả về hai loại lỗi khác nhau
- * (chưa đăng nhập ⇒ về /login; chưa có code ⇒ về màn nhập code).
+ * [rà soát 05/08] TRƯỚC ĐÂY hàm này chỉ kiểm cookie kho phim, còn phiên đăng nhập
+ * thì "route nào cũng phải tự gọi getSession()" — và 9/11 route đã quên. Hậu quả:
+ * cookie ent_access sống 30 ngày ĐỘC LẬP với phiên đăng nhập, nên người đã đăng
+ * xuất (hoặc bị khoá tài khoản) vẫn xem và XOÁ được phim. Nay gác luôn tại đây để
+ * không route nào quên được nữa.
  */
 export async function requireEntSession(
     cookies: CookieReader,
     opts: { role?: EntCodeRole } = {},
 ): Promise<EntSession> {
+    const login = await getSession()
+    if (!login?.user?.id) {
+        throw apiError(401, 'UNAUTHORIZED', 'Cần đăng nhập.')
+    }
     const session = await resolveEntSession(cookies)
     if (!session) {
         throw apiError(401, 'UNAUTHORIZED', 'Cần nhập mã truy cập kho phim.')
@@ -95,7 +104,7 @@ export async function requireEntSession(
     if (opts.role && session.role !== opts.role) {
         throw apiError(403, 'FORBIDDEN', 'Mã của bạn chỉ được xem, không được thay đổi kho phim.')
     }
-    return session
+    return { ...session, userId: login.user.id }
 }
 
 /** Thuộc tính chuẩn cho cookie kho phim. Path '/' vì API nằm ở /api/ent/*. */

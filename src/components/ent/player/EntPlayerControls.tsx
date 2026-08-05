@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import type { EntPlayerController } from './useEntPlayer'
 import { SUB_OFFSET_STEP_SEC, type SubtitleSync } from './useSubtitleSync'
+import { SUB_SIZE_STEPS, type SubSizeKey } from './subtitle-style'
 
 export interface SubtitleOption {
     id: string
@@ -48,12 +49,15 @@ export default function EntPlayerControls(props: {
     activeSubtitleId: string | null
     onSelectSubtitle: (id: string | null) => void
     sync: SubtitleSync
+    subSize: SubSizeKey
+    onSubSizeChange: (key: SubSizeKey) => void
     /** Báo lên shell: đang có menu mở hoặc đang kéo tua ⇒ ĐỪNG tự ẩn thanh. */
     onHoldChange: (hold: boolean) => void
 }) {
     const {
         c, isFullscreen, onToggleFullscreen,
-        subtitles, activeSubtitleId, onSelectSubtitle, sync, onHoldChange,
+        subtitles, activeSubtitleId, onSelectSubtitle, sync,
+        subSize, onSubSizeChange, onHoldChange,
     } = props
     const railRef = useRef<HTMLDivElement>(null)
     const [scrubbing, setScrubbing] = useState(false)
@@ -224,9 +228,26 @@ export default function EntPlayerControls(props: {
                                         </MenuItem>
                                     ))}
 
-                                    {/* Chỉnh khớp — chỉ có nghĩa khi đang bật một phụ đề */}
+                                    {/* Cỡ chữ + chỉnh khớp — chỉ có nghĩa khi đang bật một phụ đề */}
                                     {activeSubtitleId && (
                                         <>
+                                            <MenuLabel>Cỡ chữ</MenuLabel>
+                                            <div className="flex flex-wrap gap-1 px-2 pb-2">
+                                                {SUB_SIZE_STEPS.map((s) => (
+                                                    <button
+                                                        key={s.key}
+                                                        onClick={() => onSubSizeChange(s.key)}
+                                                        className={`rounded px-2 py-1 text-xs transition-colors ${
+                                                            subSize === s.key
+                                                                ? 'bg-amber-500/20 text-amber-200'
+                                                                : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'
+                                                        }`}
+                                                    >
+                                                        {s.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+
                                             <MenuLabel>Phụ đề bị lệch?</MenuLabel>
                                             <div className="flex items-center gap-1 px-2 pb-2">
                                                 <button

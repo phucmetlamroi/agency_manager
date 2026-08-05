@@ -31,6 +31,14 @@ import { ArrowLeft, Play, Pause, Loader2, AlertTriangle } from 'lucide-react'
 import { useEntPlayer } from './useEntPlayer'
 import { useSubtitleSync } from './useSubtitleSync'
 import EntPlayerControls, { type SubtitleOption } from './EntPlayerControls'
+import EntSubtitleLayer from './EntSubtitleLayer'
+import {
+    readStoredSubSize,
+    subSizePct,
+    SUB_SIZE_DEFAULT,
+    SUB_SIZE_STORAGE_KEY,
+    type SubSizeKey,
+} from './subtitle-style'
 
 const CONTROLS_HIDE_MS = 3000
 const DOUBLE_CLICK_WINDOW_MS = 220
@@ -75,7 +83,21 @@ export default function EntPlayer({
     const [flash, setFlash] = useState<'play' | 'pause' | null>(null)
     const [activeSub, setActiveSub] = useState<string | null>(null)
     const [subError, setSubError] = useState<string | null>(null)
+    // Đọc localStorage ở effect chứ không ở khởi tạo state: máy chủ dựng HTML
+    // trước, đọc ngay lúc khởi tạo là lệch giữa hai bên (hydration mismatch).
+    const [subSize, setSubSize] = useState<SubSizeKey>(SUB_SIZE_DEFAULT)
     const resumedRef = useRef(false)
+
+    useEffect(() => setSubSize(readStoredSubSize()), [])
+
+    const changeSubSize = useCallback((key: SubSizeKey) => {
+        setSubSize(key)
+        try {
+            localStorage.setItem(SUB_SIZE_STORAGE_KEY, key)
+        } catch {
+            /* localStorage bị chặn */
+        }
+    }, [])
 
     const sync = useSubtitleSync({ videoRef, videoId, activeSubtitleId: activeSub })
 
@@ -233,7 +255,12 @@ export default function EntPlayer({
             // thể chèn vào), chứ không lấy chỉ số thô của textTracks.
             const subtitleTracks = tracks.filter((t) => t.kind === 'subtitles' || t.kind === 'captions')
             subtitleTracks.forEach((t, i) => {
-                t.mode = i === wantedIndex ? 'showing' : 'hidden'
+                // 'hidden' chứ KHÔNG phải 'showing': cue vẫn nạp và vẫn chạy, chỉ
+                // là trình duyệt không tự vẽ — EntSubtitleLayer vẽ lấy để kiểm
+                // soát được phông, viền, bóng và cỡ chữ (xem tệp đó).
+                // Track không dùng để 'disabled' cho khỏi tải, và để lớp vẽ nhận
+                // ra track đang bật chỉ bằng một dấu hiệu: mode === 'hidden'.
+                t.mode = i === wantedIndex ? 'hidden' : 'disabled'
             })
         }
         apply()
@@ -308,6 +335,14 @@ export default function EntPlayer({
                         />
                     ))}
                 </video>
+
+                {/* Phụ đề — vẽ tay, bám theo khung hình thật chứ không theo cửa sổ */}
+                <EntSubtitleLayer
+                    videoRef={videoRef}
+                    activeSubtitleId={activeSub}
+                    sizePct={subSizePct(subSize)}
+                    lifted={showControls}
+                />
 
                 {/* Biểu tượng loé khi bấm */}
                 <AnimatePresence>
@@ -387,6 +422,8 @@ export default function EntPlayer({
                     activeSubtitleId={activeSub}
                     onSelectSubtitle={setActiveSub}
                     sync={sync}
+                    subSize={subSize}
+                    onSubSizeChange={changeSubSize}
                     onHoldChange={setHoldOpen}
                 />
             </div>

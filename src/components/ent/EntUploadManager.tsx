@@ -8,10 +8,11 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import type { EntCodeRole } from '@prisma/client'
-import { Film, Trash2, Check, X, Loader2, AlertTriangle, Subtitles, KeyRound, Pencil, Upload } from 'lucide-react'
+import { Film, Trash2, Check, X, Loader2, AlertTriangle, Subtitles, KeyRound, Pencil, Upload, RotateCw } from 'lucide-react'
 import EntTabBar from './EntTabBar'
 import EntUploadPanel from './EntUploadPanel'
 import EntSubtitleManager from './EntSubtitleManager'
+import { entProgress } from '@/lib/ent/progress'
 import type { EntVideoCard } from './EntLibrary'
 
 function fmtBytes(raw: string): string {
@@ -20,14 +21,6 @@ function fmtBytes(raw: string): string {
     if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`
     if (n >= 1e6) return `${(n / 1e6).toFixed(0)} MB`
     return `${(n / 1e3).toFixed(0)} KB`
-}
-
-const STATUS_LABEL: Record<EntVideoCard['status'], string> = {
-    UPLOADING: 'Đang tải lên',
-    UPLOADED: 'Đã tải lên',
-    PROCESSING: 'Đang chuyển mã',
-    READY: 'Sẵn sàng',
-    FAILED: 'Lỗi',
 }
 
 export default function EntUploadManager({
@@ -92,6 +85,23 @@ export default function EntUploadManager({
         }
     }
 
+    // Chạy lại từ tệp gốc còn trên R2 — thay cho việc gỡ phim rồi tải lại vài GB.
+    const retryVideo = async (v: EntVideoCard) => {
+        setBusy(v.id)
+        try {
+            const res = await fetch(`/api/ent/videos/${v.id}/retry`, { method: 'POST' })
+            if (!res.ok) {
+                const b = await res.json().catch(() => null)
+                toast.error(b?.error?.message ?? 'Không chạy lại được.')
+                return
+            }
+            toast.success('Đã cho chạy lại. Trạng thái sẽ tự cập nhật ngay bên dưới.')
+            setTick((n) => n + 1)
+        } finally {
+            setBusy(null)
+        }
+    }
+
     const removeVideo = async (v: EntVideoCard) => {
         if (!confirm(`Gỡ hẳn "${v.title}"? Phim và phụ đề sẽ bị xoá vĩnh viễn, không khôi phục được.`)) return
         setBusy(v.id)
@@ -145,11 +155,16 @@ export default function EntUploadManager({
                     <p className="py-10 text-center text-sm text-zinc-600">Chưa có phim nào.</p>
                 ) : (
                     <div className="space-y-2">
-                        {videos.map((v) => (
+                        {videos.map((v) => {
+                            const p = entProgress(v)
+                            // Chỉ mời "Thử lại" khi việc CHƯA tới tay Mux. Đã có asset thì
+                            // chạy lại là trả tiền encode lần hai, nên không được gợi ý.
+                            const canRetry = !v.hasMuxAsset && (p.stage === 'failed' || p.stuck)
+                            return (
                             <motion.div
                                 key={v.id}
                                 layout
-                                className="flex items-center gap-3 rounded-xl border border-white/5 bg-zinc-950/50 p-3 transition-colors hover:bg-zinc-900/50"
+                                className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-zinc-950/50 p-3 transition-colors hover:bg-zinc-900/50"
                             >
                                 <div className="h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-900">
                                     {v.posterUrl ? (
@@ -203,26 +218,46 @@ export default function EntUploadManager({
                                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
                                         <span
                                             className={
-                                                v.status === 'READY'
+                                                p.stage === 'ready'
                                                     ? 'text-emerald-500'
-                                                    : v.status === 'FAILED'
+                                                    : p.stuck
                                                       ? 'text-red-400'
                                                       : 'text-amber-500'
                                             }
                                         >
-                                            {STATUS_LABEL[v.status]}
+                                            {p.label}
                                         </span>
+                                        {/* Con số CHẠY: bằng chứng duy nhất người dùng có được
+                                            rằng hệ thống còn sống, thay cho một vòng xoay câm. */}
+                                        {p.elapsed && <span>· {p.elapsed}</span>}
                                         <span>{fmtBytes(v.sizeBytes)}</span>
                                         {v.height && <span>{v.height}p</span>}
                                         {v.subtitleCount > 0 && <span>{v.subtitleCount} phụ đề</span>}
-                                        {v.status === 'FAILED' && v.errorMessage && (
-                                            <span className="text-red-400/70">· {v.errorMessage}</span>
-                                        )}
                                     </div>
+                                    {p.hint && (
+                                        <p className="mt-1 text-[11px] leading-relaxed text-red-400/80">{p.hint}</p>
+                                    )}
                                 </div>
 
-                                {v.status === 'PROCESSING' && <Loader2 className="h-4 w-4 animate-spin text-amber-400" />}
-                                {v.status === 'FAILED' && <AlertTriangle className="h-4 w-4 text-red-400" />}
+                                {(p.stage === 'queued' || p.stage === 'encoding') && !p.stuck && (
+                                    <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                                )}
+                                {p.stuck && <AlertTriangle className="h-4 w-4 text-red-400" />}
+
+                                {canRetry && (
+                                    <button
+                                        onClick={() => retryVideo(v)}
+                                        disabled={busy === v.id}
+                                        className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-2.5 py-1.5 text-xs text-amber-300 transition-colors hover:bg-amber-500/10 disabled:opacity-40"
+                                    >
+                                        {busy === v.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <RotateCw className="h-3.5 w-3.5" />
+                                        )}
+                                        Thử lại
+                                    </button>
+                                )}
 
                                 <button
                                     onClick={() => setSubsFor(v)}
@@ -244,7 +279,8 @@ export default function EntUploadManager({
                                     )}
                                 </button>
                             </motion.div>
-                        ))}
+                            )
+                        })}
                     </div>
                 )}
             </section>

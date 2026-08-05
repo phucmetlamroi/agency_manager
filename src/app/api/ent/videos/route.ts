@@ -32,9 +32,11 @@ export const GET = withReviewRoute(async (req: NextRequest) => {
             width: true,
             height: true,
             sizeBytes: true,
+            muxAssetId: true,
             muxPlaybackId: true,
             posterTime: true,
             createdAt: true,
+            updatedAt: true,
             _count: { select: { subtitles: true } },
         },
     })
@@ -59,6 +61,11 @@ export const GET = withReviewRoute(async (req: NextRequest) => {
             subtitleCount: v._count.subtitles,
             posterUrl,
             createdAt: v.createdAt.toISOString(),
+            // Hai trường dưới đây là thứ duy nhất cho phép giao diện phân biệt
+            // "đang chạy" với "đã kẹt" (xem lib/ent/progress.ts). KHÔNG lộ chính
+            // muxAssetId ra ngoài — người xem không cần biết khoá của nhà cung cấp.
+            hasMuxAsset: v.muxAssetId != null,
+            updatedAt: v.updatedAt.toISOString(),
         }
     })
 

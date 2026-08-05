@@ -68,7 +68,46 @@ nếu không người dùng lách trần dung lượng bằng cách up vào đâ
 module Tệp, `/api/cron/review-janitor`) sẽ hỏi thẳng Mux rồi áp đúng trạng thái.
 Quá 24 giờ vẫn chưa xong thì đánh dấu lỗi và xoá asset Mux (kẻo tính tiền mãi).
 
-Phim báo **Lỗi** thì gỡ đi up lại — không có nút thử lại.
+### Đọc trạng thái trên giao diện
+
+Hàng phim trong tab **Up phim** nói rõ đang ở chặng nào và đã bao lâu:
+
+| Nhãn | Nghĩa | Bao lâu là bình thường |
+|---|---|---|
+| Đang tải lên | byte đang đi từ máy bạn lên R2 | tuỳ mạng |
+| **Đang xếp hàng** | R2 đã nhận đủ, đang chờ giao việc cho Mux | **vài giây** |
+| **Mux đang chuyển mã** | Mux đang kéo tệp về và encode | hàng chục phút với phim dài |
+| Sẵn sàng / Lỗi | xong | — |
+
+Vượt ngưỡng thì nhãn chuyển **đỏ** kèm một câu giải thích, và hiện nút **Thử lại**
+(chạy lại từ tệp gốc còn trên R2 — không phải tải lên lại). Nút này CHỈ hiện khi
+Mux chưa nhận việc: đã có asset rồi mà chạy lại là **trả tiền encode hai lần**.
+
+### Kẹt ở "Đang xếp hàng" — gần như luôn là Inngest chưa biết hàm mới
+
+Bộ ba hàm nền (`ent-process-upload`, `ent-mux-webhook`, `ent-janitor`) phải được
+**đăng ký với Inngest Cloud** thì sự kiện mới có người nhận. Nếu chưa, sự kiện gửi
+đi vẫn "thành công" rồi **rơi vào hư không** — không lỗi, không log, phim nằm mãi ở
+Đang xếp hàng. Deploy có tích hợp Vercel–Inngest thì tự đồng bộ; không thì làm tay:
+
+```bash
+curl -X PUT https://hustlytasker.xyz/api/inngest
+```
+
+Lệnh này chỉ khai báo lại danh sách hàm tại URL đó — không đụng dữ liệu, chạy lại
+bao nhiêu lần cũng được. Sau khi đồng bộ, bấm **Thử lại** trên phim đang kẹt.
+
+### Soi trạng thái thật (khi giao diện không đủ)
+
+```bash
+npx tsx scripts/ent/check-video-status.ts
+```
+
+Đặt cạnh nhau trạng thái trong DB và **câu trả lời của chính Mux** — đủ để phân biệt
+"Mux chưa nhận việc" với "Mux xong rồi mà webhook rơi mất". Cần `DATABASE_URL` +
+`MUX_TOKEN_ID` + `MUX_TOKEN_SECRET` trong môi trường. Hai script cùng bộ:
+`probe-mux-recent.ts` (liệt kê asset gần đây) và `requeue-stuck.ts` (bắn lại việc
+cho mọi phim kẹt, an toàn với việc trả tiền hai lần).
 
 ## 6. Phụ đề
 
@@ -78,6 +117,34 @@ Nên lưu tệp bằng mã **UTF-8**; bảng mã cũ sẽ ra chữ hỏng.
 
 Một phim gắn được nhiều phụ đề; người xem chọn trong menu **CC** của trình phát
 (menu chỉ hiện khi phim thực sự có phụ đề).
+
+### Chữ hiện lên trông thế nào
+
+Dựng lại đúng mặc định của VLC, số lấy từ mã nguồn `text_renderer/freetype`:
+
+| Thứ | Trị số | Nguồn |
+|---|---|---|
+| Phông | **Arial** (dự phòng: Liberation Sans → Arimo → Roboto → Noto Sans) | `SYSTEM_DEFAULT_FAMILY` trên Windows |
+| Chữ | trắng đặc | `freetype-color 0xFFFFFF`, `opacity 255` |
+| Viền | đen đặc, bán kính **4% cỡ chữ** | `outline-thickness 4` ÷ 100 |
+| Bóng đổ | đen **50%**, chếch **xuống-phải**, xa **0,06 × cỡ chữ** | `shadow-opacity 128`, `angle −45`, `distance 0.06` |
+| Nền | **không có hộp nền** | `background-opacity 0` |
+
+Mọi phông dự phòng đều được chọn vì **có đủ dấu tiếng Việt** — thiếu glyph thì
+trình duyệt tụt phông theo từng ký tự và câu thoại sẽ lẫn hai kiểu chữ.
+
+Hai chỗ cố ý lệch khỏi VLC, có lý do:
+- **Độ nhoè bóng.** VLC chép cả glyph ĐÃ CÓ VIỀN rồi dịch đi; CSS chỉ chép nét
+  chữ và không có tham số spread, nên bóng dịch 0,042em bị lớp viền 0,04em che
+  gần hết. Dùng độ nhoè 0,11em thay vào — trị số chọn bằng mắt sau khi dựng bản
+  thử so ba mức cạnh nhau.
+- **Cỡ chữ.** VLC mặc định 1/16 chiều cao khung hình (≈6,25%) — to hơn hẳn các
+  trang xem phim. Mặc định ở đây là **4,2%** (1080p ≈ 45px); nấc "Rất lớn" 6,4%
+  chính là cỡ của VLC.
+
+Cỡ chữ chỉnh trong menu **CC** (5 nấc, nhớ theo máy chứ không theo phim) và tính
+theo **chiều cao khung hình thật**, không theo cửa sổ — phim 2.39:1 có dải đen
+dày vẫn ra đúng cỡ, và phóng to hay bật toàn màn hình thì chữ to theo đúng tỉ lệ.
 
 ## 7. Phím tắt khi xem
 

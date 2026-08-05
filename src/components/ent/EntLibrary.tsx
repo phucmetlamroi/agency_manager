@@ -12,6 +12,7 @@ import { motion } from 'framer-motion'
 import type { EntCodeRole } from '@prisma/client'
 import { Play, Search, Film, Loader2, AlertTriangle, Subtitles } from 'lucide-react'
 import EntTabBar from './EntTabBar'
+import { entProgress } from '@/lib/ent/progress'
 
 export interface EntVideoCard {
     id: string
@@ -25,6 +26,10 @@ export interface EntVideoCard {
     subtitleCount: number
     posterUrl: string | null
     createdAt: string
+    /** Mux đã nhận việc chưa — phân biệt "xếp hàng" với "đang chuyển mã". */
+    hasMuxAsset: boolean
+    /** Mốc đổi trạng thái gần nhất; gốc để đếm "đã bao lâu". */
+    updatedAt: string
 }
 
 const RESUME_PREFIX = 'ent:pos:'
@@ -258,20 +263,22 @@ function PosterCard({ v, resumeSec }: { v: EntVideoCard; resumeSec?: number }) {
 }
 
 function PendingCard({ v }: { v: EntVideoCard }) {
-    const failed = v.status === 'FAILED'
+    const p = entProgress(v)
     return (
         <div className="rounded-xl border border-white/5 bg-zinc-950/50 p-4">
             <div className="flex items-center gap-2">
-                {failed ? (
+                {p.stuck ? (
                     <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
                 ) : (
                     <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-400" />
                 )}
                 <p className="truncate text-sm text-zinc-300">{v.title}</p>
             </div>
-            <p className="mt-2 text-xs text-zinc-600">
-                {failed ? (v.errorMessage ?? 'Chuyển mã thất bại.') : 'Đang chuyển mã…'}
+            <p className={`mt-2 text-xs ${p.stuck ? 'text-red-400/80' : 'text-zinc-600'}`}>
+                {p.label}
+                {p.elapsed ? ` · ${p.elapsed}` : ''}
             </p>
+            {p.hint && <p className="mt-1 text-[11px] leading-relaxed text-red-400/70">{p.hint}</p>}
         </div>
     )
 }

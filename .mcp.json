@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "codex": {
+      "command": "C:\\Users\\Dareu\\AppData\\Local\\OpenAI\\Codex\\bin\\5dee10576ec7a5b8\\codex.exe",
+      "args": [
+        "mcp-server",
+        "-c",
+        "sandbox_mode=\"read-only\"",
+        "-c",
+        "approval_policy=\"never\"",
+        "-c",
+        "model=\"gpt-5.6-sol\"",
+        "-c",
+        "model_reasoning_effort=\"max\""
+      ]
+    }
+  }
+}

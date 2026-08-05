@@ -7,12 +7,13 @@
 // lộ được điều gì ngoài việc nó tồn tại.
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { KeyRound, Loader2, Clapperboard } from 'lucide-react'
+import { KeyRound, Loader2, Clapperboard, ArrowUpRight } from 'lucide-react'
 import { formatEntCode, normalizeEntCode } from '@/lib/ent/code-format'
 
-export default function EntCodeGate() {
+export default function EntCodeGate({ canManageCodes = false }: { canManageCodes?: boolean }) {
     const router = useRouter()
     const [code, setCode] = useState('')
     const [busy, setBusy] = useState(false)
@@ -101,6 +102,25 @@ export default function EntCodeGate() {
                         {busy ? 'Đang kiểm tra…' : 'Vào kho phim'}
                     </motion.button>
                 </form>
+
+                {/* Chủ hệ thống là người DUY NHẤT tạo được mã. Không chỉ đường ở đây
+                    thì lần chạy đầu tiên bế tắc: sổ mã trống, mà lối vào trang tạo mã
+                    lại nằm sau cửa mã. */}
+                {canManageCodes && (
+                    <div className="mt-6 border-t border-white/5 pt-5">
+                        <p className="text-xs leading-relaxed text-zinc-500">
+                            Bạn là quản trị hệ thống — mã truy cập do chính bạn tạo ra rồi gửi cho người được xem.
+                        </p>
+                        <Link
+                            href="/entertainment/codes"
+                            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-zinc-300 transition-colors hover:border-amber-500/30 hover:bg-amber-500/5 hover:text-amber-200"
+                        >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            Tạo mã truy cập
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                    </div>
+                )}
             </motion.div>
         </div>
     )

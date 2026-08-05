@@ -86,12 +86,14 @@ export default function EntCodesPanel() {
 
     return (
         <div className="mx-auto max-w-4xl px-4 py-8 md:px-8">
+            {/* Về KHO PHIM chứ không phải trang up: lần đầu tiên người ta tới đây từ
+                màn nhập mã (chưa có mã ⇒ chưa vào được trang up). */}
             <Link
-                href="/entertainment/upload"
+                href="/entertainment"
                 className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
             >
                 <ArrowLeft className="h-4 w-4" />
-                Về trang up phim
+                Về kho phim
             </Link>
 
             <div className="mb-2 flex items-center gap-3">
@@ -146,7 +148,17 @@ export default function EntCodesPanel() {
                         <Loader2 className="h-5 w-5 animate-spin text-zinc-600" />
                     </div>
                 ) : codes.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-zinc-600">Chưa phát mã nào.</p>
+                    // Lần chạy đầu tiên — nói thẳng phải làm gì, đừng để một dòng
+                    // "Chưa phát mã nào" trống trơn.
+                    <div className="rounded-2xl border border-dashed border-white/10 px-6 py-10 text-center">
+                        <p className="text-sm text-zinc-300">Chưa có mã nào — kho phim đang khoá kín.</p>
+                        <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-zinc-500">
+                            Tạo một mã <span className="text-amber-300">Quản trị</span> ở trên cho chính bạn để vào
+                            được trang up phim. Sau đó, muốn cho ai xem thì tạo thêm mã{' '}
+                            <span className="text-zinc-300">Người xem</span> và gửi họ kèm đường dẫn{' '}
+                            <span className="font-mono text-zinc-400">/entertainment</span>.
+                        </p>
+                    </div>
                 ) : (
                     codes.map((c) => (
                         <motion.div

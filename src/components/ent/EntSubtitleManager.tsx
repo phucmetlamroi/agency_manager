@@ -41,22 +41,42 @@ export default function EntSubtitleManager({ video, onClose }: { video: EntVideo
             // Nhãn mặc định = tên tệp bỏ đuôi; người dùng đổi sau bằng cách up lại
             // với tên khác (kho phim thường chỉ 1-2 phụ đề nên không cần sửa nhãn).
             fd.append('label', file.name.replace(/\.[^.]+$/, ''))
+            // Đoán ngôn ngữ từ tên tệp (…vi.srt / …eng.srt) — <track> cần srclang
+            // để trình duyệt gợi ý đúng phụ đề theo ngôn ngữ hệ thống.
+            fd.append('lang', /(\W|^)(vi|vie|viet)(\W|$)/i.test(file.name) ? 'vi' : /(\W|^)(en|eng)(\W|$)/i.test(file.name) ? 'en' : 'vi')
+
             const res = await fetch(`/api/ent/videos/${video.id}/subtitles`, { method: 'POST', body: fd })
             if (!res.ok) {
                 const b = await res.json().catch(() => null)
                 toast.error(b?.error?.message ?? 'Không tải được phụ đề.')
                 return
             }
-            toast.success('Đã thêm phụ đề.')
+            const body = await res.json().catch(() => null)
+            // Nói rõ nhận được BAO NHIÊU câu thoại — người dùng có căn cứ đối chiếu
+            // với tệp gốc thay vì tin mù là "đã xong".
+            toast.success(body?.cueCount ? `Đã thêm phụ đề — nhận ${body.cueCount} câu thoại.` : 'Đã thêm phụ đề.')
+            for (const note of body?.notes ?? []) toast.info(note)
             await load()
+        } catch {
+            // Không bắt lỗi ở đây thì spinner tắt mà KHÔNG có thông báo nào —
+            // người dùng tưởng đã thêm xong.
+            toast.error('Mất kết nối khi tải phụ đề. Hãy thử lại.')
         } finally {
             setUploading(false)
         }
     }
 
     const remove = async (id: string) => {
-        const res = await fetch(`/api/ent/videos/${video.id}/subtitles/${id}`, { method: 'DELETE' })
-        if (res.ok) setSubs((prev) => prev?.filter((s) => s.id !== id) ?? null)
+        try {
+            const res = await fetch(`/api/ent/videos/${video.id}/subtitles/${id}`, { method: 'DELETE' })
+            if (!res.ok) {
+                toast.error('Không gỡ được phụ đề. Hãy thử lại.')
+                return
+            }
+            setSubs((prev) => prev?.filter((s) => s.id !== id) ?? null)
+        } catch {
+            toast.error('Mất kết nối khi gỡ phụ đề.')
+        }
     }
 
     return (

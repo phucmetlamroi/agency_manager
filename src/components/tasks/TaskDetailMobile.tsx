@@ -11,6 +11,7 @@ import React, { useEffect, useState } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { REVIEW_STATUS_MAP } from "@/lib/review/status-map"
 import { failureMessage, isNetworkFailure } from "@/lib/ui/action-feedback"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
@@ -210,10 +211,13 @@ export function TaskDetailMobile({
             !isAdmin && !!currentUserId && localTask.assigneeId === currentUserId && localTask.status === 'Đang thực hiện'
         if (shouldAutoSubmit) {
             try {
-                const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
+                // [Đồng bộ nộp bài 2026-08-04] Xem chú thích cùng chỗ ở TaskDetailModal: link và
+                // video cùng đáp xuống 'Đã nộp video (nội bộ)' (A2); server vẫn xoá deadline
+                // (A2 thuộc STATUS_REQUIRES_NULL_DEADLINE) nên state phải theo cho khỏi lệch.
+                const res = await updateTaskStatus(localTask.id, REVIEW_STATUS_MAP.submitted, workspaceId)
                 if (res?.success) {
-                    toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
-                    setLocalTask((prev) => ({ ...prev, status: 'Revision', deadline: null }))
+                    toast.success('Đã nộp bài — task chuyển sang “Đã nộp video (nội bộ)”, quản lý sẽ duyệt. Deadline đã tạm dừng.')
+                    setLocalTask((prev) => ({ ...prev, status: REVIEW_STATUS_MAP.submitted, deadline: null }))
                 } else {
                     toast.error(res?.error || 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
                 }

@@ -48,7 +48,10 @@ const STATUS_BUTTON_CONFIG: Record<string, {
 }> = {
     // [bug-report #2] 'Gửi lại' / 'Tạm ngưng' / 'Sửa frame' action buttons removed.
     'Đang thực hiện': { label: 'Bắt đầu / Tiếp tục', icon: Play, variant: 'primary' },
-    'Revision': { label: 'Nộp bài (→ Revision)', icon: Send, variant: 'warning' },
+    // [Đồng bộ nộp bài 2026-08-04] Nộp bài = 'Đã nộp video (nội bộ)' (A2), trùng đích với
+    // đường lưu link ở task detail. 'Revision' giữ lại cho QUẢN LÝ (trả bài về sửa).
+    'Đã nộp video (nội bộ)': { label: 'Nộp bài (chờ duyệt)', icon: Send, variant: 'warning' },
+    'Revision': { label: 'Trả về sửa lại', icon: Send, variant: 'warning' },
     'Hoàn tất': { label: 'Hoàn tất', icon: CheckCircle2, variant: 'success' },
     'Đang đợi giao': { label: 'Trả về hàng chờ', icon: AlertTriangle, variant: 'neutral' },
     'Nhận task': { label: 'Nhận task', icon: Play, variant: 'primary' },

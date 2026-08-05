@@ -8,12 +8,16 @@ import { formatClientHierarchy } from '@/lib/client-hierarchy'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
 import { taskTypeLabel } from '@/lib/display-labels'
 import { isReviewPhaseStatus } from '@/lib/task-statuses'
+import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
 import { getStatusInfo } from '@/components/tasks/detail-sections/_shared'
 
 // Status colours now come from the shared getStatusInfo map (single source of
 // truth — see @/components/tasks/detail-sections/_shared). Icons stay local.
 const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
     'Đang thực hiện': Play,
+    // [Đồng bộ nộp bài 2026-08-04] Không có entry thì menu 3 chấm rơi về icon Play
+    // ("phát") cho hành động nộp bài — sai nghĩa.
+    [REVIEW_STATUS_MAP.submitted]: Send,
     'Revision': Send,
     'Gửi lại': Send,
     'Hoàn tất': CheckCircle2,
@@ -58,15 +62,18 @@ export default function MobileTaskCard({
     // FSM-driven primary action — picks first valid "forward" transition for inline quick-button.
     const actorRole: ActorRole = isAdmin ? 'ADMIN' : 'USER'
     const validNextStatuses = getValidNextStatuses(task.status, actorRole)
-    // Inline button shows "primary positive" action: Bắt đầu / Nộp bài / Gửi lại / Hoàn tất
+    // Inline button shows "primary positive" action: Bắt đầu / Nộp bài / Hoàn tất.
+    // [Đồng bộ nộp bài 2026-08-04] 'Đã nộp video (nội bộ)' đứng TRƯỚC 'Revision' trong
+    // whitelist: .find() lấy phần tử khớp đầu tiên, mà với quản lý cả hai đều hợp lệ —
+    // nếu để sau, nút sẽ mang nhãn "Nộp bài" nhưng ghi 'Revision' (trả về sửa).
     const primaryActionStatus = validNextStatuses.find(s =>
-        ['Đang thực hiện', 'Revision', 'Gửi lại', 'Hoàn tất'].includes(s)
+        ['Đang thực hiện', REVIEW_STATUS_MAP.submitted, 'Revision', 'Hoàn tất'].includes(s)
     )
 
     const PRIMARY_LABEL: Record<string, string> = {
         'Đang thực hiện': 'Bắt đầu',
-        'Revision': 'Nộp bài',
-        'Gửi lại': 'Gửi lại',
+        [REVIEW_STATUS_MAP.submitted]: 'Nộp bài',
+        'Revision': 'Trả về sửa',
         'Hoàn tất': 'Hoàn tất',
     }
 

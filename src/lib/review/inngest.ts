@@ -24,6 +24,9 @@ import { notifyReview, reviewPlayerUrl, notifyManagerOfReviewFlip } from './noti
 import { purgeExpiredTrash } from './purge'
 // P6.3 activity feed bridge.
 import { auditReviewFeed } from './feed-audit'
+// [Giải trí 2026-08] Một tài khoản Mux, hai module. Chỉ import HẰNG + hàm THUẦN
+// từ ent/events.ts (không import ent/inngest.ts) để tránh vòng lặp import.
+import { ENT_EVENTS, parseEntPassthrough } from '@/lib/ent/events'
 
 export const inngest = new Inngest({ id: 'hustlytasker-review' })
 
@@ -305,6 +308,16 @@ export const reviewMuxWebhook = inngest.createFunction(
         if (ledger.alreadyProcessed) {
             reviewLog('info', 'inngest.mux_webhook.duplicate_skip', { webhookEventId })
             return { duplicate: true }
+        }
+
+        // [Giải trí 2026-08] Phòng thủ chiều sâu: sự kiện của kho phim lọt vào đây
+        // (route gửi nhầm, hoặc hàng cũ trong hàng đợi Inngest) thì thoát NGAY, TRƯỚC
+        // bước mark-processed. Nếu để chạy tiếp, applyMuxReady không thấy ReviewVersion
+        // nên trả 'gone', rồi mark-processed vẫn set processedAt — consumer của kho phim
+        // về sau thấy alreadyProcessed và bỏ qua, phim treo "đang xử lý" vĩnh viễn.
+        if (parseEntPassthrough(ledger.asset?.passthrough)) {
+            reviewLog('info', 'inngest.mux_webhook.ent_skip', { webhookEventId })
+            return { skipped: 'ent' }
         }
 
         const isReady = ledger.type === 'video.asset.ready'
@@ -632,12 +645,19 @@ export const reviewJanitor = inngest.createFunction(
                     processedAt: null,
                     receivedAt: { gte: new Date(now - WEBHOOK_MAX_AGE_MS), lt: new Date(now - WEBHOOK_GRACE_MS) },
                 },
-                select: { id: true },
+                // [Giải trí 2026-08] Cần payload để đọc passthrough — hàng của kho phim
+                // phải quay về consumer của kho phim. Bơm nhầm sang consumer này thì nó
+                // không tìm thấy ReviewVersion, đánh dấu đã-xử-lý, và phim treo vĩnh viễn.
+                select: { id: true, payload: true },
                 take: JANITOR_BATCH,
             })
             for (const w of rows) {
+                const passthrough = (w.payload as { data?: { passthrough?: unknown } } | null)?.data?.passthrough
+                const name = parseEntPassthrough(passthrough)
+                    ? ENT_EVENTS.MUX_EVENT_RECEIVED
+                    : REVIEW_EVENTS.MUX_EVENT_RECEIVED
                 await inngest
-                    .send({ name: REVIEW_EVENTS.MUX_EVENT_RECEIVED, data: { webhookEventId: w.id } })
+                    .send({ name, data: { webhookEventId: w.id } })
                     .catch((e) => reviewLog('error', 'inngest.janitor.reenqueue_failed', { webhookEventId: w.id, error: String(e) }))
             }
             if (rows.length === JANITOR_BATCH) reviewLog('warn', 'inngest.janitor.reenqueue_cap_hit', { batch: JANITOR_BATCH })

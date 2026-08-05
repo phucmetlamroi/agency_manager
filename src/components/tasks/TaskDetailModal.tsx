@@ -18,6 +18,7 @@ import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { bulkUpdateTaskDetails, bulkUpdateTaskResourceSubfields } from "@/actions/bulk-task-actions"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { REVIEW_STATUS_MAP } from "@/lib/review/status-map"
 import { failureMessage, isNetworkFailure } from "@/lib/ui/action-feedback"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
@@ -433,10 +434,18 @@ export function TaskDetailModal({
 
         if (shouldAutoSubmit) {
             try {
-                const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
+                // [Đồng bộ nộp bài 2026-08-04] Nộp bài bằng LINK giờ đáp xuống ĐÚNG ô của
+                // đường up video: 'Đã nộp video (nội bộ)' (A2). Trước đây link → 'Revision'
+                // còn video → A2, nên cùng một hành động "nộp bài" lại nằm ở hai tab khác
+                // nhau; Tệp đã khoá upload nên link là đường giao duy nhất và phải khớp quy
+                // trình duyệt A2→A3→A4→A5. Deadline VẪN bị xoá y như trước: A2 nằm trong
+                // STATUS_REQUIRES_NULL_DEADLINE (task-invariants.ts — mọi status pha duyệt),
+                // nên phải phản chiếu `deadline: null` vào state, không thì thẻ Deadline còn
+                // hiện hạn cũ tới lần refetch sau (modal này không gọi router.refresh()).
+                const res = await updateTaskStatus(localTask.id, REVIEW_STATUS_MAP.submitted, workspaceId)
                 if (res?.success) {
-                    toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
-                    setLocalTask((prev) => (prev ? { ...prev, status: 'Revision', deadline: null } : prev))
+                    toast.success('Đã nộp bài — task chuyển sang “Đã nộp video (nội bộ)”, quản lý sẽ duyệt. Deadline đã tạm dừng.')
+                    setLocalTask((prev) => (prev ? { ...prev, status: REVIEW_STATUS_MAP.submitted, deadline: null } : prev))
                 } else {
                     // Save succeeded in DB but transition failed — user can retry by
                     // re-saving the same link (idempotent on productLink, FSM still

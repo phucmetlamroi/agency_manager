@@ -77,11 +77,15 @@ export interface MuxAsset {
 export async function createMuxAsset(opts: {
     inputUrl: string
     passthrough: string
+    /** [Giải trí 2026-08] Kho phim cho chọn mức encode từng phim ('basic' = miễn phí
+     *  encode nhưng cap 720p). Bỏ trống ⇒ 'plus' — module Tệp gọi không truyền, hành
+     *  vi giữ nguyên từng byte. */
+    videoQuality?: 'basic' | 'plus'
 }): Promise<MuxAsset> {
     return muxFetch<MuxAsset>('POST', '/video/v1/assets', {
         input: [{ url: opts.inputUrl }],
         playback_policy: ['signed'],
-        video_quality: 'plus',
+        video_quality: opts.videoQuality ?? 'plus',
         passthrough: opts.passthrough,
     })
 }

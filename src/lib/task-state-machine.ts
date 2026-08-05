@@ -31,10 +31,15 @@
  */
 
 // [bug-report #2] 'Gửi lại' + 'Tạm ngưng' removed (owner 2026-07-07). 'Revision' kept.
+// [Đồng bộ nộp bài 2026-08-04] + 'Đã nộp video (nội bộ)' (A2) — ĐÍCH MỚI của thao tác
+// "nộp bài". File này chỉ dựng DANH SÁCH NÚT cho 3 màn mobile (getValidNextStatuses);
+// nó KHÔNG gác server (validateTransition ở fsm-config đã tắt theo yêu cầu chủ sản phẩm),
+// nên thêm giá trị ở đây là đổi thứ người dùng bấm được, không đổi quyền.
 export type TaskStatus =
     | 'Đang đợi giao'
     | 'Nhận task'
     | 'Đang thực hiện'
+    | 'Đã nộp video (nội bộ)'
     | 'Revision'
     | 'Hoàn tất'
     | 'Quá hạn'
@@ -48,7 +53,11 @@ export type TaskStatus =
 const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Đang đợi giao': ['Nhận task'],                     // user claim task
     'Nhận task': ['Đang thực hiện', 'Đang đợi giao'],   // user start hoặc trả task (within 10 min via returnTask)
-    'Đang thực hiện': ['Revision'],                     // user submit (→ Revision)
+    // [Đồng bộ nộp bài 2026-08-04] Nộp bài → 'Đã nộp video (nội bộ)' (A2), TRÙNG với đường
+    // lưu link ở TaskDetailModal/Mobile và với đường up video (F7). Trước đây nút này đưa
+    // sang 'Revision' còn link/video đưa sang A2 → cùng một việc nằm hai tab khác nhau.
+    'Đang thực hiện': ['Đã nộp video (nội bộ)'],
+    'Đã nộp video (nội bộ)': [],                        // chờ quản lý duyệt — vòng sửa do module duyệt lo (F8/F9)
     'Revision': [],                                      // fix loop is now handled by the review module (F9)
     'Hoàn tất': [],                                      // TERMINAL cho user
     'Quá hạn': [],                                       // TERMINAL — admin cần extend deadline để unlock
@@ -61,7 +70,9 @@ const USER_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
 const ADMIN_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
     'Đang đợi giao': ['Nhận task', 'Đã hủy'],
     'Nhận task': ['Đang thực hiện', 'Đang đợi giao', 'Đã hủy'],
-    'Đang thực hiện': ['Revision', 'Đã hủy', 'Hoàn tất'],
+    // 'Revision' GIỮ cho quản lý: đó là nút TRẢ BÀI VỀ SỬA, khác nghĩa với "nộp bài".
+    'Đang thực hiện': ['Đã nộp video (nội bộ)', 'Revision', 'Đã hủy', 'Hoàn tất'],
+    'Đã nộp video (nội bộ)': ['Revision', 'Đang thực hiện', 'Hoàn tất', 'Đã hủy'],
     'Revision': ['Hoàn tất', 'Đang thực hiện', 'Đã hủy'],
     'Hoàn tất': ['Đang thực hiện', 'Đã hủy'],              // admin có quyền unlock (audit log!)
     'Quá hạn': ['Đang thực hiện', 'Hoàn tất', 'Đã hủy'],   // admin extend deadline → resume

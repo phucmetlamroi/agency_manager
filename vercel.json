@@ -12,6 +12,9 @@
         "src/app/api/review/uploads/**/*.ts": {
             "maxDuration": 60
         },
+        "src/app/api/ent/uploads/**/*.ts": {
+            "maxDuration": 60
+        },
         "src/app/api/review/download-zip/route.ts": {
             "maxDuration": 300,
             "memory": 3009

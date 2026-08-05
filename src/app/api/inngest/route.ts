@@ -4,6 +4,8 @@
 
 import { serve } from 'inngest/next'
 import { inngest, reviewFunctions } from '@/lib/review/inngest'
+// [Giải trí] Kho phim dùng chung client Inngest, hàm riêng.
+import { entFunctions } from '@/lib/ent/inngest'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,5 +18,5 @@ export const maxDuration = 800
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
-    functions: reviewFunctions,
+    functions: [...reviewFunctions, ...entFunctions],
 })

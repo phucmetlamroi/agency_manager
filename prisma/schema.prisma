@@ -2208,3 +2208,126 @@ model CodeRedemption {
   @@unique([codeId, profileId])
   @@index([profileId])
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// [GIẢI TRÍ · 2026-08-05] Kho phim riêng của chủ hệ thống — TÍNH NĂNG ẨN,
+// vào bằng code. Kế hoạch: .claude/plans (module "Giải trí"), sổ tay docs/ent/README.md.
+//
+// TÁCH BIỆT với module Tệp/review: dùng chung HẠ TẦNG (R2 + Mux + WebhookEvent)
+// nhưng KHÔNG dùng chung bảng, không chịu cờ REVIEW_UPLOAD_MAINTENANCE /
+// REVIEW_PLAYBACK_DISABLED (Tệp đang đóng dần, kho phim thì vẫn chạy).
+//
+// KHÔNG có workspaceId: một kho duy nhất, không thuộc tổ chức nào ⇒ byte của nó
+// KHÔNG được tính vào hạn mức gói (getStorageUsage chỉ quét ReviewVersion).
+// Cố ý — đây không phải tính năng bán cho khách.
+//
+// uploadedById/createdById để String trần (không @relation) — đúng nếp
+// ReviewVersion.uploaderId, khỏi phải sửa model User.
+// ══════════════════════════════════════════════════════════════════════════
+
+/// Quyền trong kho phim. Người cầm ENT_ADMIN up/sửa/gỡ được; ENT_VIEWER chỉ xem.
+/// KHÔNG ai trong hai loại được TẠO code — việc đó thuộc global admin (User.role).
+enum EntCodeRole {
+  ENT_ADMIN
+  ENT_VIEWER
+}
+
+/// Vé vào cửa. Chủ hệ thống phát, thu hồi bất cứ lúc nào.
+/// Cookie phiên CHỈ mang codeId — vai trò luôn đọc lại từ đây mỗi request,
+/// nên revoke/đổi vai trò có hiệu lực tức thì thay vì chờ cookie 30 ngày hết hạn.
+model EntAccessCode {
+  id String @id @default(uuid())
+  // nanoid 16 ký tự (~95 bit) — đủ mạnh để lưu thẳng, đổi lại chủ hệ thống
+  // xem/copy lại được code đã phát. Chống dò bằng rate-limit theo IP + theo user.
+  code String      @unique
+  role EntCodeRole
+
+  note      String? // phát cho ai — 3 tháng sau còn biết đường thu hồi
+  revokedAt DateTime? // thu hồi: phiên đang mở cũng chết ở request kế tiếp
+
+  useCount   Int       @default(0)
+  lastUsedAt DateTime?
+
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([revokedAt])
+}
+
+/// Một bộ phim/video trong kho.
+model EntVideo {
+  id        String @id @default(uuid())
+  title     String // tên hiển thị, sửa được (mặc định = tên file bỏ đuôi)
+  fileName  String
+  mimeType  String
+  sizeBytes BigInt
+
+  pipelineStatus ReviewPipelineStatus @default(UPLOADING) // dùng chung enum của review
+  errorMessage   String? // lý do FAILED — không có cột này thì màn lỗi câm
+
+  // "plus" = giữ đúng độ phân giải nguồn (mặc định — kho phim cần nét).
+  // "basic" = encode 0đ nhưng Mux CHẶN ladder ở 720p. Chọn lúc up, không đổi sau.
+  muxQuality String @default("plus")
+
+  r2Key         String? // ent/{videoId}/source/{fileName} — giữ lại sau khi Mux xong (re-encode được)
+  muxAssetId    String? @unique
+  muxPlaybackId String? // policy SIGNED — mọi URL phát/poster đều phải ký
+  durationMs    Int?
+  width         Int?
+  height        Int?
+  posterTime    Float? // giây lấy ảnh bìa; mặc định 10% thời lượng
+
+  uploadedById String
+  uploadedAt   DateTime?
+  readyAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  subtitles      EntSubtitle[]
+  uploadSessions EntUploadSession[]
+
+  @@index([pipelineStatus, updatedAt]) // janitor + poller trạng thái
+  @@index([createdAt])
+}
+
+/// Phụ đề do người dùng up lên (.srt) — đã convert sang VTT trước khi lưu.
+/// KHÔNG có auto-sub: chỉ file người dùng đưa vào.
+model EntSubtitle {
+  id      String   @id @default(uuid())
+  videoId String
+  video   EntVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  label String // hiện trong menu phụ đề: "Tiếng Việt", "English"…
+  lang  String? // BCP-47 cho thuộc tính srclang
+
+  r2Key String // ent/{videoId}/subs/{subId}.vtt — ĐÃ là VTT, không phải SRT gốc
+
+  createdAt DateTime @default(now())
+
+  @@index([videoId])
+}
+
+/// Sổ multipart R2 cho kho phim — bản song sinh của UploadSession
+/// (bảng kia khoá cứng FK vào ReviewVersion nên không dùng chung được).
+model EntUploadSession {
+  id      String   @id @default(uuid())
+  videoId String
+  video   EntVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  idempotencyKey String? @unique // client gửi lại cùng key ⇒ phát lại response cũ
+
+  r2Key         String
+  r2UploadId    String
+  partSizeBytes Int
+  partsTotal    Int
+  partsDone     Int    @default(0)
+
+  expiresAt   DateTime // +24h; janitor abort phiên dở dang quá hạn
+  completedAt DateTime?
+  abortedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([videoId])
+}

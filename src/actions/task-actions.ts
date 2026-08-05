@@ -239,13 +239,22 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         const isUserStart = newStatus === 'Đang thực hiện'
             && isAssignee
             && (oldStatus === 'Nhận task' || oldStatus === 'Đã nhận task')
-        const isUserDelivery = newStatus === 'Revision'
+        // [Đồng bộ nộp bài 2026-08-04] Editor nộp bài giờ đáp xuống 'Đã nộp video (nội bộ)' (A2)
+        // — CÙNG ô với đường up video (F7 Mux READY), vì Tệp đã khoá upload nên link là đường
+        // giao duy nhất. Giữ 'Revision' trong điều kiện này cho các bản ghi/tab cũ và cho bất kỳ
+        // client cũ nào còn gửi status đó: cả hai đều phải bắn email + thông báo GĐ4 cho quản lý,
+        // nếu không thì đổi trạng thái xong quản lý KHÔNG biết là có bài mới.
+        const SUBMIT_STATUSES = ['Đã nộp video (nội bộ)', 'Revision']
+        const isUserDelivery = SUBMIT_STATUSES.includes(newStatus)
             && isAssignee
             && oldStatus === 'Đang thực hiện'
             && !!updatedTaskResult.productLink?.trim()
         // [Sprint P audit-fix] Add `!isAssignee` — không gửi taskFeedback email
         // cho user khi chính user là actor (admin reject ≠ user self-action).
-        const isAdminResume = newStatus === 'Đang thực hiện' && oldStatus === 'Revision' && !isAssignee
+        // [Đồng bộ nộp bài 2026-08-04] Bài nộp giờ nằm ở A2, nên "quản lý trả bài về làm tiếp"
+        // là A2 → Đang thực hiện, không còn chỉ Revision → Đang thực hiện. Thiếu vế này thì
+        // editor offline KHÔNG nhận email nào khi bài bị trả — chỉ có thông báo trong app.
+        const isAdminResume = newStatus === 'Đang thực hiện' && SUBMIT_STATUSES.includes(oldStatus) && !isAssignee
         const isAdminReject = newStatus === 'Revision' && !isUserDelivery && !isAssignee
         const isComplete = newStatus === 'Hoàn tất'
 

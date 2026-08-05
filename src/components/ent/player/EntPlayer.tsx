@@ -7,23 +7,48 @@
 //   • bấm vào mặt video = phát/dừng, kèm biểu tượng loé giữa màn
 //   • bấm đúp = toàn màn hình (desktop)
 //   • phím tắt: Space/K phát-dừng · ←/→ ±10 giây · ↑/↓ âm lượng · F · M · C
-//   • NHỚ VỊ TRÍ đang xem dở (localStorage), mở lại là chạy tiếp
+//   • NHỚ VỊ TRÍ đang xem dở, mở lại là chạy tiếp
 //
-// Toàn màn hình: dùng Fullscreen API, nhưng iOS Safari không cho fullscreen phần
-// tử div — nên có đường lùi "giả toàn màn hình" bằng CSS fixed inset-0.
+// ─── SỬA SAU RÀ SOÁT 05/08/2026 ─────────────────────────────────────────────
+// 1. Bấm đúp KHÔNG còn chạy phát/dừng hai lần: click chờ 220ms, có bấm đúp thì
+//    huỷ lệnh chờ đó.
+// 2. Trên máy cảm ứng, chạm khi điều khiển đang ẨN chỉ để HIỆN điều khiển —
+//    trước đây chạm để xem nút thì phim dừng luôn.
+// 3. Thanh điều khiển KHÔNG bị tháo khỏi DOM khi tự ẩn (chỉ mờ + tắt bắt sự kiện).
+//    Tháo ra khiến menu đang mở biến mất giữa chừng.
+// 4. Đang mở menu / đang kéo tua thì KHOÁ tự ẩn (onHoldChange).
+// 5. Phím tắt bỏ qua khi có Ctrl/Cmd/Alt, và chỉ chặn ở ô nhập CHỮ (trước đây
+//    chạm vào thanh âm lượng là mọi phím tắt chết vì nó cũng là <input>).
+// 6. Ghi vị trí xem dở cả khi DỪNG, khi TUA và khi rời trang — trước chỉ ghi lúc
+//    đang phát nên dừng rồi đóng tab là mất.
+// 7. Gắn phụ đề theo ĐỐI TƯỢNG track (không theo chỉ số) và báo khi tệp phụ đề
+//    hỏng, thay vì im lặng không hiện gì.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, Play, Pause, Loader2, AlertTriangle } from 'lucide-react'
 import { useEntPlayer } from './useEntPlayer'
+import { useSubtitleSync } from './useSubtitleSync'
 import EntPlayerControls, { type SubtitleOption } from './EntPlayerControls'
 
 const CONTROLS_HIDE_MS = 3000
+const DOUBLE_CLICK_WINDOW_MS = 220
 const RESUME_KEY = (id: string) => `ent:pos:${id}`
 /** Dưới 30 giây thì coi như mới bấm vào; trên 95% thì coi như đã xem hết. */
 const RESUME_MIN_SEC = 30
 const RESUME_MAX_RATIO = 0.95
+
+/** Ô nhập CHỮ — chỉ những thứ này mới được cướp phím tắt. */
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url'])
+
+function isTextEntry(el: EventTarget | null): boolean {
+    if (!(el instanceof HTMLElement)) return false
+    if (el.isContentEditable) return true
+    if (el.tagName === 'TEXTAREA') return true
+    if (el.tagName === 'INPUT') return TEXT_INPUT_TYPES.has((el as HTMLInputElement).type)
+    return false
+}
 
 export default function EntPlayer({
     videoId,
@@ -39,15 +64,20 @@ export default function EntPlayer({
     const videoRef = useRef<HTMLVideoElement>(null)
     const shellRef = useRef<HTMLDivElement>(null)
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const c = useEntPlayer({ videoRef, videoId, enabled: true })
 
     const [controlsVisible, setControlsVisible] = useState(true)
+    const [holdOpen, setHoldOpen] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [pseudoFs, setPseudoFs] = useState(false)
     const [flash, setFlash] = useState<'play' | 'pause' | null>(null)
     const [activeSub, setActiveSub] = useState<string | null>(null)
+    const [subError, setSubError] = useState<string | null>(null)
     const resumedRef = useRef(false)
+
+    const sync = useSubtitleSync({ videoRef, videoId, activeSubtitleId: activeSub })
 
     // ── tự ẩn điều khiển ──
     const poke = useCallback(() => {
@@ -60,13 +90,28 @@ export default function EntPlayer({
         poke()
         return () => {
             if (hideTimer.current) clearTimeout(hideTimer.current)
+            if (clickTimer.current) clearTimeout(clickTimer.current)
         }
     }, [poke])
 
-    // Đang dừng thì LUÔN hiện điều khiển — ẩn lúc dừng chỉ làm người xem hoang mang.
-    const showControls = controlsVisible || !c.isPlaying
+    // Đang dừng, đang mở menu, hoặc đang kéo tua ⇒ LUÔN hiện điều khiển.
+    const showControls = controlsVisible || !c.isPlaying || holdOpen
 
     // ── nhớ vị trí xem dở ──
+    const saveProgress = useCallback(() => {
+        try {
+            const v = videoRef.current
+            if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return
+            if (v.currentTime > v.duration * RESUME_MAX_RATIO || v.currentTime < RESUME_MIN_SEC) {
+                localStorage.removeItem(RESUME_KEY(videoId))
+            } else {
+                localStorage.setItem(RESUME_KEY(videoId), String(Math.floor(v.currentTime)))
+            }
+        } catch {
+            /* localStorage bị chặn */
+        }
+    }, [videoId])
+
     useEffect(() => {
         if (!c.ready || resumedRef.current || !c.durationSec) return
         resumedRef.current = true
@@ -76,24 +121,29 @@ export default function EntPlayer({
                 c.seekTo(saved)
             }
         } catch {
-            /* localStorage bị chặn — bỏ qua, không phải lỗi đáng báo */
+            /* bỏ qua */
         }
     }, [c, c.ready, c.durationSec, videoId])
 
     useEffect(() => {
-        if (!c.isPlaying) return
-        const t = setInterval(() => {
-            try {
-                const v = videoRef.current
-                if (!v || !Number.isFinite(v.duration)) return
-                if (v.currentTime > v.duration * RESUME_MAX_RATIO) localStorage.removeItem(RESUME_KEY(videoId))
-                else localStorage.setItem(RESUME_KEY(videoId), String(Math.floor(v.currentTime)))
-            } catch {
-                /* bỏ qua */
-            }
-        }, 5000)
-        return () => clearInterval(t)
-    }, [c.isPlaying, videoId])
+        const v = videoRef.current
+        if (!v) return
+        // Ghi ở MỌI thời điểm đáng ghi, không chỉ khi đang phát: dừng rồi đóng tab
+        // là kịch bản thường gặp nhất và trước đây mất sạch.
+        const tick = setInterval(saveProgress, 5000)
+        v.addEventListener('pause', saveProgress)
+        v.addEventListener('seeked', saveProgress)
+        window.addEventListener('pagehide', saveProgress)
+        document.addEventListener('visibilitychange', saveProgress)
+        return () => {
+            clearInterval(tick)
+            saveProgress()
+            v.removeEventListener('pause', saveProgress)
+            v.removeEventListener('seeked', saveProgress)
+            window.removeEventListener('pagehide', saveProgress)
+            document.removeEventListener('visibilitychange', saveProgress)
+        }
+    }, [saveProgress])
 
     // ── toàn màn hình ──
     const toggleFullscreen = useCallback(() => {
@@ -124,10 +174,11 @@ export default function EntPlayer({
     // ── phím tắt ──
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            const t = e.target as HTMLElement | null
-            // Đang gõ trong ô nhập thì phím tắt phải im — nếu không, gõ chữ "f" trong
-            // ô tìm kiếm sẽ bật toàn màn hình.
-            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+            // Đừng cướp phím tắt của trình duyệt (Ctrl+F, Cmd+R…).
+            if (e.ctrlKey || e.metaKey || e.altKey) return
+            // Chỉ nhường cho ô nhập CHỮ. Thanh âm lượng cũng là <input> nhưng
+            // chặn ở đó thì chạm vào nó một lần là mọi phím tắt chết.
+            if (isTextEntry(e.target)) return
             poke()
             switch (e.key) {
                 case ' ':
@@ -170,37 +221,74 @@ export default function EntPlayer({
         return () => window.removeEventListener('keydown', onKey)
     }, [c, poke, subtitles, toggleFullscreen])
 
-    // ── bật/tắt track phụ đề trên thẻ video ──
+    // ── bật/tắt track phụ đề ──
     useEffect(() => {
         const v = videoRef.current
         if (!v) return
-        // Duyệt textTracks của chính DOM (không phải danh sách React) vì trình duyệt
-        // mới là nơi giữ trạng thái showing/hidden thật.
-        for (let i = 0; i < v.textTracks.length; i++) {
-            const track = v.textTracks[i]
-            const wanted = subtitles[i]?.id === activeSub
-            track.mode = wanted ? 'showing' : 'hidden'
+        const wantedIndex = activeSub ? subtitles.findIndex((s) => s.id === activeSub) : -1
+
+        const apply = () => {
+            const tracks = Array.from(v.textTracks)
+            // Ghép theo THỨ TỰ track phụ đề (bỏ qua track khác loại mà hls.js có
+            // thể chèn vào), chứ không lấy chỉ số thô của textTracks.
+            const subtitleTracks = tracks.filter((t) => t.kind === 'subtitles' || t.kind === 'captions')
+            subtitleTracks.forEach((t, i) => {
+                t.mode = i === wantedIndex ? 'showing' : 'hidden'
+            })
         }
+        apply()
+        // Track nạp bất đồng bộ — hls.js/HLS gốc có thể thêm track sau khi mount.
+        v.textTracks.addEventListener?.('addtrack', apply)
+        return () => v.textTracks.removeEventListener?.('addtrack', apply)
     }, [activeSub, subtitles, c.ready])
 
-    const onSurfaceClick = () => {
-        setFlash(c.isPlaying ? 'pause' : 'play')
-        setTimeout(() => setFlash(null), 450)
-        c.toggle()
+    // Không tải được tệp phụ đề thì phải NÓI — im lặng là người xem tưởng phim
+    // không có phụ đề và đi tìm bản khác.
+    const onTrackError = useCallback(() => {
+        setSubError('Không tải được tệp phụ đề này.')
+        setTimeout(() => setSubError(null), 6000)
+    }, [])
+
+    // ── bấm vào mặt video ──
+    const onSurfacePointerUp = (e: React.PointerEvent) => {
+        const coarse = e.pointerType === 'touch' || e.pointerType === 'pen'
+        // Trên máy cảm ứng: chạm khi điều khiển đang ẩn chỉ để HIỆN nó ra.
+        if (coarse && !showControls) {
+            poke()
+            return
+        }
         poke()
+        // Hoãn lệnh phát/dừng để nhường cho bấm đúp (toàn màn hình).
+        if (clickTimer.current) clearTimeout(clickTimer.current)
+        clickTimer.current = setTimeout(() => {
+            setFlash(c.isPlaying ? 'pause' : 'play')
+            setTimeout(() => setFlash(null), 450)
+            c.toggle()
+        }, DOUBLE_CLICK_WINDOW_MS)
+    }
+
+    const onSurfaceDoubleClick = () => {
+        if (clickTimer.current) {
+            clearTimeout(clickTimer.current)
+            clickTimer.current = null
+        }
+        toggleFullscreen()
     }
 
     return (
         <div
             ref={shellRef}
             onMouseMove={poke}
-            onTouchStart={poke}
-            className={`relative flex flex-col bg-black ${
+            className={`relative flex select-none flex-col bg-black ${
                 pseudoFs ? 'fixed inset-0 z-50 h-[100dvh] w-screen' : 'h-[100dvh] w-full'
             } ${showControls ? '' : 'cursor-none'}`}
         >
             {/* Bề mặt video */}
-            <div className="relative flex-1 overflow-hidden" onClick={onSurfaceClick} onDoubleClick={toggleFullscreen}>
+            <div
+                className="relative flex-1 overflow-hidden"
+                onPointerUp={onSurfacePointerUp}
+                onDoubleClick={onSurfaceDoubleClick}
+            >
                 {/* KHÔNG đặt crossOrigin: phụ đề là same-origin (/api/ent/...) nên không
                     cần, mà đặt vào sẽ bắt cả nguồn HLS gốc trên Safari phải qua CORS. */}
                 <video
@@ -214,8 +302,9 @@ export default function EntPlayer({
                             key={s.id}
                             kind="subtitles"
                             label={s.label}
-                            srcLang={s.lang ?? undefined}
+                            srcLang={s.lang ?? 'vi'}
                             src={`/api/ent/videos/${videoId}/subtitles/${s.id}`}
+                            onError={onTrackError}
                         />
                     ))}
                 </video>
@@ -246,58 +335,61 @@ export default function EntPlayer({
                         <Loader2 className="h-8 w-8 animate-spin text-white/70" />
                     </div>
                 )}
+                {/* Khựng vì đang nạp thêm dữ liệu — không có chỉ báo thì người xem
+                    tưởng phim đứng hình. */}
+                {c.ready && c.stalled && !c.error && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+                    </div>
+                )}
                 {c.error && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
                         <AlertTriangle className="h-8 w-8 text-red-400" />
                         <p className="text-zinc-300">{c.error}</p>
                     </div>
                 )}
+
+                {subError && (
+                    <div className="pointer-events-none absolute bottom-28 left-1/2 -translate-x-1/2 rounded-lg bg-red-500/90 px-3 py-1.5 text-xs text-white">
+                        {subError}
+                    </div>
+                )}
             </div>
 
-            {/* Thanh trên: nút quay lại + tên phim — ẩn/hiện cùng điều khiển */}
-            <AnimatePresence>
-                {showControls && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.18 }}
-                        className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent px-4 py-4"
-                    >
-                        <Link
-                            href="/entertainment"
-                            onClick={(e) => e.stopPropagation()}
-                            className="pointer-events-auto rounded-lg p-2 text-white transition-colors hover:bg-white/10"
-                            title="Về kho phim"
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </Link>
-                        <h1 className="truncate text-sm font-medium text-white md:text-base">{title}</h1>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* Thanh trên: nút quay lại + tên phim */}
+            <div
+                className={`absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/80 to-transparent px-4 py-4 transition-opacity duration-200 ${
+                    showControls ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+            >
+                <Link
+                    href="/entertainment"
+                    className="rounded-lg p-2 text-white transition-colors hover:bg-white/10"
+                    title="Về kho phim"
+                >
+                    <ArrowLeft className="h-5 w-5" />
+                </Link>
+                <h1 className="truncate text-sm font-medium text-white md:text-base">{title}</h1>
+            </div>
 
-            {/* Thanh điều khiển */}
-            <AnimatePresence>
-                {showControls && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 12 }}
-                        transition={{ duration: 0.18 }}
-                        className="absolute inset-x-0 bottom-0"
-                    >
-                        <EntPlayerControls
-                            c={c}
-                            isFullscreen={isFullscreen || pseudoFs}
-                            onToggleFullscreen={toggleFullscreen}
-                            subtitles={subtitles}
-                            activeSubtitleId={activeSub}
-                            onSelectSubtitle={setActiveSub}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* Thanh điều khiển — GIỮ TRONG DOM khi ẩn, chỉ mờ đi. Tháo ra sẽ làm
+                menu đang mở biến mất và ngắt cả thao tác kéo tua dở dang. */}
+            <div
+                className={`absolute inset-x-0 bottom-0 transition-opacity duration-200 ${
+                    showControls ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+            >
+                <EntPlayerControls
+                    c={c}
+                    isFullscreen={isFullscreen || pseudoFs}
+                    onToggleFullscreen={toggleFullscreen}
+                    subtitles={subtitles}
+                    activeSubtitleId={activeSub}
+                    onSelectSubtitle={setActiveSub}
+                    sync={sync}
+                    onHoldChange={setHoldOpen}
+                />
+            </div>
         </div>
     )
 }

@@ -25,6 +25,8 @@ export interface EntPlayerController {
     ready: boolean
     error: string | null
     isPlaying: boolean
+    /** Đang khựng vì chờ nạp dữ liệu — để hiện vòng xoay, đừng để người xem tưởng treo. */
+    stalled: boolean
     currentSec: number
     durationSec: number
     bufferedSec: number
@@ -33,6 +35,8 @@ export interface EntPlayerController {
     volume: number
     levels: EntQualityLevel[]
     currentLevel: number
+    /** Khi đang ở chế độ Tự động: mức đang thực sự phát, để hiện "Tự động (1080p)". */
+    autoLevelHeight: number | null
     nativeHls: boolean
     play: () => void
     pause: () => void
@@ -82,10 +86,16 @@ export function useEntPlayer(opts: {
     const [volume, setVolumeState] = useState(1)
     const [levels, setLevels] = useState<EntQualityLevel[]>([])
     const [currentLevel, setCurrentLevel] = useState(-1)
+    const [autoLevelHeight, setAutoLevelHeight] = useState<number | null>(null)
     const [nativeHls, setNativeHls] = useState(false)
+    const [stalled, setStalled] = useState(false)
 
     const hlsRef = useRef<any>(null)
     const refreshAttemptsRef = useRef(0)
+    // Mức chất lượng người xem đã GHIM. Sau khi xin lại token (403) hls.js dựng
+    // lại nguồn và quay về Tự động — phải ghim lại, nếu không mức đã chọn âm thầm
+    // mất mà người xem không biết.
+    const pinnedLevelRef = useRef(-1)
 
     // ── gắn hls.js (hoặc HLS gốc trên Safari) ──
     useEffect(() => {
@@ -165,6 +175,9 @@ export function useEntPlayer(opts: {
                     )
                     hls.startLevel = topLevel
                     hls.startLoad()
+                    // Sau khi ký lại token vì 403, nguồn được dựng lại từ đầu ⇒
+                    // ghim lại đúng mức người xem đã chọn.
+                    if (pinnedLevelRef.current >= 0) hls.currentLevel = pinnedLevelRef.current
                     setReady(true)
                 })
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
@@ -172,6 +185,8 @@ export function useEntPlayer(opts: {
                 })
                 hls.on(Hls.Events.LEVEL_SWITCHED, (_e: unknown, data: { level: number }) => {
                     setCurrentLevel(hls.autoLevelEnabled ? -1 : data.level)
+                    const h = hls.levels?.[data.level]?.height ?? null
+                    setAutoLevelHeight(hls.autoLevelEnabled ? h : null)
                 })
                 hls.on(
                     Hls.Events.ERROR,
@@ -226,16 +241,25 @@ export function useEntPlayer(opts: {
         const onTime = () => {
             setCurrentSec(video.currentTime)
             // Mốc đã tải sẵn: vẽ vệt sáng mờ trên thanh tua như các trang xem phim.
+            // Đặt lại về vị trí hiện tại trước khi dò — tua tới vùng CHƯA tải mà
+            // giữ giá trị cũ sẽ vẽ một vệt "đã tải" dối.
             const b = video.buffered
+            let end = video.currentTime
             for (let i = 0; i < b.length; i++) {
                 if (b.start(i) <= video.currentTime && video.currentTime <= b.end(i)) {
-                    setBufferedSec(b.end(i))
+                    end = b.end(i)
                     break
                 }
             }
+            setBufferedSec(end)
         }
-        const onPlay = () => setIsPlaying(true)
+        const onPlay = () => {
+            setIsPlaying(true)
+            setStalled(false)
+        }
         const onPause = () => setIsPlaying(false)
+        const onWaiting = () => setStalled(true)
+        const onPlaying = () => setStalled(false)
         const onLoaded = () => setDurationSec(Number.isFinite(video.duration) ? video.duration : 0)
         const onRate = () => setPlaybackRate(video.playbackRate)
         const onVol = () => {
@@ -248,6 +272,8 @@ export function useEntPlayer(opts: {
         video.addEventListener('progress', onTime)
         video.addEventListener('play', onPlay)
         video.addEventListener('pause', onPause)
+        video.addEventListener('waiting', onWaiting)
+        video.addEventListener('playing', onPlaying)
         video.addEventListener('loadedmetadata', onLoaded)
         video.addEventListener('durationchange', onLoaded)
         video.addEventListener('ratechange', onRate)
@@ -258,6 +284,8 @@ export function useEntPlayer(opts: {
             video.removeEventListener('progress', onTime)
             video.removeEventListener('play', onPlay)
             video.removeEventListener('pause', onPause)
+            video.removeEventListener('waiting', onWaiting)
+            video.removeEventListener('playing', onPlaying)
             video.removeEventListener('loadedmetadata', onLoaded)
             video.removeEventListener('durationchange', onLoaded)
             video.removeEventListener('ratechange', onRate)
@@ -303,7 +331,9 @@ export function useEntPlayer(opts: {
         const hls = hlsRef.current
         if (!hls) return
         hls.currentLevel = index // -1 = tự động
+        pinnedLevelRef.current = index
         setCurrentLevel(index)
+        if (index >= 0) setAutoLevelHeight(null)
     }, [])
     const toggleMute = useCallback(() => {
         const v = videoRef.current
@@ -324,6 +354,7 @@ export function useEntPlayer(opts: {
         ready,
         error,
         isPlaying,
+        stalled,
         currentSec,
         durationSec,
         bufferedSec,
@@ -332,6 +363,7 @@ export function useEntPlayer(opts: {
         volume,
         levels,
         currentLevel,
+        autoLevelHeight,
         nativeHls,
         play,
         pause,

@@ -1,17 +1,27 @@
 'use client'
 
 // [Giải trí] Thanh điều khiển kiểu trang xem phim.
-// Bố cục theo quy ước chung (Netflix/YouTube): thanh tua chiếm trọn bề ngang ở
-// trên, hàng nút bên dưới; nhóm trái = phát/tua/âm lượng/thời gian, nhóm phải =
-// phụ đề/cài đặt/toàn màn hình.
+// Bố cục theo quy ước chung: thanh tua chiếm trọn bề ngang ở trên, hàng nút bên
+// dưới; nhóm trái = phát/tua/âm lượng/thời gian, nhóm phải = phụ đề/cài đặt/toàn
+// màn hình.
+//
+// ─── SỬA SAU RÀ SOÁT 05/08/2026 ─────────────────────────────────────────────
+// • touch-action:none trên thanh tua — thiếu nó thì trình duyệt di động cướp cử
+//   chỉ kéo để cuộn trang, người dùng KHÔNG tua được bằng ngón tay.
+// • onPointerCancel — thiếu thì cờ "đang kéo" kẹt true, rê chuột ngang qua thanh
+//   là phim nhảy lung tung.
+// • Thanh âm lượng chỉ hiện khi rê chuột ⇒ máy cảm ứng không chỉnh được. Nay
+//   máy không có hover thì luôn hiện.
+// • Menu mở / đang kéo phải GIỮ thanh điều khiển, không cho tự ẩn (onHoldChange).
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
     Play, Pause, Volume2, VolumeX, Volume1, Maximize, Minimize,
-    Settings, Subtitles, RotateCcw, RotateCw,
+    Settings, Subtitles, RotateCcw, RotateCw, Minus, Plus, Undo2,
 } from 'lucide-react'
 import type { EntPlayerController } from './useEntPlayer'
+import { SUB_OFFSET_STEP_SEC, type SubtitleSync } from './useSubtitleSync'
 
 export interface SubtitleOption {
     id: string
@@ -37,12 +47,34 @@ export default function EntPlayerControls(props: {
     subtitles: SubtitleOption[]
     activeSubtitleId: string | null
     onSelectSubtitle: (id: string | null) => void
+    sync: SubtitleSync
+    /** Báo lên shell: đang có menu mở hoặc đang kéo tua ⇒ ĐỪNG tự ẩn thanh. */
+    onHoldChange: (hold: boolean) => void
 }) {
-    const { c, isFullscreen, onToggleFullscreen, subtitles, activeSubtitleId, onSelectSubtitle } = props
+    const {
+        c, isFullscreen, onToggleFullscreen,
+        subtitles, activeSubtitleId, onSelectSubtitle, sync, onHoldChange,
+    } = props
     const railRef = useRef<HTMLDivElement>(null)
     const [scrubbing, setScrubbing] = useState(false)
     const [hoverSec, setHoverSec] = useState<number | null>(null)
     const [menu, setMenu] = useState<null | 'settings' | 'subs'>(null)
+    // Máy cảm ứng không có hover ⇒ thanh âm lượng phải hiện sẵn.
+    const [coarsePointer, setCoarsePointer] = useState(false)
+
+    useEffect(() => {
+        const mq = window.matchMedia('(hover: none)')
+        const update = () => setCoarsePointer(mq.matches)
+        update()
+        mq.addEventListener('change', update)
+        return () => mq.removeEventListener('change', update)
+    }, [])
+
+    // Giữ thanh điều khiển khi đang thao tác — nếu không, nó tự ẩn giữa chừng
+    // và menu đang mở biến mất theo.
+    useEffect(() => {
+        onHoldChange(menu !== null || scrubbing)
+    }, [menu, scrubbing, onHoldChange])
 
     const dur = c.durationSec || 0
     const pct = dur ? (c.currentSec / dur) * 100 : 0
@@ -52,45 +84,58 @@ export default function EntPlayerControls(props: {
         const el = railRef.current
         if (!el || !dur) return 0
         const rect = el.getBoundingClientRect()
-        return ((clientX - rect.left) / rect.width) * dur
+        const ratio = (clientX - rect.left) / rect.width
+        return Math.min(Math.max(0, ratio), 1) * dur
     }
 
-    const onRailDown = (e: React.PointerEvent) => {
-        if (!dur) return
-        e.currentTarget.setPointerCapture(e.pointerId)
-        setScrubbing(true)
-        c.seekTo(secAtClientX(e.clientX))
-    }
-    const onRailMove = (e: React.PointerEvent) => {
-        if (!dur) return
-        setHoverSec(secAtClientX(e.clientX))
-        if (scrubbing) c.seekTo(secAtClientX(e.clientX))
-    }
-    const onRailUp = (e: React.PointerEvent) => {
-        if (scrubbing) {
+    const endScrub = (e: React.PointerEvent) => {
+        if (!scrubbing) return
+        try {
             e.currentTarget.releasePointerCapture(e.pointerId)
-            setScrubbing(false)
+        } catch {
+            /* con trỏ đã mất */
         }
+        setScrubbing(false)
     }
 
     const VolumeIcon = c.muted || c.volume === 0 ? VolumeX : c.volume < 0.5 ? Volume1 : Volume2
     const qualityLabel =
-        c.currentLevel === -1 ? 'Tự động' : (c.levels.find((l) => l.index === c.currentLevel)?.label ?? 'Tự động')
+        c.currentLevel === -1
+            ? c.autoLevelHeight
+                ? `Tự động (${c.autoLevelHeight}p)`
+                : 'Tự động'
+            : (c.levels.find((l) => l.index === c.currentLevel)?.label ?? 'Tự động')
+
+    const volSliderCls = coarsePointer
+        ? 'ml-2 w-20 opacity-100'
+        : 'w-0 opacity-0 group-hover/vol:ml-2 group-hover/vol:w-20 group-hover/vol:opacity-100 focus:ml-2 focus:w-20 focus:opacity-100'
 
     return (
         <div
-            className="bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 pb-3 pt-10 md:px-5 md:pb-4"
+            className="select-none bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 pb-3 pt-10 md:px-5 md:pb-4"
             // Bấm vào thanh điều khiển KHÔNG được lọt xuống bề mặt video (bề mặt đó
-            // đang bắt click để play/pause).
+            // đang bắt click để phát/dừng và bấm đúp để toàn màn hình).
             onClick={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
         >
             {/* Thanh tua */}
             <div
                 ref={railRef}
-                onPointerDown={onRailDown}
-                onPointerMove={onRailMove}
-                onPointerUp={onRailUp}
+                style={{ touchAction: 'none' }}
+                onPointerDown={(e) => {
+                    if (!dur) return
+                    e.currentTarget.setPointerCapture(e.pointerId)
+                    setScrubbing(true)
+                    c.seekTo(secAtClientX(e.clientX))
+                }}
+                onPointerMove={(e) => {
+                    if (!dur) return
+                    setHoverSec(secAtClientX(e.clientX))
+                    if (scrubbing) c.seekTo(secAtClientX(e.clientX))
+                }}
+                onPointerUp={endScrub}
+                onPointerCancel={endScrub}
                 onPointerLeave={() => setHoverSec(null)}
                 className="group/rail relative -mx-1 cursor-pointer px-1 py-2.5"
             >
@@ -98,14 +143,15 @@ export default function EntPlayerControls(props: {
                     <div className="absolute inset-y-0 left-0 rounded-full bg-white/25" style={{ width: `${bufPct}%` }} />
                     <div className="absolute inset-y-0 left-0 rounded-full bg-amber-500" style={{ width: `${pct}%` }} />
                     <div
-                        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400 opacity-0 shadow transition-opacity group-hover/rail:opacity-100"
-                        style={{ left: `${pct}%`, opacity: scrubbing ? 1 : undefined }}
+                        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400 shadow transition-opacity group-hover/rail:opacity-100"
+                        style={{ left: `${pct}%`, opacity: scrubbing || coarsePointer ? 1 : 0 }}
                     />
                 </div>
                 {hoverSec != null && dur > 0 && (
                     <div
                         className="pointer-events-none absolute -top-6 -translate-x-1/2 rounded bg-black/80 px-1.5 py-0.5 text-[11px] tabular-nums text-white"
-                        style={{ left: `${(hoverSec / dur) * 100}%` }}
+                        // Kẹp trong khoảng 2%–98% để bong bóng không bay ra ngoài thanh.
+                        style={{ left: `${Math.min(98, Math.max(2, (hoverSec / dur) * 100))}%` }}
                     >
                         {fmtTime(hoverSec)}
                     </div>
@@ -131,7 +177,6 @@ export default function EntPlayerControls(props: {
                     </span>
                 </IconBtn>
 
-                {/* Âm lượng: rê vào mới hiện thanh trượt, đúng nếp các trang xem phim */}
                 <div className="group/vol flex items-center">
                     <IconBtn onClick={c.toggleMute} label={c.muted ? 'Bật tiếng (M)' : 'Tắt tiếng (M)'}>
                         <VolumeIcon className="h-5 w-5" />
@@ -144,11 +189,11 @@ export default function EntPlayerControls(props: {
                         value={c.muted ? 0 : c.volume}
                         onChange={(e) => c.setVolume(Number(e.target.value))}
                         aria-label="Âm lượng"
-                        className="ent-vol h-1 w-0 cursor-pointer opacity-0 transition-all duration-200 group-hover/vol:ml-2 group-hover/vol:w-20 group-hover/vol:opacity-100 focus:ml-2 focus:w-20 focus:opacity-100"
+                        className={`ent-vol h-1 cursor-pointer transition-all duration-200 ${volSliderCls}`}
                     />
                 </div>
 
-                <span className="ml-1 select-none text-xs tabular-nums text-white/80 md:text-sm">
+                <span className="ml-1 text-xs tabular-nums text-white/80 md:text-sm">
                     {fmtTime(c.currentSec)} <span className="text-white/40">/ {fmtTime(dur)}</span>
                 </span>
 
@@ -166,27 +211,57 @@ export default function EntPlayerControls(props: {
                         <AnimatePresence>
                             {menu === 'subs' && (
                                 <Menu onClose={() => setMenu(null)}>
-                                    <MenuItem
-                                        active={activeSubtitleId === null}
-                                        onClick={() => {
-                                            onSelectSubtitle(null)
-                                            setMenu(null)
-                                        }}
-                                    >
+                                    <MenuItem active={activeSubtitleId === null} onClick={() => onSelectSubtitle(null)}>
                                         Tắt
                                     </MenuItem>
                                     {subtitles.map((s) => (
                                         <MenuItem
                                             key={s.id}
                                             active={activeSubtitleId === s.id}
-                                            onClick={() => {
-                                                onSelectSubtitle(s.id)
-                                                setMenu(null)
-                                            }}
+                                            onClick={() => onSelectSubtitle(s.id)}
                                         >
                                             {s.label}
                                         </MenuItem>
                                     ))}
+
+                                    {/* Chỉnh khớp — chỉ có nghĩa khi đang bật một phụ đề */}
+                                    {activeSubtitleId && (
+                                        <>
+                                            <MenuLabel>Phụ đề bị lệch?</MenuLabel>
+                                            <div className="flex items-center gap-1 px-2 pb-2">
+                                                <button
+                                                    onClick={() => sync.nudge(-SUB_OFFSET_STEP_SEC)}
+                                                    title="Phụ đề đang hiện muộn — cho hiện sớm hơn"
+                                                    className="rounded-lg p-1.5 text-zinc-300 transition-colors hover:bg-white/10"
+                                                >
+                                                    <Minus className="h-3.5 w-3.5" />
+                                                </button>
+                                                <span className="min-w-[68px] text-center text-xs tabular-nums text-zinc-200">
+                                                    {sync.offsetSec > 0 ? '+' : ''}
+                                                    {sync.offsetSec.toFixed(1)}s
+                                                </span>
+                                                <button
+                                                    onClick={() => sync.nudge(SUB_OFFSET_STEP_SEC)}
+                                                    title="Phụ đề đang hiện sớm — cho hiện muộn hơn"
+                                                    className="rounded-lg p-1.5 text-zinc-300 transition-colors hover:bg-white/10"
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                </button>
+                                                {sync.offsetSec !== 0 && (
+                                                    <button
+                                                        onClick={sync.reset}
+                                                        title="Về mốc gốc"
+                                                        className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-200"
+                                                    >
+                                                        <Undo2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="px-3 pb-2 text-[10px] leading-relaxed text-zinc-600">
+                                                Lời thoại tới trước hình thì bấm ➕, tới sau hình thì bấm ➖.
+                                            </p>
+                                        </>
+                                    )}
                                 </Menu>
                             )}
                         </AnimatePresence>
@@ -225,8 +300,8 @@ export default function EntPlayerControls(props: {
                                     <p className="px-3 pb-2 text-[11px] text-zinc-500">Đang tải…</p>
                                 ) : (
                                     <>
-                                        <MenuItem active={c.currentLevel === -1} onClick={() => c.setLevel(-1)}>
-                                            Tự động
+                                        <MenuItem active={c.currentLevel === -1} onClick={() => c.setLevel(-1)} keepOpen>
+                                            {c.autoLevelHeight ? `Tự động (${c.autoLevelHeight}p)` : 'Tự động'}
                                         </MenuItem>
                                         {[...c.levels]
                                             .sort((a, b) => (b.height ?? 0) - (a.height ?? 0))
@@ -235,6 +310,7 @@ export default function EntPlayerControls(props: {
                                                     key={l.index}
                                                     active={c.currentLevel === l.index}
                                                     onClick={() => c.setLevel(l.index)}
+                                                    keepOpen
                                                 >
                                                     {l.label}
                                                 </MenuItem>
@@ -251,7 +327,6 @@ export default function EntPlayerControls(props: {
                 </IconBtn>
             </div>
 
-            {/* Nhãn chất lượng hiện hành — nhỏ, chỉ để biết đang xem mức nào */}
             {!c.nativeHls && c.levels.length > 0 && (
                 <div className="mt-1 text-right text-[10px] text-white/35">{qualityLabel}</div>
             )}
@@ -295,7 +370,12 @@ function IconBtn({
 }) {
     return (
         <button
-            onClick={onClick}
+            onClick={(e) => {
+                onClick()
+                // Bỏ focus: giữ focus trên nút khiến phím Space sau đó bấm lại
+                // chính nút này thay vì đi vào phím tắt của trình phát.
+                e.currentTarget.blur()
+            }}
             title={label}
             aria-label={label}
             className={`rounded-lg p-2 transition-colors hover:bg-white/10 ${active ? 'text-amber-400' : 'text-white'}`}
@@ -315,7 +395,7 @@ function Menu({ children, onClose }: { children: React.ReactNode; onClose: () =>
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 6 }}
                 transition={{ duration: 0.15 }}
-                className="absolute bottom-full right-0 z-20 mb-2 min-w-[160px] overflow-hidden rounded-xl border border-white/10 bg-zinc-950/95 py-1 shadow-2xl backdrop-blur-xl"
+                className="absolute bottom-full right-0 z-20 mb-2 max-h-[60vh] min-w-[190px] overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 py-1 shadow-2xl backdrop-blur-xl"
             >
                 {children}
             </motion.div>
@@ -331,14 +411,18 @@ function MenuItem({
     children,
     active,
     onClick,
+    keepOpen,
 }: {
     children: React.ReactNode
     active?: boolean
     onClick: () => void
+    /** Menu chất lượng nên ở lại để người xem đổi thử vài mức. */
+    keepOpen?: boolean
 }) {
     return (
         <button
             onClick={onClick}
+            data-keep-open={keepOpen ? '1' : undefined}
             className={`block w-full px-3 py-1.5 text-left text-sm transition-colors ${
                 active ? 'bg-amber-500/15 text-amber-200' : 'text-zinc-300 hover:bg-white/5'
             }`}

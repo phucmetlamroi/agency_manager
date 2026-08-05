@@ -12,7 +12,7 @@ import { withReviewRoute } from '@/lib/review/route-auth'
 import { putObjectBytes } from '@/lib/review/r2'
 import { reviewLog } from '@/lib/review/logger'
 import { requireEntSession } from '@/lib/ent/auth'
-import { srtToVtt, SubtitleParseError } from '@/lib/ent/subtitles'
+import { srtToVtt, SubtitleParseError, decodeSubtitleBytes } from '@/lib/ent/subtitles'
 import { ENT_SUBTITLE_MAX_BYTES, entSubtitleKey } from '@/lib/ent/constants'
 
 export const runtime = 'nodejs'
@@ -50,10 +50,16 @@ export const POST = withReviewRoute<Ctx>(async (req: NextRequest, { params }) =>
     const lang = langRaw ? langRaw.slice(0, 16) : null
 
     let vtt: string
+    let cueCount: number
+    let notes: string[]
+    let encoding: string
     try {
-        // Đọc UTF-8. Phụ đề tiếng Việt lưu bảng mã cũ (windows-1258) sẽ ra ký tự
-        // hỏng — người dùng thấy ngay trên trình phát và tự lưu lại bằng UTF-8.
-        ;({ vtt } = srtToVtt(await file.text()))
+        // Đọc BYTE THÔ chứ không dùng file.text(): file.text() luôn giả định UTF-8,
+        // nên phụ đề tiếng Việt lưu bảng mã cũ (windows-1258) hoặc UTF-16 sẽ ra
+        // chữ hỏng mà KHÔNG báo lỗi gì — người dùng chỉ phát hiện khi đang xem phim.
+        const decoded = decodeSubtitleBytes(await file.arrayBuffer())
+        encoding = decoded.encoding
+        ;({ vtt, cueCount, notes } = srtToVtt(decoded.text))
     } catch (e) {
         if (e instanceof SubtitleParseError) throw apiError(400, 'VALIDATION_ERROR', e.message)
         throw e
@@ -67,6 +73,8 @@ export const POST = withReviewRoute<Ctx>(async (req: NextRequest, { params }) =>
         data: { id: subId, videoId, label: label.slice(0, 100), lang, r2Key: key },
         select: { id: true, label: true, lang: true },
     })
-    reviewLog('info', 'ent.subtitle.added', { videoId, subId })
-    return apiJson(row, { status: 201 })
+    reviewLog('info', 'ent.subtitle.added', { videoId, subId, cueCount, encoding })
+    // Trả cueCount + ghi chú để giao diện nói được "đã nhận 812 câu thoại" —
+    // người dùng có căn cứ đối chiếu thay vì tin mù.
+    return apiJson({ ...row, cueCount, encoding, notes }, { status: 201 })
 })

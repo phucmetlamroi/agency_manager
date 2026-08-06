@@ -53,6 +53,33 @@ công trên bảng điều khiển R2 (khoá dạng `ent/<id phim>/source/...`).
 > chỉ dọn asset cũ của module Tệp; **tài khoản Mux phải giữ**, không thì kho phim
 > chết theo.
 
+## 3b. Byte nằm ở đâu
+
+**Hai nơi, hai việc khác nhau** — không nơi nào thay được nơi kia:
+
+| Nơi | Giữ gì | Đường dẫn |
+|---|---|---|
+| **Cloudflare R2** | tệp **gốc** y nguyên như lúc up, và phụ đề đã chuyển sang VTT | `ent/{videoId}/source/{tên tệp}` · `ent/{videoId}/subs/{subId}.vtt` |
+| **Mux** | bản **đã chuyển mã** để phát (HLS nhiều mức chất lượng) | asset mang `passthrough = ent:{videoId}` |
+
+Cùng một bucket R2 (`R2_BUCKET`, mặc định `hustly-review`) và cùng một tài khoản
+Mux với module Tệp — tách nhau bằng **tiền tố khoá** (`ent/` với `review/`) và
+bằng **tiền tố passthrough** `ent:`. Không có bucket riêng, không có tài khoản riêng.
+
+Giữ bản gốc trên R2 sau khi Mux đã xong là **cố ý**: mất bản gốc thì không
+encode lại được, và R2 rẻ hơn hẳn (~$0,015/GB/tháng, không tính phí lấy dữ liệu ra).
+
+Đếm thật bất cứ lúc nào:
+
+```bash
+npx tsx scripts/ent/r2-usage.ts
+```
+
+`r2-orphans.ts` đi xa hơn một bước: đối chiếu vật thể R2 với cơ sở dữ liệu để tìm
+byte **mồ côi** (không hàng nào trỏ tới ⇒ tính tiền mãi mà không khoá nào tìm ra),
+và liệt kê **multipart dở dang** — loại này `ListObjectsV2` KHÔNG thấy nhưng vẫn
+tính tiền, nên nhìn danh sách vật thể sẽ tưởng kho sạch trong khi vẫn đang chảy tiền.
+
 ## 4. Kho phim KHÔNG tính vào hạn mức gói
 
 `getStorageUsage` (`src/lib/billing/usage.ts`) chạy SQL thẳng trên bảng

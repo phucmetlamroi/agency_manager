@@ -89,6 +89,9 @@ export default function EntUploadPanel({ onUploaded }: { onUploaded?: () => void
                     phase: 'queued' as const,
                     progress: 0,
                     speed: null,
+                    retries: 0,
+                    staleUrlRetries: 0,
+                    lastRetryReason: null,
                     error: null,
                     videoId: null,
                     sessionId: null,
@@ -289,6 +292,18 @@ export default function EntUploadPanel({ onUploaded }: { onUploaded?: () => void
                                         : ''}
                                 </span>
                             </div>
+
+                            {/* Chỉ hiện khi CÓ làm lại. Im lặng lúc mọi thứ trơn tru là
+                                đúng; nhưng lúc chậm bất thường thì dòng này trả lời
+                                ngay câu "ống hẹp hay đang làm lại vòng vòng" — thứ
+                                trước đây phải suy ngược từ hành vi thanh tiến độ. */}
+                            {(it.retries > 0 || it.staleUrlRetries > 0) && it.phase === 'uploading' && (
+                                <p className="mt-1.5 text-[11px] text-amber-500/80">
+                                    Đã làm lại {it.retries + it.staleUrlRetries} lần
+                                    {it.staleUrlRetries > 0 ? ` (${it.staleUrlRetries} lần do URL hết hạn)` : ''}
+                                    {it.lastRetryReason ? ` · gần nhất: ${it.lastRetryReason}` : ''}
+                                </p>
+                            )}
 
                             {it.error && (
                                 <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-red-400">

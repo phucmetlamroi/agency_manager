@@ -53,6 +53,25 @@ export interface EntUploadItem {
     progress: number
     /** byte/giây, null khi chưa đo được */
     speed: number | null
+    /**
+     * Số lần một phần phải làm lại vì hỏng (mất kết nối, 5xx, khựng quá 120 giây).
+     *
+     * [06/08] Thêm sau một cuộc điều tra tốn công vô ích: có lần tải lên chậm gấp
+     * 80 lần bình thường, và KHÔNG có cách nào biết đó là "ống mạng hẹp" hay "đang
+     * âm thầm làm lại". Mã cho phép tới 4 lượt làm lại mỗi phần với backoff 1–30
+     * giây mà giao diện không hé một chữ, nên phải suy ngược từ hành vi thanh tiến
+     * độ mới loại được. Số này hiện ra là lần sau phân biệt trong 5 giây.
+     */
+    retries: number
+    /**
+     * Số lần URL ký hết hạn GIỮA CHỪNG một phần. Tách riêng khỏi `retries` vì nó
+     * chỉ đúng một bệnh: phần quá to so với đường truyền nên chưa đẩy xong thì chữ
+     * ký đã chết. Thấy số này lớn là biết phải hạ kích thước phần, không phải đổ
+     * cho nhà mạng.
+     */
+    staleUrlRetries: number
+    /** Lý do lần làm lại gần nhất — để không phải mở bảng điều khiển trình duyệt. */
+    lastRetryReason: string | null
     error: string | null
     videoId: string | null
     /** Phiên trên máy chủ — giữ lại để huỷ đúng phiên. */
@@ -252,6 +271,16 @@ export async function runEntUpload(
             return true
         }
 
+        // Đếm việc làm lại để giao diện NÓI RA được, thay vì để người dùng nhìn một
+        // con số tốc độ thấp mà không biết vì ống hẹp hay vì đang làm lại vòng vòng.
+        let retries = 0
+        let staleUrlRetries = 0
+        const noteRetry = (reason: string, stale = false) => {
+            if (stale) staleUrlRetries++
+            else retries++
+            cb.onUpdate({ retries, staleUrlRetries, lastRetryReason: reason })
+        }
+
         const uploadOne = async (part: PartPlan) => {
             if (done.has(part.partNumber)) return // đã xong ở lần chạy trước
             for (let attempt = 0; ; attempt++) {
@@ -277,11 +306,13 @@ export async function runEntUpload(
                     if (status === -1) throw e
                     // 403 = URL ký hết hạn ⇒ xin bộ mới rồi thử lại NGAY, không tính lượt.
                     if (status === 403 && (await refreshUrls())) {
+                        noteRetry('URL ký hết hạn giữa chừng — phần quá lớn so với đường truyền', true)
                         attempt--
                         continue
                     }
                     const retryable = status === 0 || isRetryableStatus(status)
                     if (!retryable || attempt + 1 >= MAX_PART_ATTEMPTS) throw e
+                    noteRetry(status === 0 ? 'mất kết nối hoặc khựng quá 120 giây' : `máy chủ trả HTTP ${status}`)
                     await new Promise((r) => setTimeout(r, computeBackoffMs(attempt)))
                 }
             }

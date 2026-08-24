@@ -8,6 +8,7 @@
  * Chạy: npx tsx scripts/ent/probe-cron-alive.ts
  */
 import { prisma } from '../../src/lib/db'
+import { OVERDUE_ELIGIBLE_STATUSES } from '../../src/lib/task-statuses'
 
 const H = (n: number) => new Date(Date.now() - n * 3600_000)
 const ago = (d: Date | null) => {
@@ -27,16 +28,22 @@ async function main() {
         orderBy: { updatedAt: 'desc' },
         select: { updatedAt: true },
     })
+    // [SỬA 24/08] Trước đây đếm `status != 'Quá hạn'` — SAI, và sai theo hướng gây
+    // hoảng: nó ra 72 trong khi cron thực tế lật 0 task. Route check-deadline lọc
+    // bằng DANH SÁCH TRẮNG OVERDUE_ELIGIBLE_STATUSES; mọi trạng thái chờ duyệt và
+    // 6 trạng thái video đều cronOverdueEligible=false nên cron KHÔNG BAO GIỜ đụng
+    // tới (chú thích trong route: "the cron never overwrites their lifecycle value").
+    // Dùng đúng bộ lọc của route, nếu không con số này chỉ để doạ người đọc.
     const shouldBeOverdue = await prisma.task.count({
-        where: { deadline: { lt: new Date() }, assigneeId: { not: null }, status: { not: 'Quá hạn' } },
+        where: { deadline: { lt: new Date() }, assigneeId: { not: null }, status: { in: OVERDUE_ELIGIBLE_STATUSES } },
     })
     console.log('── check-deadline (mỗi giờ) ─────────────────────────────')
     console.log(`   Lần cuối đánh dấu 'Quá hạn' : ${ago(overdueMarked?.updatedAt ?? null)}`)
-    console.log(`   Task ĐANG quá hạn chưa đánh dấu: ${shouldBeOverdue}`)
+    console.log(`   Task cron SẼ lật khi bật lại: ${shouldBeOverdue}`)
     console.log(
         shouldBeOverdue > 0
-            ? `   ⚠️  Còn ${shouldBeOverdue} task quá hạn chưa được xử lý ⇒ cron nhiều khả năng KHÔNG chạy.`
-            : '   ✅ Không tồn đọng.',
+            ? `   ⚠️  Bật lại sẽ lật ${shouldBeOverdue} task cùng lúc — mỗi task một thông báo.\n        Chạy scripts/ent/preview-overdue-flip.ts để xem chi tiết trước.`
+            : '   ✅ Không có task nào bị lật — bật cron không gây mưa thông báo.',
     )
 
     // ── send-digest (mỗi giờ) — đánh dấu emailSentAt ──

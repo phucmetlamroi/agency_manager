@@ -55,12 +55,28 @@ có video mới đi qua đường đó. Đồng hồ đếm ngược có thật,
 
 | Job | Dấu vết | Kết luận |
 |---|---|---|
-| **check-deadline** | Lần cuối ghi `'Quá hạn'`: **34 ngày trước**. Đang có **72 task quá hạn chưa đánh dấu** | 🔴 chết |
+| **check-deadline** | Lần cuối ghi `'Quá hạn'`: **34 ngày trước** | 🔴 chết |
 | **auth-cleanup** | **130** bản ghi đăng nhập cũ hơn 90 ngày còn nguyên | 🔴 chết |
 | **cleanup-notifications** | **75** thông báo đáng lẽ đã dọn còn nguyên | 🔴 chết |
 | send-digest | 219 thông báo chờ gửi >2h | ❓ không kết luận được — `emailSentAt` cũng do đường gửi email tức thời đặt, không riêng digest |
 
-**72 task quá hạn** là con số cần chú ý trước khi bật `check-deadline` lại — xem mục B2.
+### ✅ Bật lại `check-deadline` KHÔNG gây mưa thông báo
+
+Đã kiểm bằng chính bộ lọc của route (`npx tsx scripts/ent/preview-overdue-flip.ts`):
+
+```
+Đếm thô (mọi trạng thái)  : 72
+THỰC TẾ cron sẽ lật       : 0
+```
+
+Cron lọc bằng **danh sách trắng** `OVERDUE_ELIGIBLE_STATUSES` — chỉ 5 trạng thái giai đoạn sản
+xuất (`Đang đợi giao`, `Nhận task`, `Đã nhận task`, `Đang thực hiện`, `Revision`). Toàn bộ 72
+task kia đang ở trạng thái **chờ duyệt** hoặc **trạng thái video (A2–A7)**, đều có
+`cronOverdueEligible = false` nên cron **không bao giờ đụng tới** — đúng như chú thích trong
+route: *"the cron never overwrites their lifecycle value"*.
+
+> ⚠️ Đếm thô kiểu `status != 'Quá hạn'` cho ra **72** và gây hoảng vô cớ. Luôn dùng
+> `OVERDUE_ELIGIBLE_STATUSES` khi ước lượng tác động của job này.
 
 ---
 
@@ -161,10 +177,25 @@ Phải timeout/refused. Trả `200` = mọi cấu hình Caddy đang bị đi vò
 
 ### B2. Cron — 8 job, hiện **0 job đang chạy**
 
-Chép [`hustly-cron`](hustly-cron) và [`crontab`](crontab).
+**Đã kiểm chứng 24/08:** gọi cả 8 endpoint bằng mã **cố tình sai** → cả 8 trả **401**. Chứng
+minh ba thứ cùng lúc mà không kích hoạt job nào:
+- 8 route đều sống trên VPS
+- `CRON_SECRET` **đã cấu hình** (thiếu thì trả 500, không phải 401)
+- Gác cửa fail-closed, chặn đúng
 
-Tin tốt: `src/lib/cron-auth.ts` chỉ đọc `Authorization: Bearer` — **không route nào phụ thuộc
-header riêng của Vercel**, curl chạy được ngay, không phải sửa code.
+⇒ **Không phải sửa dòng code nào.** Chỉ thiếu người gọi.
+
+**Và không có scheduler cũ nào đang chạy** — `auth-cleanup` + `cleanup-notifications` đều nằm
+trong danh sách 6 job của cron-job.org cũ, mà cả hai đã xác nhận chết. Nên dựng crontab mới
+**không sợ chạy trùng** (digest gửi đôi, email gia hạn gửi đôi).
+
+Ba bước cài:
+```bash
+sudo cp hustly-cron /usr/local/bin/ && sudo chmod 700 /usr/local/bin/hustly-cron
+sudo touch /var/log/hustly-cron.log
+sudo crontab -e        # dán nội dung docs/vps/crontab
+```
+Kiểm sau một giờ: `tail /var/log/hustly-cron.log` phải có `job=send-digest http=200`.
 
 > `RAILWAY_MIGRATION.md` **lỗi thời** — chỉ liệt kê 6/8 job, thiếu đúng `review-janitor` (giữ
 > tiền Mux/R2) và `billing-sweep` (doanh thu).

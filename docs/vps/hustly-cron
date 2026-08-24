@@ -22,9 +22,20 @@
 set -uo pipefail
 
 JOB="${1:?Thiếu tên job. Ví dụ: hustly-cron review-janitor}"
-APP_DIR=/srv/hustlytasker
+
+# ⚠️ ĐỔI CHO ĐÚNG MÁY CỦA BẠN trước khi dùng.
+# Đây là thư mục chứa .env của dự án. Sai đường dẫn = không đọc được CRON_SECRET
+# = MỌI job thất bại, và thất bại lặng lẽ (chỉ có một dòng trong log).
+# Máy hiện tại: /root/agency_manager
+APP_DIR="${HUSTLY_APP_DIR:-/root/agency_manager}"
+
 BASE_URL=https://hustlytasker.xyz
 LOG=/var/log/hustly-cron.log
+
+if [ ! -f "$APP_DIR/.env" ]; then
+    echo "$(date -u +%FT%TZ) job=${JOB} LOI=khong-thay-$APP_DIR/.env (sua APP_DIR trong script)" >> "$LOG"
+    exit 1
+fi
 
 # `tr -d '\r'` BẮT BUỘC, không phải cho đẹp:
 # thư mục dự án copy từ Windows sang thì .env có kết thúc dòng CRLF. Ký tự \r

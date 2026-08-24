@@ -27,7 +27,8 @@ StartLimitIntervalSec=60
 [Service]
 Type=simple
 User=hustly
-WorkingDirectory=/srv/hustlytasker
+# ⚠️ ĐỔI CHO ĐÚNG MÁY. Máy hiện tại: /root/agency_manager
+WorkingDirectory=/root/agency_manager
 
 Environment=NODE_ENV=production
 # TZ=UTC là CỐ Ý, không phải bỏ quên giờ Việt Nam.

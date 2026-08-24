@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#
+# Gọi một lịch chạy định kỳ của HustlyTasker và ghi kết quả ra nhật ký.
+#
+# Chép vào /usr/local/bin/hustly-cron rồi:
+#   sudo chown root:root /usr/local/bin/hustly-cron
+#   sudo chmod 700       /usr/local/bin/hustly-cron
+#   sudo touch /var/log/hustly-cron.log
+#
+# Dùng: /usr/local/bin/hustly-cron review-janitor
+#
+# VÌ SAO PHẢI CÓ SCRIPT NÀY thay vì viết curl thẳng vào crontab:
+#
+#   1. cron biến dấu `%` thành ký tự xuống dòng. Viết `curl -w '%{http_code}'`
+#      thẳng trong crontab là lệnh bị CẮT ĐÔI và im lặng không chạy — không báo
+#      lỗi gì, chỉ là job không bao giờ nổ.
+#   2. Bí mật không nằm trong crontab (crontab đọc được bởi nhiều tiến trình hơn
+#      là .env với quyền 600).
+#   3. Có nhật ký để biết job CÓ chạy hay không. Không có nó thì cron hỏng là
+#      hỏng lặng lẽ, đúng cái bệnh đang đi chữa.
+
+set -uo pipefail
+
+JOB="${1:?Thiếu tên job. Ví dụ: hustly-cron review-janitor}"
+APP_DIR=/srv/hustlytasker
+BASE_URL=https://hustlytasker.xyz
+LOG=/var/log/hustly-cron.log
+
+# `tr -d '\r'` BẮT BUỘC, không phải cho đẹp:
+# thư mục dự án copy từ Windows sang thì .env có kết thúc dòng CRLF. Ký tự \r
+# dính vào cuối bí mật làm MỌI job trả 401, trong khi nhìn bằng mắt thì bí mật
+# hoàn toàn đúng — rất tốn thời gian để tìm ra.
+SECRET=$(grep -m1 '^CRON_SECRET=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"'\''\r')
+
+if [ -z "${SECRET:-}" ]; then
+    echo "$(date -u +%FT%TZ) job=${JOB} LOI=khong-doc-duoc-CRON_SECRET tu ${APP_DIR}/.env" >> "$LOG"
+    exit 1
+fi
+
+# -m 600: review-janitor có thể chạy lâu khi dọn tồn đọng.
+OUT=$(curl -sS -m 600 -w $'\n%{http_code}' \
+      -H "Authorization: Bearer ${SECRET}" \
+      "${BASE_URL}/api/cron/${JOB}" 2>&1)
+
+CODE=$(printf '%s' "$OUT" | tail -n1)
+BODY=$(printf '%s' "$OUT" | sed '$d' | head -c 800 | tr '\n' ' ')
+
+echo "$(date -u +%FT%TZ) job=${JOB} http=${CODE} body=${BODY}" >> "$LOG"
+
+# ⚠️ ĐỌC NHẬT KÝ NÀY THẾ NÀO — http=200 KHÔNG có nghĩa là job đã làm việc:
+#
+#   • review-janitor  trả 200 ngay khi GỬI ĐƯỢC sự kiện cho Inngest, không phải
+#     khi janitor chạy xong. Muốn biết nó thật sự làm gì phải mở bảng điều khiển
+#     Inngest xem lượt chạy review-janitor VÀ ent-janitor (một sự kiện kích hoạt
+#     cả hai), đọc con số trả về {aborted, redriven, reconciled, purged}.
+#
+#   • hard-delete-workspaces / hard-delete-profiles trả 200 kèm
+#     {"deleted":0,"skipped":"migration pending"} — tức là KHÔNG xoá gì cả.
+#     Tìm bằng:  grep 'migration pending' /var/log/hustly-cron.log
+#
+# Mã thoát của script luôn là 0 sau khi ghi log, để một job hỏng không làm cron
+# gửi mail rác mỗi giờ. Giám sát bằng cách đọc log (xem docs/vps/README.md mục D2).

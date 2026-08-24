@@ -1,3 +1,17 @@
+> ## ⚠️ TÀI LIỆU NÀY ĐÃ CŨ — ĐỪNG LÀM THEO
+>
+> Viết cho **Railway**, không phải VPS tự quản. Thực tế dự án đã chuyển sang **VPS + Caddy**
+> (08/2026). Tài liệu đúng: **[`docs/vps/README.md`](docs/vps/README.md)**.
+>
+> Và nó **SAI ở một chỗ tốn tiền**: mục 5 ghi "Cron (6 job)" trong khi `vercel.json` khai
+> **8 job**. Hai job bị bỏ sót lại đúng là hai job đắt nhất —
+> **`/api/cron/review-janitor`** (dọn Mux + R2, không chạy = trả phí lưu trữ mãi mãi cho dữ
+> liệu đã vứt, và mất vĩnh viễn khả năng cứu webhook sau 7 ngày) và
+> **`/api/cron/billing-sweep`** (nhắc gia hạn — bỏ một ngày là nhóm khách rơi đúng cửa sổ đó
+> vĩnh viễn không được nhắc). Ai làm theo file này sẽ im lặng chạy thiếu cả hai.
+>
+> Giữ lại để tham khảo phần chuyển dữ liệu `pg_dump`/`pg_restore` ở mục 4.
+
 # Chuyển từ Vercel + Neon → Railway (app + Postgres) + Supabase Storage
 
 Mục tiêu: hạ chi phí ~$40/tháng → ~$8-15/tháng, **không downtime** (Vercel vẫn chạy cho tới khi bạn đổi domain).
@@ -62,7 +76,7 @@ pg_restore --data-only --disable-triggers --no-owner \
 Nếu `pg_restore` báo vài lỗi "already exists"/sequence, thường vô hại; kiểm tra lại số dòng bằng cách đăng nhập app.
 > Cách thay thế (đơn giản hơn nếu data-only lỗi FK): bỏ bước 3, dump FULL `pg_dump "$NEON_URL" -Fc -f neon-full.dump` rồi `pg_restore --clean --if-exists --no-owner -d "$RAILWAY_URL" neon-full.dump` vào DB rỗng (đừng để `prisma db push` chạy trước — set tạm env `NIXPACKS_NO_POSTINSTALL` hoặc xoá postinstall cho lần đầu).
 
-## 5. Cron (6 job) — dùng cron-job.org miễn phí
+## 5. Cron (⚠️ THIẾU 2 JOB — bảng dưới chỉ có 6/8, xem docs/vps/crontab cho bản đủ)
 Với mỗi job dưới đây, tạo 1 cron trên https://cron-job.org trỏ tới `https://<app-railway-url>/api/cron/<tên>`,
 method GET, thêm header `Authorization: Bearer <CRON_SECRET của bạn>`:
 | Endpoint | Lịch |

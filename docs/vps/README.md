@@ -7,8 +7,8 @@ Kiểu hỏng đặc trưng của việc này đã lộ ra hai lần rồi: xu�
 có `$HOME` ghi được — **lỗi nằm im trong code cả năm**, chỉ nổ khi rời Vercel (đã sửa,
 `cfef579`). Và 8 lịch cron trong `vercel.json` thì **chưa chạy ngày nào** kể từ lúc chuyển.
 
-**Bối cảnh đã chốt:** tên miền giữ nguyên `hustlytasker.xyz` (chỉ đổi DNS) · reverse proxy
-**Caddy** · giữ nguyên thư mục dự án · đang dùng Resend, Supabase, SePay.
+**Bối cảnh:** tên miền giữ nguyên `hustlytasker.xyz` (chỉ đổi DNS) · reverse proxy
+**nginx/1.24.0 (Ubuntu)** · giữ nguyên thư mục dự án · đang dùng Resend, Supabase, SePay.
 
 **File cấu hình sẵn sàng chép** trong thư mục này:
 
@@ -17,17 +17,50 @@ có `$HOME` ghi được — **lỗi nằm im trong code cả năm**, chỉ nổ
 | [`hustlytasker.service`](hustlytasker.service) | `/etc/systemd/system/` |
 | [`hustly-cron`](hustly-cron) | `/usr/local/bin/` (chmod 700) |
 | [`crontab`](crontab) | `sudo crontab -e` |
-| [`Caddyfile`](Caddyfile) | `/etc/caddy/` |
+| [`nginx.conf`](nginx.conf) | **bản vá bổ sung** — đừng chép đè cấu hình đang chạy |
+
+> `Caddyfile` trong thư mục này **không dùng tới** — máy chủ thật chạy nginx, không phải Caddy.
+> Giữ lại phòng khi sau này đổi.
 
 ---
 
-## ⏳ Có một đồng hồ đang đếm ngược
+## ✅ Đã kiểm chứng từ xa ngày 24/08/2026 — ba mục ĐẠT
 
-`src/lib/review/inngest.ts:55` — `WEBHOOK_MAX_AGE_MS = 7 ngày`. Janitor chỉ cứu được webhook
-Mux bị rơi **trong vòng 7 ngày**; quá hạn nó ghi log `webhooks_abandoned` rồi bỏ luôn.
+Không cần làm gì với ba mục này, đã đo thật chứ không phải suy đoán:
 
-Janitor chưa chạy lần nào từ khi rời Vercel ⇒ **mỗi ngày trôi qua là một lô video mất vĩnh
-viễn khả năng tự cứu.** Mục B2 không để sang tuần sau được.
+| Mục | Cách đo | Kết quả |
+|---|---|---|
+| **A1 · Đồng hồ** | So header `Date` của máy chủ với Google và một máy thứ ba | **Lệch 0 giây.** Webhook Mux/SePay an toàn |
+| **C1 · `X-Real-IP`** | Gửi `X-Real-IP: 203.0.113.77` giả từ ngoài vào, xem DB ghi gì | **Ghi IP công cộng THẬT**, không phải header giả ⇒ nginx đã ghi đè đúng |
+| **C5 · Giới hạn body** | POST 2MB | **Đi lọt** ⇒ `client_max_body_size` đã nâng khỏi mặc định 1MB |
+
+Chạy lại bất cứ lúc nào: `npx tsx scripts/ent/probe-real-ip.ts`
+
+## 🟢 Và tin tốt: thiệt hại webhook = **KHÔNG**
+
+Cảnh báo trước đó về `WEBHOOK_MAX_AGE_MS = 7 ngày` (janitor chỉ cứu được webhook Mux rơi trong
+7 ngày) **đã không xảy ra**. Đo thật:
+
+```
+🔴 ĐÃ MẤT VĨNH VIỄN (>7 ngày) : 0
+🟡 CÒN CỨU ĐƯỢC (<7 ngày)     : 0
+```
+
+Không webhook nào bị bỏ rơi. Lý do: module Tệp đang trong giai đoạn đóng dần nên gần như không
+có video mới đi qua đường đó. Đồng hồ đếm ngược có thật, nhưng **chưa mất gì cả**.
+
+## ❌ Ba lịch cron đã xác nhận CHẾT
+
+`npx tsx scripts/ent/probe-cron-alive.ts`
+
+| Job | Dấu vết | Kết luận |
+|---|---|---|
+| **check-deadline** | Lần cuối ghi `'Quá hạn'`: **34 ngày trước**. Đang có **72 task quá hạn chưa đánh dấu** | 🔴 chết |
+| **auth-cleanup** | **130** bản ghi đăng nhập cũ hơn 90 ngày còn nguyên | 🔴 chết |
+| **cleanup-notifications** | **75** thông báo đáng lẽ đã dọn còn nguyên | 🔴 chết |
+| send-digest | 219 thông báo chờ gửi >2h | ❓ không kết luận được — `emailSentAt` cũng do đường gửi email tức thời đặt, không riêng digest |
+
+**72 task quá hạn** là con số cần chú ý trước khi bật `check-deadline` lại — xem mục B2.
 
 ---
 
@@ -37,8 +70,8 @@ viễn khả năng tự cứu.** Mục B2 không để sang tuần sau được.
 - Sửa **redirect URI OAuth** (Google, Drive, Dropbox) — callback không đổi
 - Xác thực lại **domain Resend** (SPF/DKIM)
 - Sửa **CSP** trong `next.config.ts` — đã có đủ `*.supabase.co` (cả `wss://`), `*.mux.com`,
-  `*.r2.cloudflarestorage.com`, `qr.sepay.vn`
-- `client_max_body_size` kiểu nginx — Caddy không giới hạn body mặc định, xem C5
+  `*.r2.cloudflarestorage.com`, `qr.sepay.vn` (đã xác nhận qua header thật)
+- **A1 đồng hồ**, **C1 `X-Real-IP`**, **C5 giới hạn body** — đã đo, đều đạt (bảng phía trên)
 - Đổi `middleware.ts` → `proxy.ts` — Next 16 mới khuyến nghị, chưa bắt buộc
 - **Đừng xoá `vercel.json`** — nó là bản ghi duy nhất của 8 lịch cron
 

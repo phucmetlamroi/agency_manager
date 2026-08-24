@@ -26,8 +26,15 @@ StartLimitIntervalSec=60
 
 [Service]
 Type=simple
-User=hustly
-# ⚠️ ĐỔI CHO ĐÚNG MÁY. Máy hiện tại: /root/agency_manager
+
+# ⚠️ HAI DÒNG NÀY PHẢI KHỚP MÁY THẬT. Máy hiện tại chạy bằng root, dự án ở
+# /root/agency_manager. Đặt User khác root sẽ KHÔNG đọc được thư mục đó
+# (/root mặc định quyền 700) và service chết ngay lúc khởi động.
+#
+# Chạy Next bằng root không phải cách đẹp nhất về bảo mật. Muốn chặt chẽ hơn thì
+# chuyển dự án ra /srv/, tạo user riêng rồi chown — nhưng đó là việc riêng, đừng
+# làm chen ngang lúc đang dựng lại hạ tầng.
+User=root
 WorkingDirectory=/root/agency_manager
 
 Environment=NODE_ENV=production
@@ -37,9 +44,14 @@ Environment=NODE_ENV=production
 # 23h ngày 31 rơi sang tháng sau so với hành vi cũ. UTC = giữ nguyên như Vercel.
 Environment=TZ=UTC
 
+# ⚠️ KIỂM ĐƯỜNG DẪN npm TRƯỚC: `which npm`.
+# systemd KHÔNG dùng PATH của shell đăng nhập, phải ghi đường dẫn tuyệt đối. Nếu
+# npm cài qua nvm thì nó nằm ở /root/.nvm/versions/node/vXX/bin/npm chứ không
+# phải /usr/bin/npm, và service sẽ chết với lỗi 203/EXEC.
+#
 # -H 127.0.0.1 BẮT BUỘC: không có nó Next bind 0.0.0.0, ai cũng vào thẳng
-# http://<IP-VPS>:3000 được, đi vòng qua Caddy — mất TLS và mất luôn phần
-# ghi đè X-Real-IP chống giả mạo (xem docs/vps/Caddyfile).
+# http://<IP-VPS>:3000 được, đi vòng qua nginx — mất TLS và mất luôn phần
+# ghi đè X-Real-IP chống giả mạo (xem docs/vps/nginx.conf).
 ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3000
 
 # Rời Vercel là mất tích hợp tự đồng bộ Inngest. Không đăng ký lại thì hai hàm

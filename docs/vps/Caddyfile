@@ -1,0 +1,135 @@
+# Caddy cho HustlyTasker trên VPS tự quản.
+# Chép vào /etc/caddy/Caddyfile rồi:
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Chia theo TUYẾN vì mỗi nhóm route có nhu cầu rất khác nhau: một route cần 900
+# giây, hai route cần tắt đệm để stream nhiều GB, phần còn lại thì 120 giây là dư.
+#
+# ⚠️ `header_up X-Real-IP {remote_host}` phải có ở MỌI khối handle.
+#    Bỏ sót một khối là hở đúng khối đó. Lý do ở ngay dưới đây.
+
+hustlytasker.xyz, www.hustlytasker.xyz {
+
+	# ── NHẬT KÝ TRUY CẬP — phải bật bằng tay ─────────────────────────────────
+	# Caddy KHÔNG ghi access log mặc định. Không có nó thì:
+	#   • không dò được scheduler cũ (cron-job.org) còn đang bắn trùng vào cùng
+	#     tên miền — mà chạy trùng thì digest gửi đôi, email nhắc gia hạn gửi đôi
+	#   • mọi việc điều tra sau này đều mù
+	log {
+		output file /var/log/caddy/hustly-access.log {
+			roll_size 100MiB
+			roll_keep 7
+		}
+	}
+
+	# ══ TUYẾN A — /api/inngest, cần khoảng thở LỚN NHẤT ═════════════════════
+	# src/app/api/inngest/route.ts khai maxDuration = 800 giây vì một bước
+	# (ensure-color-tags) STREAM cả video qua ffmpeg từ R2 → gắn lại thẻ màu →
+	# R2 trong MỘT lần gọi duy nhất. Cắt sớm = video không được gắn thẻ màu và
+	# job bị tính là thất bại.
+	# Trên Vercel con số 800 đó là thật; trên VPS nó vô nghĩa — thứ cắt thật là
+	# timeout của Caddy ở đây.
+	@inngest path /api/inngest*
+	handle @inngest {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up X-Real-IP {remote_host}
+			header_up -X-Vercel-Forwarded-For
+			transport http {
+				dial_timeout            10s
+				response_header_timeout 900s
+				read_timeout            900s
+				write_timeout           900s
+			}
+		}
+	}
+
+	# ══ TUYẾN B — hai route tải ZIP, TẮT ĐỆM ════════════════════════════════
+	# Hai route này stream nhiều GB qua tiến trình Node. `flush_interval -1` đẩy
+	# byte ra ngay thay vì gom lại. Không có nó, proxy hút cả tệp zip vào bộ nhớ
+	# hoặc đĩa trước khi gửi cho khách ⇒ mất cơ chế backpressure ⇒ đúng kịch bản
+	# hết RAM đã ghi trong src/app/api/review/download-zip/route.ts (video 964MB).
+	# read/write_timeout = 0 (không giới hạn) vì mạng khách chậm thì tải lâu là
+	# bình thường, không phải lỗi.
+	@zip path /api/review/download-zip* /api/share/*/download-zip*
+	handle @zip {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up X-Real-IP {remote_host}
+			header_up -X-Vercel-Forwarded-For
+			flush_interval -1
+			transport http {
+				dial_timeout            10s
+				response_header_timeout 300s
+				read_timeout            0
+				write_timeout           0
+			}
+		}
+	}
+
+	# ══ TUYẾN C — ba route chậm, 300 giây ═══════════════════════════════════
+	#   scan-folder                     — người dùng từng dán thư mục vài trăm tệp
+	#   share/[token]/invoices/[id]/pdf — Chromium dựng PDF
+	@slow path /api/integrations/scan-folder* /api/share/*/invoices/*/pdf*
+	handle @slow {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up X-Real-IP {remote_host}
+			header_up -X-Vercel-Forwarded-For
+			transport http {
+				dial_timeout            10s
+				response_header_timeout 300s
+				read_timeout            300s
+				write_timeout           300s
+			}
+		}
+	}
+
+	# ══ TUYẾN D — mọi thứ còn lại ═══════════════════════════════════════════
+	handle {
+		# `encode` CHỈ đặt ở đây, cố ý. Đưa lên phạm vi cả site là nén luôn tệp
+		# .zip vốn đã ở chế độ STORE — đốt CPU vô ích và có thể phá streaming
+		# của TUYẾN B.
+		encode zstd gzip
+
+		# Chặn thân yêu cầu quá khổ để chống DoS. 25MB dư cho đường upload ảnh
+		# lớn nhất (10MB) cộng overhead multipart.
+		# ⚠️ ĐÂY KHÔNG PHẢI thứ đang chặn upload nếu anh gặp lỗi kích thước:
+		#    Caddy vốn KHÔNG giới hạn body mặc định (nginx mới có, 1MB — nên hầu
+		#    hết hướng dẫn trên mạng nói về nginx). Trần thật nằm ở Next: 5 đường
+		#    upload ảnh là Server Action, mà Next mặc định giới hạn 1MB và
+		#    next.config.ts không khai experimental.serverActions.bodySizeLimit.
+		#    Trần đó giống hệt nhau trên Vercel và VPS ⇒ không phải lỗi di trú.
+		request_body {
+			max_size 25MB
+		}
+
+		reverse_proxy 127.0.0.1:3000 {
+			# ── DÒNG QUAN TRỌNG NHẤT TRONG CẢ FILE ──────────────────────────
+			# src/lib/request-ip.ts đọc `x-real-ip` ĐẦU TIÊN, và chú thích ngay
+			# trong file đó nói rõ vì sao: "Vercel sets them to the TRUE
+			# connecting client and OVERRIDES anything the caller sent".
+			#
+			# Caddy KHÔNG ghi đè và cũng không xoá — nó chuyển tiếp nguyên xi
+			# header khách gửi lên. Nghĩa là nếu thiếu dòng dưới:
+			#   • ai cũng gửi được `X-Real-IP: <bịa>` đổi mỗi request ⇒ vô hiệu
+			#     hoá toàn bộ giới hạn tần suất theo IP chạy trên cơ sở dữ liệu,
+			#     gồm cả trần chống dò mật khẩu ở cổng chia sẻ cho khách
+			#   • cột LoginAttempt.ipAddress ghi giá trị do kẻ tấn công tự khai
+			#     ⇒ nhật ký điều tra thành vô giá trị, và có thể đổ tội cho một
+			#     địa chỉ vô can
+			# Đây là lỗ hổng MỚI SINH RA do rời Vercel, không phải lỗi có sẵn.
+			header_up X-Real-IP {remote_host}
+
+			# Xoá header giả mạo tên Vercel: app đọc nó ở thứ tự ưu tiên thứ hai,
+			# và trên VPS không còn ai đặt nó một cách chính đáng nữa.
+			header_up -X-Vercel-Forwarded-For
+
+			flush_interval -1
+			transport http {
+				dial_timeout            10s
+				response_header_timeout 120s
+				read_timeout            120s
+				write_timeout           120s
+			}
+		}
+	}
+}

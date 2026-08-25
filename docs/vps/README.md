@@ -31,10 +31,47 @@ Không cần làm gì với ba mục này, đã đo thật chứ không phải s
 | Mục | Cách đo | Kết quả |
 |---|---|---|
 | **A1 · Đồng hồ** | So header `Date` của máy chủ với Google và một máy thứ ba | **Lệch 0 giây.** Webhook Mux/SePay an toàn |
-| **C1 · `X-Real-IP`** | Gửi `X-Real-IP: 203.0.113.77` giả từ ngoài vào, xem DB ghi gì | **Ghi IP công cộng THẬT**, không phải header giả ⇒ nginx đã ghi đè đúng |
+| **C1 · `X-Real-IP` qua nginx** | Gửi header giả vào `https://hustlytasker.xyz` | **Ghi IP THẬT** ⇒ nginx ghi đè đúng |
 | **C5 · Giới hạn body** | POST 2MB | **Đi lọt** ⇒ `client_max_body_size` đã nâng khỏi mặc định 1MB |
 
 Chạy lại bất cứ lúc nào: `npx tsx scripts/ent/probe-real-ip.ts`
+
+## 🔴 NHƯNG: cổng 3000 mở thẳng ra Internet — nginx bị đi vòng
+
+App chạy trong **Docker**, ánh xạ cổng `0.0.0.0:3000->3000/tcp`. Nghĩa là
+`http://<IP-VPS>:3000` vào thẳng ứng dụng, **không qua nginx**.
+
+Đã kiểm chứng 25/08 — cả hai đều thành công từ máy ngoài:
+
+```
+curl http://<IP-VPS>:3000/                    → HTTP 200
+curl -H 'X-Real-IP: 198.51.100.42' ... :3000  → DB ghi lại ĐÚNG 198.51.100.42
+```
+
+Vì thế kết luận "C1 đạt" ở bảng trên **chỉ đúng với lối đi qua nginx**. Kẻ tấn công
+chỉ cần đi vòng qua cổng 3000 là:
+
+- **Vô hiệu hoá toàn bộ giới hạn tần suất theo IP** (đổi header mỗi lượt là bucket
+  mới) — gồm cả trần chống dò mật khẩu ở cổng chia sẻ cho khách
+- **Đầu độc `LoginAttempt.ipAddress`** — nhật ký điều tra ghi giá trị kẻ tấn công
+  tự khai, có thể đổ tội cho địa chỉ vô can
+- **Bỏ hoàn toàn TLS** — mật khẩu và cookie phiên đi qua HTTP trần
+
+**Sửa:** trong `docker-compose.yml`, đổi ánh xạ cổng thành chỉ nghe nội bộ:
+
+```yaml
+ports:
+  - "127.0.0.1:3000:3000"     # KHÔNG phải "3000:3000"
+```
+
+rồi `docker compose up -d` và đóng luôn ở tường lửa:
+
+```bash
+sudo ufw allow 80,443/tcp && sudo ufw deny 3000/tcp && sudo ufw enable
+```
+
+Kiểm lại **từ máy ngoài** (không phải từ VPS): `curl -m 5 http://<IP-VPS>:3000/`
+phải **timeout / refused**.
 
 ## 🟢 Và tin tốt: thiệt hại webhook = **KHÔNG**
 
@@ -155,25 +192,47 @@ Dùng **Quên mật khẩu** với email của chính mình → xem log tìm `Em
 
 ## B — Dựng lại hai thứ Vercel làm hộ
 
-### B1. Trình quản lý tiến trình
+### B1. Trình quản lý tiến trình — **Docker đã lo, KHÔNG cần systemd**
 
-Hiện app chết là nằm chết. Chép [`hustlytasker.service`](hustlytasker.service):
+> ⚠️ File [`hustlytasker.service`](hustlytasker.service) trong thư mục này **không dùng
+> được cho máy hiện tại**. Nó gọi `npm run start` trên máy chủ, mà VPS **không cài
+> node/npm** (`which npm` trả rỗng). App chạy trong **Docker**:
+> container `agency_manager_web`, image `agency_manager-web`.
+> Giữ file lại phòng khi sau này chạy trực tiếp bằng Node.
+
+Docker tự làm việc của trình quản lý tiến trình — nhưng **chỉ khi có chính sách khởi
+động lại**. Mặc định là `no`, tức là **reboot xong container KHÔNG tự bật**.
 
 ```bash
-sudo systemctl daemon-reload && sudo systemctl enable --now hustlytasker
+docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' agency_manager_web
 ```
 
-**Kiểm chứng thật** — không phải "thấy nó chạy là xong":
-```bash
-sudo systemctl kill -s SIGKILL hustlytasker
-sleep 6 && systemctl is-active hustlytasker      # phải in: active
+| Kết quả | Nghĩa |
+|---|---|
+| `no` hoặc rỗng | 🔴 reboot là web nằm chết — **phải sửa** |
+| `always` / `unless-stopped` | ✅ đạt |
+
+Sửa trong `docker-compose.yml`:
+
+```yaml
+services:
+  web:
+    restart: unless-stopped
 ```
 
-**Cổng 3000 có hở ra Internet không?** Chạy **từ máy anh**, không phải từ VPS:
+rồi `docker compose up -d`.
+
+**Kiểm chứng thật** — giết container xem có tự sống lại không:
 ```bash
-curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<IP-VPS>:3000/
+docker kill agency_manager_web
+sleep 8 && docker ps --filter name=agency_manager_web --format '{{.Status}}'
 ```
-Phải timeout/refused. Trả `200` = mọi cấu hình Caddy đang bị đi vòng qua.
+Phải thấy `Up ...` chứ không phải rỗng.
+
+**Cách build lại sau khi `git pull`** (thay cho `npm run build`):
+```bash
+cd /root/agency_manager && docker compose up -d --build
+```
 
 ### B2. Cron — 8 job, hiện **0 job đang chạy**
 

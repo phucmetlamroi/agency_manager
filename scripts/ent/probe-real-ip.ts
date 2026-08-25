@@ -13,7 +13,17 @@
  */
 import { prisma } from '../../src/lib/db'
 
-const FORGED = '203.0.113.77' // TEST-NET-3, dải dành riêng cho tài liệu
+/**
+ * Mọi dải IP dành riêng cho tài liệu (RFC 5737). Không máy thật nào dùng chúng,
+ * nên thấy bất kỳ cái nào trong nhật ký = header giả ĐÃ LỌT.
+ *
+ * [SỬA 25/08] Trước đây ghi cứng đúng MỘT địa chỉ ('203.0.113.77'). Lần thử sau
+ * dùng 198.51.100.42 và script báo "🟢 ĐÚNG" trong khi header giả lọt hoàn toàn
+ * — báo xanh sai còn tệ hơn không kiểm.
+ */
+const FORGED_RANGES = ['192.0.2.', '198.51.100.', '203.0.113.']
+const isForged = (ip: string) => FORGED_RANGES.some((r) => ip.startsWith(r))
+const FORGED = '203.0.113.77'
 
 async function main() {
     const rows = await prisma.rateLimitBucket.findMany({
@@ -40,7 +50,7 @@ async function main() {
 
     const newest = rows[0].key.replace('client-error:', '')
     console.log('\n── Chẩn đoán ──')
-    if (newest === FORGED) {
+    if (isForged(newest)) {
         console.log('  🔴 HEADER GIẢ ĐI LỌT.')
         console.log('     Máy chủ tin vào IP do người gọi tự khai ⇒ mọi giới hạn tần suất theo IP')
         console.log('     bị vô hiệu (chỉ cần đổi header mỗi lượt), và LoginAttempt.ipAddress ghi')

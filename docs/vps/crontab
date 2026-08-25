@@ -46,6 +46,11 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 20 * * *  /usr/local/bin/hustly-cron review-janitor           # 03:00 VN
 
 # ── Giữ cho app còn sống (tuỳ chọn nhưng nên có) ────────────────────────────
-# Restart=always của systemd lo được trường hợp tiến trình CHẾT, nhưng không lo
-# được trường hợp Node còn sống mà không trả lời request nữa.
-*/5 * * * *  curl -fsS -m 20 -o /dev/null https://hustlytasker.xyz/ || systemctl restart hustlytasker
+# App chạy trong Docker (container agency_manager_web). `restart: unless-stopped`
+# của Docker lo được trường hợp tiến trình CHẾT, nhưng KHÔNG lo được trường hợp
+# app còn sống mà không trả lời request nữa (treo).
+#
+# ⚠️ Dòng này TRƯỚC ĐÂY ghi `systemctl restart hustlytasker` — sai nền tảng, dịch
+# vụ đó không tồn tại trên máy này. Nó chỉ chạy khi web đã sập, nên hỏng lặng lẽ
+# đúng lúc cần nhất.
+*/5 * * * *  curl -fsS -m 20 -o /dev/null https://hustlytasker.xyz/ || docker restart agency_manager_web

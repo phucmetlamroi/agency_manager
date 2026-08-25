@@ -1,0 +1,40 @@
+# Bản đang chạy thật trên VPS (đưa vào git 25/08/2026).
+#
+# Đã bỏ `version: '3.8'` — Docker Compose v2 báo thẳng nó đã lỗi thời và bị bỏ qua.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agency_manager_web
+
+    # Đây chính là "trình quản lý tiến trình" của hệ thống — Docker tự bật lại
+    # container sau khi máy reboot hoặc app chết. KHÔNG cần systemd.
+    restart: always
+
+    ports:
+      # ⚠️ TIỀN TỐ 127.0.0.1 LÀ BẮT BUỘC, không phải cho gọn.
+      #
+      # [25/08] Trước đây ghi "3000:3000" — Docker hiểu là 0.0.0.0, tức mở ra CẢ
+      # INTERNET. Đã kiểm chứng từ máy ngoài:
+      #     curl http://<IP-VPS>:3000/                     → HTTP 200
+      #     curl -H 'X-Real-IP: 198.51.100.42' ... :3000   → DB ghi ĐÚNG IP giả
+      #
+      # Hậu quả khi đi vòng qua nginx: mất TLS (mật khẩu và cookie phiên đi trần),
+      # và mất luôn dòng `proxy_set_header X-Real-IP $remote_addr` của nginx —
+      # nên mọi giới hạn tần suất theo IP bị vô hiệu (đổi header mỗi lượt là có
+      # bucket mới) và LoginAttempt.ipAddress ghi giá trị kẻ tấn công tự khai.
+      #
+      # An toàn khi đổi vì nginx đã trỏ đúng chỗ: proxy_pass http://127.0.0.1:3000
+      # (/etc/nginx/sites-enabled/agency-manager).
+      - "127.0.0.1:3000:3000"
+
+    env_file:
+      - .env
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

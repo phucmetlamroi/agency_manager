@@ -9,9 +9,9 @@
  * Chạy sau khi bắn một request kèm `X-Real-IP: 203.0.113.77` vào
  * /api/log-client-error (route đó ghi thẳng IP vào RateLimitBucket).
  *
- * Chạy: npx tsx scripts/ent/probe-real-ip.ts
+ * Chạy: npx tsx scripts/probe-real-ip.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 /**
  * Mọi dải IP dành riêng cho tài liệu (RFC 5737). Không máy thật nào dùng chúng,

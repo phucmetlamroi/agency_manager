@@ -10,11 +10,11 @@
  * xem". Đây chỉ là tệp PDF, đúng định dạng, để xem/gửi/in; đăng ký chính thức
  * vào hệ thống thì làm qua giao diện thật (nút "Xuất & Lưu" trong InvoiceModal).
  *
- * Chạy: npx tsx scripts/ent/render-archie-invoice.ts
+ * Chạy: npx tsx scripts/render-archie-invoice.ts
  */
-import { prisma } from '../../src/lib/db'
-import { generateInvoicePDF, type InvoiceData } from '../../src/lib/invoice-generator'
-import { TASK_STATUS_META } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { generateInvoicePDF, type InvoiceData } from '../src/lib/invoice-generator'
+import { TASK_STATUS_META } from '../src/lib/task-statuses'
 import fs from 'fs'
 
 const PROFILE_ID = '61f25775-eb95-4ece-96e8-99ae97542af1'

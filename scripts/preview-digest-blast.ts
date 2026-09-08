@@ -6,9 +6,9 @@
  * và bỏ qua ai có emailEnabled = false. Mặc định là 'REALTIME' — nhóm đó KHÔNG
  * đi qua digest cron chút nào.
  *
- * Chạy: npx tsx scripts/ent/preview-digest-blast.ts
+ * Chạy: npx tsx scripts/preview-digest-blast.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 async function main() {
     const pending = await prisma.notification.groupBy({

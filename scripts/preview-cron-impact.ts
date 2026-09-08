@@ -7,10 +7,10 @@
  *   🟠 GỬI RA NGOÀI  — email tới người thật, không thu hồi được
  *   🟢 vô hại        — dọn rác nội bộ
  *
- * Chạy: npx tsx scripts/ent/preview-cron-impact.ts
+ * Chạy: npx tsx scripts/preview-cron-impact.ts
  */
-import { prisma } from '../../src/lib/db'
-import { OVERDUE_ELIGIBLE_STATUSES } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { OVERDUE_ELIGIBLE_STATUSES } from '../src/lib/task-statuses'
 
 const now = new Date()
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400_000)

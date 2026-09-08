@@ -6,9 +6,9 @@
  *
  * Chỉ sửa ĐÚNG MỘT trường, ĐÚNG MỘT hàng, có xác nhận trước/sau. Không đụng gì khác.
  *
- * Chạy: npx tsx scripts/ent/fix-billing-currency.ts
+ * Chạy: npx tsx scripts/fix-billing-currency.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 const PROFILE_ID = '61f25775-eb95-4ece-96e8-99ae97542af1'
 

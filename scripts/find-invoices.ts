@@ -10,16 +10,16 @@
  * khi đó hoá đơn ĐÃ được ghi vào cơ sở dữ liệu và task ĐÃ bị đánh dấu INVOICED,
  * chỉ thiếu mỗi tệp PDF. Đúng cái bẫy script này để phát hiện.
  *
- * Chạy: npx tsx scripts/ent/find-invoices.ts "<tên khách>"
+ * Chạy: npx tsx scripts/find-invoices.ts "<tên khách>"
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 const PROFILE_ID = '61f25775-eb95-4ece-96e8-99ae97542af1'
 
 async function main() {
     const q = process.argv[2]
     if (!q) {
-        console.error('Dùng: npx tsx scripts/ent/find-invoices.ts "<tên khách>"')
+        console.error('Dùng: npx tsx scripts/find-invoices.ts "<tên khách>"')
         process.exit(1)
     }
 

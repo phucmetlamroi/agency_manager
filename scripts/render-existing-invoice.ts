@@ -14,17 +14,17 @@
  *
  * KHÔNG ghi gì vào cơ sở dữ liệu. Không tạo hoá đơn mới.
  *
- * Chạy: npx tsx scripts/ent/render-existing-invoice.ts INV-2026-273 <đường-dẫn-ra>
+ * Chạy: npx tsx scripts/render-existing-invoice.ts INV-2026-273 <đường-dẫn-ra>
  */
-import { prisma } from '../../src/lib/db'
-import { generateInvoicePDF, type InvoiceData } from '../../src/lib/invoice-generator'
+import { prisma } from '../src/lib/db'
+import { generateInvoicePDF, type InvoiceData } from '../src/lib/invoice-generator'
 import fs from 'fs'
 
 async function main() {
     const number = process.argv[2]
     const out = process.argv[3]
     if (!number || !out) {
-        console.error('Dùng: npx tsx scripts/ent/render-existing-invoice.ts <mã hoá đơn> <đường dẫn ra>')
+        console.error('Dùng: npx tsx scripts/render-existing-invoice.ts <mã hoá đơn> <đường dẫn ra>')
         process.exit(1)
     }
 

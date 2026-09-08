@@ -3,7 +3,7 @@
  * agencyName (Profile.name), hồ sơ thanh toán mặc định (BillingProfile),
  * depositBalance của client, và mã hóa đơn kế tiếp chưa trùng.
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 async function main() {
     const profileId = '61f25775-eb95-4ece-96e8-99ae97542af1'

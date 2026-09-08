@@ -5,7 +5,7 @@
  *   • hàm nền chưa hề chạy   ⇒ Mux không có asset nào mang passthrough `ent:`
  *   • hàm chạy nhưng ghi DB hụt ⇒ Mux CÓ asset mồ côi (đang tính tiền!)
  *
- * Chạy: npx tsx scripts/ent/probe-mux-recent.ts
+ * Chạy: npx tsx scripts/probe-mux-recent.ts
  */
 const id = process.env.MUX_TOKEN_ID
 const secret = process.env.MUX_TOKEN_SECRET

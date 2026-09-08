@@ -8,9 +8,9 @@
  * trước thì màn hình trống — và trống ĐÚNG, không phải lỗi. Script in ra địa chỉ
  * cần mở để khỏi phải đoán.
  *
- * Chạy: npx tsx scripts/ent/where-is-my-request.ts
+ * Chạy: npx tsx scripts/where-is-my-request.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 async function main() {
     const pending = await prisma.clientTaskRequest.findMany({

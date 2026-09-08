@@ -34,7 +34,7 @@ Không cần làm gì với ba mục này, đã đo thật chứ không phải s
 | **C1 · `X-Real-IP` qua nginx** | Gửi header giả vào `https://hustlytasker.xyz` | **Ghi IP THẬT** ⇒ nginx ghi đè đúng |
 | **C5 · Giới hạn body** | POST 2MB | **Đi lọt** ⇒ `client_max_body_size` đã nâng khỏi mặc định 1MB |
 
-Chạy lại bất cứ lúc nào: `npx tsx scripts/ent/probe-real-ip.ts`
+Chạy lại bất cứ lúc nào: `npx tsx scripts/probe-real-ip.ts`
 
 ## 🔴 NHƯNG: cổng 3000 mở thẳng ra Internet — nginx bị đi vòng
 
@@ -88,7 +88,7 @@ có video mới đi qua đường đó. Đồng hồ đếm ngược có thật,
 
 ## ❌ Ba lịch cron đã xác nhận CHẾT
 
-`npx tsx scripts/ent/probe-cron-alive.ts`
+`npx tsx scripts/probe-cron-alive.ts`
 
 | Job | Dấu vết | Kết luận |
 |---|---|---|
@@ -99,7 +99,7 @@ có video mới đi qua đường đó. Đồng hồ đếm ngược có thật,
 
 ### ✅ Bật lại `check-deadline` KHÔNG gây mưa thông báo
 
-Đã kiểm bằng chính bộ lọc của route (`npx tsx scripts/ent/preview-overdue-flip.ts`):
+Đã kiểm bằng chính bộ lọc của route (`npx tsx scripts/preview-overdue-flip.ts`):
 
 ```
 Đếm thô (mọi trạng thái)  : 72
@@ -283,7 +283,7 @@ Vài trăm task trở lên → chạy ban đêm và báo trước cho team, nế
 
 > **Bẫy giám sát:** `review-janitor` trả 200 khi **gửi được sự kiện**, không phải khi janitor
 > chạy xong. `hard-delete-*` trả 200 kèm `{"skipped":"migration pending"}` = không xoá gì.
-> Phải mở **bảng điều khiển Inngest** xem lượt chạy `review-janitor` + `ent-janitor`.
+> Phải mở **bảng điều khiển Inngest** xem lượt chạy `review-janitor`.
 
 > Giới hạn `JANITOR_BATCH=100` / `PURGE_BATCH=25` mỗi đêm là **cố ý** — tồn đọng cần vài đêm
 > mới rút cạn. Đừng tăng lên cho nhanh.
@@ -294,9 +294,9 @@ Vài trăm task trở lên → chạy ban đêm và báo trước cho team, nế
 curl -X PUT https://hustlytasker.xyz/api/inngest     # kỳ vọng: modified:true
 ```
 
-Rời Vercel là mất tích hợp tự đồng bộ. Quên = `review-janitor` và `ent-janitor` (hai hàm
-**không có nguồn kích hoạt nào khác**) không tồn tại với Inngest Cloud; cron vẫn trả 200, sự
-kiện bay vào hư không, không một dòng log. `ExecStartPost` trong service file tự lo việc này.
+Rời Vercel là mất tích hợp tự đồng bộ. Quên = `review-janitor` (hàm **không có nguồn kích
+hoạt nào khác**) không tồn tại với Inngest Cloud; cron vẫn trả 200, sự kiện bay vào hư không,
+không một dòng log. `ExecStartPost` trong service file tự lo việc này.
 
 Kiểm chứng đầy đủ — script gọi **thật** Mux, R2, Inngest chứ không chỉ kiểm biến có mặt:
 ```bash
@@ -461,6 +461,6 @@ mới là cách chữa thật).
 8. `sudo systemctl kill -s SIGKILL hustlytasker; sleep 6; systemctl is-active hustlytasker` → active
 9. Từ máy ngoài: `curl http://<IP-VPS>:3000/` → refused
 10. Qua đầu giờ → `tail /var/log/hustly-cron.log` có `job=send-digest http=200`
-11. Chạy tay `review-janitor` → bảng điều khiển Inngest: `review-janitor` **và** `ent-janitor`
-    đều hoàn tất (đừng nhìn mã HTTP của cron)
+11. Chạy tay `review-janitor` → bảng điều khiển Inngest: lượt chạy `review-janitor`
+    hoàn tất (đừng nhìn mã HTTP của cron)
 12. Upload một video → theo tới `READY`, xác nhận Mux → Inngest thông suốt

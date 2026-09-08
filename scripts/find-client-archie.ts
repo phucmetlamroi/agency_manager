@@ -9,9 +9,9 @@
  *   → cộng cả client con (subsidiaries) nếu Archie là công ty mẹ có nhiều nhánh
  *   → liệt kê Task theo clientId (kể cả các client con), sắp theo ngày tạo
  *
- * Chạy: npx tsx scripts/ent/find-client-archie.ts
+ * Chạy: npx tsx scripts/find-client-archie.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 function vnd(n: unknown): string {
     const num = Number(n ?? 0)

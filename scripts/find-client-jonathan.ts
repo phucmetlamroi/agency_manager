@@ -3,9 +3,9 @@
  * — chỉ đọc. Kiểm trước khi dựng hóa đơn: đây là dữ liệu THẬT trong hệ thống hay
  * chủ hệ thống đang cho số liệu tay (task chưa từng tạo trong app)?
  *
- * Chạy: npx tsx scripts/ent/find-client-jonathan.ts
+ * Chạy: npx tsx scripts/find-client-jonathan.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 const PROFILE_ID = '61f25775-eb95-4ece-96e8-99ae97542af1'
 

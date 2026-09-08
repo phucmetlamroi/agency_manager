@@ -5,10 +5,10 @@
  * biết được là tìm DẤU VẾT chúng để lại trong cơ sở dữ liệu. Mỗi job dưới đây
  * có một dấu vết riêng mà chỉ nó mới tạo ra được.
  *
- * Chạy: npx tsx scripts/ent/probe-cron-alive.ts
+ * Chạy: npx tsx scripts/probe-cron-alive.ts
  */
-import { prisma } from '../../src/lib/db'
-import { OVERDUE_ELIGIBLE_STATUSES } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { OVERDUE_ELIGIBLE_STATUSES } from '../src/lib/task-statuses'
 
 const H = (n: number) => new Date(Date.now() - n * 3600_000)
 const ago = (d: Date | null) => {
@@ -42,7 +42,7 @@ async function main() {
     console.log(`   Task cron SẼ lật khi bật lại: ${shouldBeOverdue}`)
     console.log(
         shouldBeOverdue > 0
-            ? `   ⚠️  Bật lại sẽ lật ${shouldBeOverdue} task cùng lúc — mỗi task một thông báo.\n        Chạy scripts/ent/preview-overdue-flip.ts để xem chi tiết trước.`
+            ? `   ⚠️  Bật lại sẽ lật ${shouldBeOverdue} task cùng lúc — mỗi task một thông báo.\n        Chạy scripts/preview-overdue-flip.ts để xem chi tiết trước.`
             : '   ✅ Không có task nào bị lật — bật cron không gây mưa thông báo.',
     )
 

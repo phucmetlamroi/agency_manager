@@ -3,7 +3,7 @@
  * ReviewFolder/ReviewAsset, để đối chiếu với bản kế hoạch mà `prisma db push`
  * sắp áp. Mục đích: chắc chắn không có chỉ mục tạo bằng SQL TAY nào bị xoá mất.
  *
- * Chạy: DATABASE_URL="<chuỗi prod>" npx tsx scripts/ent/check-prod-indexes.ts
+ * Chạy: DATABASE_URL="<chuỗi prod>" npx tsx scripts/check-prod-indexes.ts
  * KHÔNG ghi gì vào database.
  */
 import { PrismaClient } from '@prisma/client'

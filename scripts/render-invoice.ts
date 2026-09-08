@@ -9,13 +9,13 @@
  * không trùng với hàng thật). Đây chỉ là tệp PDF để xem/gửi/in; đăng ký chính
  * thức vào hệ thống thì làm qua giao diện thật (nút "Xuất & Lưu" trong InvoiceModal).
  *
- * Chạy: npx tsx scripts/ent/render-invoice.ts "<tên client>" "<đường dẫn ra>" ["<lọc tên task>"]
+ * Chạy: npx tsx scripts/render-invoice.ts "<tên client>" "<đường dẫn ra>" ["<lọc tên task>"]
  *   - Không truyền lọc tên task ⇒ lấy TẤT CẢ task của client đó.
  *   - Có lọc ⇒ chỉ lấy task có title chứa chuỗi đó (không phân biệt hoa/thường).
  */
-import { prisma } from '../../src/lib/db'
-import { generateInvoicePDF, type InvoiceData } from '../../src/lib/invoice-generator'
-import { TASK_STATUS_META } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { generateInvoicePDF, type InvoiceData } from '../src/lib/invoice-generator'
+import { TASK_STATUS_META } from '../src/lib/task-statuses'
 import fs from 'fs'
 
 const PROFILE_ID = '61f25775-eb95-4ece-96e8-99ae97542af1'
@@ -31,7 +31,7 @@ async function main() {
     const out = process.argv[3]
     const titleFilter = process.argv[4]
     if (!clientName || !out) {
-        console.error('Dùng: npx tsx scripts/ent/render-invoice.ts "<tên client>" "<đường dẫn ra>" ["<lọc tên task>"]')
+        console.error('Dùng: npx tsx scripts/render-invoice.ts "<tên client>" "<đường dẫn ra>" ["<lọc tên task>"]')
         process.exit(1)
     }
 

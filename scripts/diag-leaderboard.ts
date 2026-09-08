@@ -8,10 +8,10 @@
  *   2. Bộ lọc `role: 'USER'` ⇒ ai mang vai trò khác bị LOẠI khỏi bảng hoàn toàn.
  *   3. Bộ nhớ đệm 24h (unstable_cache) ⇒ số cũ.
  *
- * Chạy: npx tsx scripts/ent/diag-leaderboard.ts
+ * Chạy: npx tsx scripts/diag-leaderboard.ts
  */
-import { prisma } from '../../src/lib/db'
-import { SALARY_PENDING_STATUSES } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { SALARY_PENDING_STATUSES } from '../src/lib/task-statuses'
 
 const WS = '6007171e-824c-4566-8a68-0012c0368d40' // August/2026
 

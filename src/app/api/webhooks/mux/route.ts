@@ -10,7 +10,6 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { inngest, REVIEW_EVENTS } from '@/lib/review/inngest'
 import { reviewLog } from '@/lib/review/logger'
-import { ENT_EVENTS, parseEntPassthrough } from '@/lib/ent/events'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -82,18 +81,22 @@ export async function POST(req: NextRequest) {
     reviewLog('info', 'webhook.mux.received', { eventId, type, duplicated })
 
     if (!duplicated) {
-        // [Giải trí 2026-08] Một tài khoản Mux phục vụ HAI module. Passthrough là thứ
-        // duy nhất phân biệt: tiền tố `ent:` ⇒ kho phim, còn lại ⇒ module Tệp. Gửi nhầm
-        // nhánh thì consumer kia không tìm thấy bản ghi, đánh dấu đã-xử-lý, và video
-        // treo "đang xử lý" vĩnh viễn.
-        const eventName = parseEntPassthrough(payload?.data?.passthrough)
-            ? ENT_EVENTS.MUX_EVENT_RECEIVED
-            : REVIEW_EVENTS.MUX_EVENT_RECEIVED
+        // [2026-09-08] Kho phim "Giải trí" đã gỡ khỏi sản phẩm, nhưng asset của nó có thể vẫn
+        // còn trên Mux (chưa dọn) và vẫn bắn webhook — nhận ra bằng passthrough tiền tố `ent:`.
+        // Ghi sổ xong thì đánh dấu đã-xử-lý NGAY và không bơm vào Inngest: consumer của module
+        // Tệp không có ReviewVersion nào khớp, còn janitor bước (d) sẽ bơm lại mọi hàng chưa
+        // xử lý suốt 7 ngày — hai thứ đó cộng lại là log rác đều đặn cho một tính năng đã chết.
+        const passthrough = payload?.data?.passthrough
+        if (typeof passthrough === 'string' && passthrough.startsWith('ent:')) {
+            await prisma.webhookEvent.update({ where: { id: eventId }, data: { processedAt: new Date() } })
+            reviewLog('info', 'webhook.mux.ent_legacy_ignored', { eventId, type })
+            return NextResponse.json({ ok: true, ignored: 'ent' })
+        }
         // Fire-and-forget into Inngest; the ledger is the source of truth, so a
         // failed send is recovered by the reconcile job (P1) — never block the 200.
         try {
             await inngest.send({
-                name: eventName,
+                name: REVIEW_EVENTS.MUX_EVENT_RECEIVED,
                 data: { webhookEventId: eventId, type },
             })
         } catch (e) {

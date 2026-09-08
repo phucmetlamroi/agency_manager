@@ -5,15 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
     Settings, Edit3, Trash2, RotateCcw, Loader2,
     Shield, AlertTriangle, Clock, Check, Plug, DollarSign,
-    Clapperboard, ArrowUpRight,
 } from 'lucide-react'
 import { renameWorkspaceAction, deleteWorkspaceAction, restoreWorkspaceAction } from '@/actions/workspace-actions'
 import { toast } from 'sonner'
 import ConnectorsPanel from '@/components/settings/ConnectorsPanel'
 import PricingRulesPanel from '@/components/settings/PricingRulesPanel'
 import { roleLabel } from '@/lib/display-labels'
-import StudyPlaceBoard from '@/components/study-place/StudyPlaceBoard'
-import type { StudyPlaceProgressDTO } from '@/lib/study-place'
 
 type IntegrationRow = {
     provider: string
@@ -35,7 +32,7 @@ type PricingRuleRow = {
 
 type ClientOption = { id: number; name: string }
 
-type TabId = 'general' | 'connectors' | 'pricing' | 'study'
+type TabId = 'general' | 'connectors' | 'pricing'
 
 type Props = {
     workspaceId: string
@@ -56,13 +53,15 @@ type Props = {
     pricingRules?: PricingRuleRow[]
     /** [Quick Create] Clients available in this profile (for pricing rule scope) */
     clients?: ClientOption[]
-    /** StudyPlace progress synchronized for the current user in this workspace */
-    studyProgress?: StudyPlaceProgressDTO[]
+    /** [Đã gỡ StudyPlace 2026-09-08] Prop giữ lại CHỈ để src/app/[workspaceId]/mc/settings/page.tsx
+     *  (vùng không được sửa — Mission Control phải byte-identical) còn biên dịch. Không đọc,
+     *  không truyền đi đâu. Xoá cùng lúc với stub ở src/actions/study-place-actions.ts. */
+    studyProgress?: unknown
 }
 
 export default function WorkspaceSettingsPanel({
     workspaceId, workspace, currentUserRole, isGlobalAdmin, memberCount,
-    integrations = [], pricingRules = [], clients = [], studyProgress = [],
+    integrations = [], pricingRules = [], clients = [],
 }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -80,14 +79,13 @@ export default function WorkspaceSettingsPanel({
     // [Quick Create] Tab navigation — restore tab from URL on mount (post-OAuth redirect)
     const initialTab = (searchParams?.get('tab') as TabId | null) ?? 'general'
     const [activeTab, setActiveTab] = useState<TabId>(
-        initialTab === 'connectors' || initialTab === 'pricing' || initialTab === 'study' ? initialTab : 'general',
+        initialTab === 'connectors' || initialTab === 'pricing' ? initialTab : 'general',
     )
 
     const TABS: Array<{ id: TabId; label: string; icon: any }> = [
         { id: 'general', label: 'Tổng quan', icon: Settings },
         { id: 'connectors', label: 'Kết nối', icon: Plug },
         { id: 'pricing', label: 'Bảng giá', icon: DollarSign },
-        { id: 'study', label: 'StudyPlace', icon: Check },
     ]
 
     function handleTabChange(tabId: TabId) {
@@ -188,11 +186,6 @@ export default function WorkspaceSettingsPanel({
             {/* Tab: Pricing Rules */}
             {activeTab === 'pricing' && (
                 <PricingRulesPanel workspaceId={workspaceId} rules={pricingRules} clients={clients} />
-            )}
-
-            {/* Tab: StudyPlace */}
-            {activeTab === 'study' && (
-                <StudyPlaceBoard workspaceId={workspaceId} initialProgress={studyProgress} />
             )}
 
             {/* Tab: General */}
@@ -298,25 +291,6 @@ export default function WorkspaceSettingsPanel({
                     </div>
                 </div>
             </div>
-
-            {/* [Giải trí] Lối vào kho phim — tính năng ẨN, sau đây còn một cửa mã truy cập
-                nữa. Card này chỉ là đường đi; không có mã thì bấm vào chỉ gặp ô nhập mã,
-                không lộ gì về nội dung bên trong. Trang cài đặt vốn đã gate ADMIN. */}
-            {activeTab === 'general' && (
-                <a
-                    href="/entertainment"
-                    className="group flex items-center gap-4 rounded-2xl border border-white/5 bg-zinc-950/50 p-6 shadow-xl backdrop-blur-xl transition-colors hover:border-amber-500/20 hover:bg-zinc-900/50"
-                >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 transition-colors group-hover:bg-amber-500/20">
-                        <Clapperboard className="h-5 w-5" strokeWidth={1.5} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="text-sm font-bold text-zinc-100">Giải trí</div>
-                        <div className="text-xs text-zinc-500">Khu vực riêng — cần mã truy cập.</div>
-                    </div>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-zinc-600 transition-colors group-hover:text-amber-400" />
-                </a>
-            )}
 
             {/* Danger Zone */}
             {isOwner && !isSoftDeleted && (

@@ -7,9 +7,9 @@
  * Có thông báo mà hộp thư trống thì gần như chắc là B — nhưng phải nhìn hàng thật
  * mới dám nói, vì thông báo có thể đi đường khác.
  *
- * Chạy: npx tsx scripts/ent/probe-client-requests.ts
+ * Chạy: npx tsx scripts/probe-client-requests.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 async function main() {
     const total = await prisma.clientTaskRequest.count()

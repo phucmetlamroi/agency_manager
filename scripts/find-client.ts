@@ -2,9 +2,9 @@
  * [Tra cứu] Tìm khách theo tên trong hồ sơ Hustly Team + liệt kê task theo workspace.
  * Chỉ đọc. Bản dùng chung, thay cho các bản hardcode từng khách trước đây.
  *
- * Chạy: npx tsx scripts/ent/find-client.ts "<tên khách>"
+ * Chạy: npx tsx scripts/find-client.ts "<tên khách>"
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 const PROFILE_ID = '61f25775-eb95-4ece-96e8-99ae97542af1'
 
@@ -16,7 +16,7 @@ const usd = (n: unknown) => {
 async function main() {
     const q = process.argv[2]
     if (!q) {
-        console.error('Dùng: npx tsx scripts/ent/find-client.ts "<tên khách>"')
+        console.error('Dùng: npx tsx scripts/find-client.ts "<tên khách>"')
         process.exit(1)
     }
 

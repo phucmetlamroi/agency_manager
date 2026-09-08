@@ -10,10 +10,10 @@
  * = false, cron KHÔNG bao giờ đụng tới chúng (chú thích trong route: "the cron
  * never overwrites their lifecycle value").
  *
- * Chạy: npx tsx scripts/ent/preview-overdue-flip.ts
+ * Chạy: npx tsx scripts/preview-overdue-flip.ts
  */
-import { prisma } from '../../src/lib/db'
-import { OVERDUE_ELIGIBLE_STATUSES } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { OVERDUE_ELIGIBLE_STATUSES } from '../src/lib/task-statuses'
 
 const days = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400_000)
 

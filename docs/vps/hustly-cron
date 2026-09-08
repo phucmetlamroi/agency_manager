@@ -62,8 +62,8 @@ echo "$(date -u +%FT%TZ) job=${JOB} http=${CODE} body=${BODY}" >> "$LOG"
 #
 #   • review-janitor  trả 200 ngay khi GỬI ĐƯỢC sự kiện cho Inngest, không phải
 #     khi janitor chạy xong. Muốn biết nó thật sự làm gì phải mở bảng điều khiển
-#     Inngest xem lượt chạy review-janitor VÀ ent-janitor (một sự kiện kích hoạt
-#     cả hai), đọc con số trả về {aborted, redriven, reconciled, purged}.
+#     Inngest xem lượt chạy review-janitor, đọc con số trả về
+#     {aborted, redriven, reconciled, purged}.
 #
 #   • hard-delete-workspaces / hard-delete-profiles trả 200 kèm
 #     {"deleted":0,"skipped":"migration pending"} — tức là KHÔNG xoá gì cả.

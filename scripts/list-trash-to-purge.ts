@@ -5,9 +5,9 @@
  * Xoá thật khỏi Mux + R2, KHÔNG hoàn tác được. Đây là lần cuối nhìn thấy chúng
  * trước khi biến mất.
  *
- * Chạy: npx tsx scripts/ent/list-trash-to-purge.ts
+ * Chạy: npx tsx scripts/list-trash-to-purge.ts
  */
-import { prisma } from '../../src/lib/db'
+import { prisma } from '../src/lib/db'
 
 const PURGE_AGE_DAYS = 30
 const daysSince = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400_000)

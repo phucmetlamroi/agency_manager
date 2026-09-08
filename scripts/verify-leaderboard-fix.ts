@@ -2,10 +2,10 @@
  * [Xác minh] Chạy ĐÚNG phép tính MỚI của Leaderboard.tsx trên dữ liệu thật để
  * đối chiếu với bảng cũ — chỉ đọc.
  *
- * Chạy: npx tsx scripts/ent/verify-leaderboard-fix.ts
+ * Chạy: npx tsx scripts/verify-leaderboard-fix.ts
  */
-import { prisma } from '../../src/lib/db'
-import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '../../src/lib/task-statuses'
+import { prisma } from '../src/lib/db'
+import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from '../src/lib/task-statuses'
 
 const WS = '6007171e-824c-4566-8a68-0012c0368d40' // August/2026
 

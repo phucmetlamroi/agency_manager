@@ -6,7 +6,7 @@
  * vật thể, không ước lượng từ bảng trong cơ sở dữ liệu — hai số này lệch nhau
  * đúng ở chỗ đáng lo: vật thể mồ côi mà DB không còn khoá nào trỏ tới.
  *
- * Chạy: npx tsx scripts/ent/r2-usage.ts
+ * Chạy: npx tsx scripts/r2-usage.ts
  *   (cần R2_ACCOUNT_ID + R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY + R2_BUCKET)
  */
 import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'

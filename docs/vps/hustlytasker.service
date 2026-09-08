@@ -54,8 +54,8 @@ Environment=TZ=UTC
 # ghi đè X-Real-IP chống giả mạo (xem docs/vps/nginx.conf).
 ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3000
 
-# Rời Vercel là mất tích hợp tự đồng bộ Inngest. Không đăng ký lại thì hai hàm
-# review-janitor và ent-janitor (không có nguồn kích hoạt nào khác ngoài cron)
+# Rời Vercel là mất tích hợp tự đồng bộ Inngest. Không đăng ký lại thì hàm
+# review-janitor (không có nguồn kích hoạt nào khác ngoài cron)
 # sẽ không tồn tại với Inngest Cloud: cron vẫn trả 200, sự kiện bay vào hư không,
 # không một dòng log nào. Dòng dưới tự lo việc đó sau MỖI lần khởi động.
 ExecStartPost=/bin/sh -c 'sleep 15; curl -fsS -X PUT https://hustlytasker.xyz/api/inngest || true'

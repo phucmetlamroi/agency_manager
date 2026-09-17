@@ -14,15 +14,14 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, User, Lock, CheckCircle2, Loader2, ArrowLeft, AtSign } from 'lucide-react'
 import PasswordStrengthMeter from '@/components/auth/PasswordStrengthMeter'
 import { UsernameInput } from '@/components/auth/UsernameInput'
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
+import { submitSignup } from '@/lib/signup-client'
 
 export default function SignupPage() {
-    const router = useRouter()
     const [displayName, setDisplayName] = useState('')
     const [username, setUsername] = useState('')
     const [email, setEmail] = useState('')
@@ -45,24 +44,15 @@ export default function SignupPage() {
         setFieldErrors({})
 
         startTransition(async () => {
-            try {
-                const res = await fetch('/api/auth/signup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email, password, displayName, username, acceptTos, honeypot,
-                    }),
-                })
-                const data = await res.json()
-                if (res.ok && data.success) {
-                    setDone(true)
-                } else if (data.errors) {
-                    setFieldErrors(data.errors)
-                } else {
-                    setError(data.message || 'Đã xảy ra lỗi.')
-                }
-            } catch {
-                setError('Không thể kết nối đến máy chủ.')
+            const data = await submitSignup({
+                email, password, displayName, username, acceptTos, honeypot,
+            })
+            if (data.success) {
+                setDone(true)
+            } else if (data.errors) {
+                setFieldErrors(data.errors)
+            } else {
+                setError(data.message || 'Đã xảy ra lỗi.')
             }
         })
     }

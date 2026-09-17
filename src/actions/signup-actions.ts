@@ -172,10 +172,14 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
 
     // ── 5. Vercel BotID — passive bot detection (replaces Cloudflare Turnstile) ──
     // BotID đọc passive signals từ client (set bởi src/instrumentation-client.ts)
-    // và classify request. Local dev returns isBot=false. Vercel platform
-    // fail-open nếu signal không khả dụng — đủ phù hợp với defense-in-depth
-    // hiện tại (Upstash rate-limit + honeypot + HIBP + bcrypt 12).
-    const botCheck = await checkBotId()
+    // và classify request. Local dev returns isBot=false; production requires
+    // Vercel request context and must not call this SDK on a standalone server.
+    // BotID requires Vercel request context + OIDC in production. Keep the
+    // existing defense on Vercel; self-hosted deployments retain the honeypot,
+    // Upstash rate limits, HIBP check, and disposable-email guard.
+    const botCheck = process.env.VERCEL === '1' && !process.env.ELECTRON_DESKTOP
+        ? await checkBotId()
+        : { isBot: false }
     if (botCheck.isBot) {
         await paddingDelay()
         return {

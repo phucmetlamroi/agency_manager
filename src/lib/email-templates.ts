@@ -15,6 +15,13 @@ const safeEmailUrl = (raw: string | null | undefined): string => {
 
 // Base Template Wrapper — HustlyTasker branded shell (operational/admin emails)
 // User-facing notifications use src/lib/notification-emails/ instead.
+//
+// [AUDIT HT-035 fix] `title` được escape NGAY TẠI ĐÂY, không giao cho từng nơi gọi.
+// Mọi template đều nhét tiêu đề task / tên người vào tham số này rồi nó chảy thẳng vào <h1>, nên
+// đây là điểm nghẽn: bịt một chỗ là phủ cả 9 template hiện có lẫn template viết sau. Bắt từng nơi
+// gọi tự nhớ escape chính là cách lỗ hổng này sinh ra — 1 trong 9 template nhớ, 8 cái quên.
+// ⚠️ `content` thì KHÔNG escape: nó đã là HTML do chính ta dựng. Trách nhiệm escape biến trong
+// thân email nằm ở từng template, ngay chỗ nội suy.
 const wrapTemplate = (content: string, title: string) => `<!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -30,7 +37,7 @@ const wrapTemplate = (content: string, title: string) => `<!DOCTYPE html>
 <div style="display:inline-block;background:rgba(255,255,255,0.18);border-radius:10px;padding:8px 14px;">
 <span style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;">⚡ HustlyTasker</span>
 </div>
-<h1 style="margin:14px 0 0 0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.4;">${title}</h1>
+<h1 style="margin:14px 0 0 0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.4;">${escapeHtml(title)}</h1>
 </td></tr>
 <tr><td style="padding:32px 32px 28px 32px;">${content}</td></tr>
 <tr><td style="padding:0 32px 28px 32px;">
@@ -56,13 +63,16 @@ export const emailTemplates = {
         // (UTC on Vercel) → shows +7h off. formatVietnamDateTime pins Asia/Ho_Chi_Minh.
         const deadlineStr = deadline ? formatVietnamDateTime(deadline) : 'Không có hạn chót'
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
+        // [AUDIT HT-035 fix] Tiêu đề task do editor tự đặt → escape trước khi nhúng vào HTML email.
+        const safeUser = escapeHtml(userName)
+        const safeTitle = escapeHtml(taskTitle)
         // Scenario 1
         const content = `
-            <p>Chào <strong>${userName}</strong>,</p>
+            <p>Chào <strong>${safeUser}</strong>,</p>
             <p>Admin vừa giao cho bạn một task mới trong dự án.</p>
-            
+
             <div class="card">
-                <p><strong>Nhiệm vụ:</strong> ${taskTitle}</p>
+                <p><strong>Nhiệm vụ:</strong> ${safeTitle}</p>
                 <p><strong>Deadline:</strong> ${deadlineStr}</p>
             </div>
 
@@ -87,15 +97,19 @@ export const emailTemplates = {
         // [video-fix ①] Render the start time in Vietnam time, not the server's UTC zone.
         const timeStr = formatVietnamDateTime(startTime)
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
+        // [AUDIT HT-035 fix] escape mọi giá trị do người dùng kiểm soát.
+        const safeUser = escapeHtml(userName)
+        const safeTitle = escapeHtml(taskTitle)
+        const safeClient = escapeHtml(clientName)
 
         const content = `
             <p>Xin chào,</p>
-            <p><strong>${userName}</strong> đã bắt đầu thực hiện task <strong>${taskTitle}</strong> của khách hàng <strong>${clientName}</strong> vào lúc ${timeStr}.</p>
+            <p><strong>${safeUser}</strong> đã bắt đầu thực hiện task <strong>${safeTitle}</strong> của khách hàng <strong>${safeClient}</strong> vào lúc ${timeStr}.</p>
 
             <div class="card">
-                <p><strong>Nhân viên:</strong> ${userName}</p>
-                <p><strong>Task:</strong> ${taskTitle}</p>
-                <p><strong>Khách hàng:</strong> ${clientName}</p>
+                <p><strong>Nhân viên:</strong> ${safeUser}</p>
+                <p><strong>Task:</strong> ${safeTitle}</p>
+                <p><strong>Khách hàng:</strong> ${safeClient}</p>
                 <p><strong>Thời gian bắt đầu:</strong> ${timeStr}</p>
             </div>
 
@@ -142,7 +156,9 @@ export const emailTemplates = {
                 <a href="${link}" class="btn" style="background-color: #f59e0b;">VÀO REVIEW NGAY</a>
             </div>
         `
-        return wrapTemplate(content, `[HustlyTasker] ${safeUser} đã nộp video cho task`)
+        // ⚠️ Truyền chuỗi THÔ cho wrapTemplate, không phải `safeUser`: wrapTemplate nay tự escape
+        // `title`, nên đưa giá trị đã escape vào sẽ escape HAI LẦN và người nhận thấy `&amp;lt;`.
+        return wrapTemplate(content, `[HustlyTasker] ${userName} đã nộp video cho task`)
     },
 
     // 4. Task Status Bulk Digest — [Sprint Q]
@@ -155,22 +171,25 @@ export const emailTemplates = {
         items: Array<{ title: string; clientName: string; oldStatus: string }>,
     ) => {
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin`
+        // [AUDIT HT-035 fix] Mỗi hàng mang tiêu đề task + tên khách do người dùng nhập; email này
+        // gửi cho NHIỀU người nhận cùng lúc, nên một task độc hại phát tán tới cả nhóm.
+        const safeStatus = escapeHtml(newStatus)
         const rows = items.map((item) => `
             <tr>
                 <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">
-                    <strong style="color: #111827;">${item.title}</strong>
-                    <div style="color: #6b7280; font-size: 11px; margin-top: 2px;">${item.clientName}</div>
+                    <strong style="color: #111827;">${escapeHtml(item.title)}</strong>
+                    <div style="color: #6b7280; font-size: 11px; margin-top: 2px;">${escapeHtml(item.clientName)}</div>
                 </td>
                 <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; white-space: nowrap;">
-                    ${item.oldStatus} → <strong style="color: #7C3AED;">${newStatus}</strong>
+                    ${escapeHtml(item.oldStatus)} → <strong style="color: #7C3AED;">${safeStatus}</strong>
                 </td>
             </tr>
         `).join('')
 
         const content = `
-            <p>Xin chào <strong>${recipientName}</strong>,</p>
-            <p><strong>${actorName}</strong> vừa cập nhật status cho <strong>${items.length} task</strong> sang
-            <span class="highlight">${newStatus}</span>:</p>
+            <p>Xin chào <strong>${escapeHtml(recipientName)}</strong>,</p>
+            <p><strong>${escapeHtml(actorName)}</strong> vừa cập nhật status cho <strong>${items.length} task</strong> sang
+            <span class="highlight">${safeStatus}</span>:</p>
 
             <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background: #fafafa; border-radius: 8px; overflow: hidden;">
                 <thead>
@@ -196,13 +215,14 @@ export const emailTemplates = {
     // Admin Feedback (To User)
     taskFeedback: (userName: string, taskTitle: string, feedback: string) => {
         const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`
+        // [AUDIT HT-035 fix] feedback là văn bản tự do dài nhất trong mọi email ở đây.
         const content = `
-            <p>Chào <strong>${userName}</strong>,</p>
+            <p>Chào <strong>${escapeHtml(userName)}</strong>,</p>
             <p>Admin đã xem bài làm của bạn và có một số yêu cầu chỉnh sửa (Feedback).</p>
-            
+
             <div class="card" style="border-left-color: #f59e0b; background-color: #fffbeb;">
                 <p><strong>👉 Lời nhắn từ Admin:</strong></p>
-                <p style="font-style: italic;">"${feedback}"</p>
+                <p style="font-style: italic;">"${escapeHtml(feedback)}"</p>
             </div>
 
             <p>Bạn hãy vào xem chi tiết và thực hiện chỉnh sửa sớm nhé.</p>
@@ -221,7 +241,7 @@ export const emailTemplates = {
             <p>Tuyệt vời! Admin đã nghiệm thu task của bạn.</p>
             
             <div class="card" style="border-left-color: #10b981; background-color: #ecfdf5;">
-                <p><strong>Dự án/Task:</strong> ${taskTitle}</p>
+                <p><strong>Dự án/Task:</strong> ${escapeHtml(taskTitle)}</p>
                 <p><strong>Trạng thái:</strong> ✅ Đã hoàn thành</p>
                 ${revenue > 0 ? `<p><strong>Ghi nhận doanh thu:</strong> ${formatCurrency(revenue)}</p>` : ''}
             </div>
@@ -236,22 +256,25 @@ export const emailTemplates = {
     },
     // 5. Invoice Created (To Admin/Treasurer)
     invoiceCreated: (userName: string, invoiceNumber: string, clientName: string, amount: string, link: string) => {
+        // [AUDIT HT-035 fix] `link` ở template này là THAM SỐ do nơi gọi truyền vào (khác các
+        // template trên, nơi link được dựng từ biến môi trường) — nên phải qua safeEmailUrl.
+        const safeCta = safeEmailUrl(link)
         const content = `
-            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Xin chào <strong>${escapeHtml(userName)}</strong>,</p>
             <p>Hệ thống xác nhận bạn vừa tạo thành công hóa đơn mới.</p>
-            
+
             <div class="card" style="border-left-color: #3b82f6; background-color: #eff6ff;">
-                <p><strong>Mã hóa đơn:</strong> ${invoiceNumber}</p>
-                <p><strong>Khách hàng:</strong> ${clientName}</p>
-                <p><strong>Tổng tiền:</strong> ${amount}</p>
+                <p><strong>Mã hóa đơn:</strong> ${escapeHtml(invoiceNumber)}</p>
+                <p><strong>Khách hàng:</strong> ${escapeHtml(clientName)}</p>
+                <p><strong>Tổng tiền:</strong> ${escapeHtml(amount)}</p>
             </div>
 
             <p>Hóa đơn đã được lưu vào hệ thống và gửi yêu cầu thanh toán (nếu có cấu hình tự động).</p>
-            <p>Bạn có thể xem chi tiết tại đường dẫn bên dưới:</p>
-            
-            <div style="text-align: center;">
-                 <a href="${link}" class="btn">XEM CHI TIẾT KHÁCH HÀNG</a>
-            </div>
+            ${safeCta ? '<p>Bạn có thể xem chi tiết tại đường dẫn bên dưới:</p>' : ''}
+
+            ${safeCta ? `<div style="text-align: center;">
+                 <a href="${safeCta}" class="btn">XEM CHI TIẾT KHÁCH HÀNG</a>
+            </div>` : ''}
         `
         return wrapTemplate(content, `[Invoice] Đã tạo hóa đơn mới #${invoiceNumber}`)
     },
@@ -276,25 +299,29 @@ export const emailTemplates = {
         const emoji = typeEmoji[notification.type] || '🔔'
 
         // Build CTA link
-        let ctaLink = `${appUrl}/dashboard`
-        let ctaLabel = 'MỞ AGENCYMANAGER'
-        if (notification.taskId) {
-            ctaLink = `${appUrl}/dashboard`
-            ctaLabel = 'XEM TASK'
-        }
+        // [AUDIT HT-035 fix] `appUrl` là THAM SỐ do nơi gọi truyền vào, y hệt `link` của
+        // invoiceCreated — không phải hằng số dựng từ biến môi trường như các template khác. Nên
+        // nó phải qua safeEmailUrl (chỉ http/https, rồi escape) trước khi vào href, và CTA bị bỏ
+        // hẳn nếu không đạt. Hai template cuối file này hiện CHƯA CÓ NƠI GỌI NÀO; vá luôn chính
+        // vì thế — người đấu dây chúng sau này không có cách nào biết phải tự nhớ escape, mà
+        // "mỗi nơi gọi tự nhớ" đúng là cách lỗ hổng HT-035 sinh ra (8/9 template quên).
+        const safeAppUrl = safeEmailUrl(`${appUrl}/dashboard`)
+        const ctaLabel = notification.taskId ? 'XEM TASK' : 'MỞ AGENCYMANAGER'
 
         const content = `
-            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Xin chào <strong>${escapeHtml(userName)}</strong>,</p>
             <p>Bạn có một thông báo mới:</p>
 
             <div class="card">
-                <p><strong>${emoji} ${notification.title}</strong></p>
-                <p style="color: #4b5563; margin-top: 8px;">${notification.body}</p>
+                <p><strong>${emoji} ${escapeHtml(notification.title)}</strong></p>
+                <p style="color: #4b5563; margin-top: 8px;">${escapeHtml(notification.body)}</p>
             </div>
 
+            ${safeAppUrl ? `
             <div style="text-align: center;">
-                <a href="${ctaLink}" class="btn">${ctaLabel}</a>
+                <a href="${safeAppUrl}" class="btn">${ctaLabel}</a>
             </div>
+            ` : ''}
 
             <p style="font-size: 12px; color: #9ca3af; margin-top: 24px;">
                 Bạn nhận email này vì đã bật thông báo qua email.
@@ -334,22 +361,27 @@ export const emailTemplates = {
         const truncate = (text: string, maxLen = 80) =>
             text.length > maxLen ? text.slice(0, maxLen) + '...' : text
 
+        // [AUDIT HT-035 fix] escape SAU khi cắt: cắt trước rồi escape thì một thực thể HTML có thể
+        // bị cắt đôi; escape sau cắt luôn cho chuỗi hợp lệ.
         const rows = notifications.map(n => {
             const emoji = typeEmoji[n.type] || '🔔'
             return `
                 <tr>
                     <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 14px; width: 30px; text-align: center;">${emoji}</td>
                     <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb;">
-                        <div style="font-weight: 600; font-size: 13px; color: #111827;">${n.title}</div>
-                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${truncate(n.body)}</div>
+                        <div style="font-weight: 600; font-size: 13px; color: #111827;">${escapeHtml(n.title)}</div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${escapeHtml(truncate(n.body))}</div>
                     </td>
                     <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; white-space: nowrap; text-align: right;">${formatRelativeTime(n.createdAt)}</td>
                 </tr>
             `
         }).join('')
 
+        // [AUDIT HT-035 fix] `appUrl` do nơi gọi truyền vào — cùng lý do như notificationRealtime.
+        const safeAppUrl = safeEmailUrl(`${appUrl}/dashboard`)
+
         const content = `
-            <p>Xin chào <strong>${userName}</strong>,</p>
+            <p>Xin chào <strong>${escapeHtml(userName)}</strong>,</p>
             <p>Bạn có <strong>${notifications.length}</strong> thông báo mới:</p>
 
             <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
@@ -358,9 +390,11 @@ export const emailTemplates = {
                 </tbody>
             </table>
 
+            ${safeAppUrl ? `
             <div style="text-align: center;">
-                <a href="${appUrl}/dashboard" class="btn">XEM TẤT CẢ THÔNG BÁO</a>
+                <a href="${safeAppUrl}" class="btn">XEM TẤT CẢ THÔNG BÁO</a>
             </div>
+            ` : ''}
 
             <p style="font-size: 12px; color: #9ca3af; margin-top: 24px;">
                 Bạn nhận email này vì đã bật thông báo tổng hợp.

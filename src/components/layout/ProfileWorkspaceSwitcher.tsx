@@ -47,7 +47,7 @@ const DROPDOWN_BG = "#0A0A0A"
 const HOVER_BG = "#211B31"
 const ACTIVE_BG = "rgba(139,92,246,0.12)"
 const ACCENT = "#8B5CF6"
-const MUTED = "#71717A"
+const MUTED = "#878790"
 const MUTED_LIGHT = "#A1A1AA"
 
 export function ProfileWorkspaceSwitcher({ workspaceId, collapsed = false, viewRole = "USER" }: Props) {

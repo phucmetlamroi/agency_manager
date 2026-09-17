@@ -82,20 +82,9 @@ export default function StaffErrorDetail({ staff, performance, errorDetails, wor
                         </p>
                     </div>
 
+                    {/* [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ ô "Xếp hạng" (huy hiệu S/A/B/C/D).
+                        Giữ ô "Tổng Lỗi Tháng" — đó là số lỗi thô, không phải hạng. */}
                     <div className="flex items-center gap-4 mt-6 md:mt-0">
-                        <div className="px-6 py-4 rounded-xl bg-zinc-950/50 border border-white/5 text-center shadow-inner">
-                            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-1">Xếp hạng</p>
-                            <Badge variant="outline" className={`text-xl px-4 py-1 border-0 ${
-                                performance?.rank === 'S' ? 'bg-purple-500/20 text-purple-400' :
-                                performance?.rank === 'A' ? 'bg-blue-500/20 text-blue-400' :
-                                performance?.rank === 'B' ? 'bg-green-500/20 text-green-400' :
-                                performance?.rank === 'C' ? 'bg-yellow-500/20 text-yellow-400' :
-                                performance?.rank === 'N/A' || !performance?.rank ? 'bg-zinc-500/20 text-zinc-400' :
-                                'bg-red-500/20 text-red-400'
-                            }`}>
-                                Hạng {performance?.rank || 'N/A'}
-                            </Badge>
-                        </div>
                         <div className="px-6 py-4 rounded-xl bg-zinc-950/50 border border-white/5 text-center shadow-inner">
                             <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-1">Tổng Lỗi Tháng</p>
                             <p className="text-2xl font-bold text-red-400">-{performance?.totalPenalty || 0}đ</p>

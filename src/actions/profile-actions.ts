@@ -193,6 +193,11 @@ export async function updateProfile(userId: string, data: {
         // own account; the client-supplied userId is ignored.
         const session = await getSession()
         if (!session?.user?.id) return { error: 'Unauthorized' }
+        // [AUDIT HT-033 fix] getSession() chỉ giải mã JWT — không chạm DB, nên không thấy được
+        // tài khoản đã bị KHÓA hay phiên đã bị thu hồi (sessionVersion). Cùng chốt với
+        // updateProfileSettings/deleteProfileAction ngay trong file này.
+        const { isSessionLive } = await import('@/lib/profile-permissions')
+        if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
         const targetId = session.user.id
 
         await prisma.user.update({
@@ -234,25 +239,44 @@ export async function createProfileForUser(name: string) {
     if (!session?.user?.id) {
         return { error: 'Bạn cần đăng nhập' }
     }
+    // [AUDIT HT-033 fix] ĐÂY LÀ NỬA ĐẦU CỦA ĐƯỜNG NÉ LỆNH KHOÁ, và là lý do finding này tồn tại.
+    // Admin đặt role=LOCKED cho X, nhưng cookie JWT của X còn hiệu lực tới 7 ngày và getSession()
+    // không hề đọc DB. X gọi thẳng action này (nó nằm trong action manifest vì được client
+    // component tham chiếu, tức gọi được từ bên ngoài) → tạo Profile mới → tự thành OWNER qua
+    // ProfileAccess → gọi createWorkspaceAction (nửa sau) → có workspace hoạt động bình thường.
+    // Lệnh khoá tài khoản bị vô hiệu hoàn toàn mà không cần khai thác gì thêm.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
     const trimmed = name?.trim()
     if (!trimmed) return { error: 'Tên profile không được để trống' }
     if (trimmed.length > 50) return { error: 'Tên profile không được quá 50 ký tự' }
     if (trimmed.length < 2) return { error: 'Tên profile phải có ít nhất 2 ký tự' }
 
-    // Rate limit — max 5 profiles per user
-    const ownedAccessCount = await prisma.profileAccess.count({
-        where: { userId: session.user.id },
-    })
-    const ownedDirectCount = await prisma.profile.count({
-        where: { users: { some: { id: session.user.id } } },
-    })
-    if (ownedAccessCount + ownedDirectCount >= 5) {
-        return { error: 'Đã đạt giới hạn 5 profile/user. Hãy xoá profile cũ trước.' }
-    }
-
     try {
         const newProfile = await prisma.$transaction(async (tx) => {
+            // [AUDIT SWEEP-2026-07-30 fix] HAI KHIẾM KHUYẾT TRONG CÙNG BỘ ĐẾM.
+            //
+            // (1) TOCTOU: trần 5 profile/user trước đây đếm NGOÀI transaction rồi tạo bên trong mà
+            //     không đếm lại — N request song song của cùng một người đều đọc 4 và đều tạo.
+            //     Khuôn đúng đã có trong repo: advisory lock + RE-COUNT trong transaction
+            //     (src/lib/review/guest-subscribe.ts, cap MAX_REVIEWERS_PER_SHARE).
+            // (2) Bộ đếm SAI BẢN CHẤT: nó đếm MỌI hàng ProfileAccess bất kể vai, nên bị MỜI vào 5
+            //     team là hết quyền tự tạo team của mình — trong khi chú thích của chính hàm ghi
+            //     "max 5 profiles CREATED per user". Nay chỉ đếm vai OWNER (= profile do mình tạo),
+            //     theo quyết định của chủ dự án.
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`profile-quota:${session.user.id}`}, 0))`
+            const ownedAccessCount = await tx.profileAccess.count({
+                where: { userId: session.user.id, role: 'OWNER' },
+            })
+            // Quan hệ legacy `User.profileId` — giữ lại để không nới trần cho dữ liệu cũ.
+            const ownedDirectCount = await tx.profile.count({
+                where: { users: { some: { id: session.user.id } } },
+            })
+            if (ownedAccessCount + ownedDirectCount >= 5) {
+                throw new Error('PROFILE_QUOTA_REACHED')
+            }
+
             const profile = await tx.profile.create({
                 data: { name: trimmed },
             })
@@ -268,6 +292,9 @@ export async function createProfileForUser(name: string) {
         revalidatePath('/', 'layout')
         return { success: true, profile: { id: newProfile.id, name: newProfile.name } }
     } catch (e: any) {
+        if (e?.message === 'PROFILE_QUOTA_REACHED') {
+            return { error: 'Đã đạt giới hạn 5 profile/user. Hãy xoá profile cũ trước.' }
+        }
         console.error('createProfileForUser error:', e)
         return { error: 'Không thể tạo profile. Vui lòng thử lại.' }
     }
@@ -512,6 +539,11 @@ export async function changePassword(userId: string, currentPass: string, newPas
         // account; the client-supplied userId is ignored.
         const session = await getSession()
         if (!session?.user?.id) return { error: 'Unauthorized' }
+        // [AUDIT HT-033 fix] Đổi mật khẩu là đường ghi thông tin đăng nhập. Tài khoản đã bị khoá
+        // hoặc phiên đã bị thu hồi (chính "đăng xuất mọi thiết bị" / đặt lại mật khẩu bump
+        // sessionVersion) không được phép đặt lại mật khẩu bằng token cũ.
+        const { isSessionLive } = await import('@/lib/profile-permissions')
+        if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
         const targetId = session.user.id
 
         // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the

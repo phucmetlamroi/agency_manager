@@ -58,6 +58,11 @@ import {
 } from '@/lib/review/view-prefs'
 import { useFolderUploads, useUploadItems } from '@/lib/review/use-upload-store'
 import { uploadEngine } from '@/lib/review/upload-engine'
+import {
+    REVIEW_UPLOAD_MAINTENANCE,
+    REVIEW_UPLOAD_MAINTENANCE_MESSAGE,
+    REVIEW_SERVICE_CLOSE_DATE_LABEL,
+} from '@/lib/review/upload-maintenance'
 import { collectDropFiles, fromFileList, filterValid, enqueueFolderTree, UPLOAD_ACCEPT, type DroppedFile } from '@/lib/review/team-upload'
 import {
     type ItemKind,
@@ -71,6 +76,9 @@ import {
     apiRestoreItems,
     apiSetAssetStatus,
     apiMergeStacks,
+    apiUngroupFolder,
+    apiResetAssetName,
+    apiGroupAssets,
     downloadVersion,
     downloadZip,
     teamFolderUrl,
@@ -100,12 +108,21 @@ import { SelectionBar } from './SelectionBar'
 interface BreadcrumbItem {
     id: string
     name: string
+    /** ancestor sits in the trash → not navigable (getFolder 404s). */
+    deleted?: boolean
 }
 interface ChildrenResult {
     folders: FolderDto[]
     assets: AssetDto[]
     summary: { folderCount: number; assetCount: number; totalBytes: string }
     nextCursor: string | null
+    /**
+     * [kiểm toán 2026-07 · T-04] true = tài khoản này chưa được giao task nào, nên lưới rỗng
+     * vì PHẠM VI rỗng chứ không phải vì chưa có dữ liệu. Chỉ dùng để chọn câu chữ.
+     * Bản sao của trường cùng tên ở ListChildrenResult (src/lib/review/folders.ts) — thiếu ở
+     * đây thì data?.scopeEmpty luôn undefined và nhánh mới không bao giờ chạy.
+     */
+    scopeEmpty?: boolean
 }
 interface TreeNode {
     id: string
@@ -462,6 +479,12 @@ export function TeamBrowser({
 
     const ingest = useCallback(
         async (dropped: DroppedFile[]) => {
+            // [Tệp maintenance 2026-08-04] Chặn TRƯỚC enqueueFolderTree — hàm đó tạo cây
+            // thư mục qua API trước khi enqueue, để lọt là còn rác thư mục rỗng.
+            if (REVIEW_UPLOAD_MAINTENANCE) {
+                toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                return
+            }
             const { valid, skipped } = filterValid(dropped)
             if (skipped > 0) toast(`Đã bỏ qua ${skipped} file không phải ảnh/video`)
             if (valid.length === 0) return
@@ -699,9 +722,22 @@ export function TeamBrowser({
                 .filter((a): a is NonNullable<typeof a> => !!a && a.currentVersion?.uploadStatus === 'ready' && !!a.currentVersionId)
             const notReady = assetItems.length - readyAssets.length
 
-            // Download rule (owner): a folder → the WHOLE folder as ONE .zip. Assets only → 3+ videos
-            // bundle into a .zip; 1–2 download as separate individual files. (A single video → direct.)
-            const useZip = folderItems.length > 0 || readyAssets.length >= 3
+            // Download rule (owner): a folder → the WHOLE folder as ONE .zip.
+            //
+            // [sự cố 2026-07-29] Ngưỡng CŨ là `readyAssets.length >= 3` → chọn 3 video là đi qua
+            // /api/review/download-zip, tức MỌI BYTE chui qua serverless function. Function đó chạy
+            // ở mức bộ nhớ mặc định (~1 GB) trong khi một video của xưởng đã ~964 MB. Bộ nhớ nó
+            // tiêu = (byte đọc từ R2) − (byte trình duyệt đã tải về); R2 thì nhanh, mạng người dùng
+            // thì không, nên hiệu số đó phình tới bằng cả file. Log production:
+            //   "instance was killed because it ran out of available memory" @ /api/review/download-zip
+            // Bị giết giữa chừng thì KHÔNG có phản hồi HTTP nào cả — trình duyệt treo request, vòng
+            // xoay quay mãi, không bao giờ hiện hộp thoại lưu file. Đúng triệu chứng đã quay lại.
+            //
+            // Asset thì không cần gói: mỗi asset đã có sẵn URL ký sẵn của R2, để R2 tự phục vụ byte
+            // — 0 MB RAM của function, không dính trần 300 giây, và tải nhanh hơn vì không qua trung
+            // gian. Nên asset LUÔN tải thẳng, bất kể số lượng. Chỉ thư mục mới cần .zip (vẫn là
+            // đường có rủi ro — xem chú thích ở route).
+            const useZip = folderItems.length > 0
             const tid = toast.loading('Đang chuẩn bị tải xuống…')
             try {
                 if (useZip) {
@@ -722,7 +758,9 @@ export function TeamBrowser({
                     for (const a of readyAssets) {
                         await downloadVersion(a.currentVersionId!)
                         count += 1
-                        // stagger the (at most 2) downloads so the browser doesn't drop the second one.
+                        // Giãn nhịp để trình duyệt không bỏ rơi lượt sau. Trước đây chú thích ghi
+                        // "at most 2" vì ngưỡng cũ chỉ cho tối đa 2 file đi đường này; nay asset
+                        // luôn tải thẳng nên vòng lặp phải đúng với MỌI số lượng.
                         if (count < readyAssets.length) await new Promise((r) => setTimeout(r, 400))
                     }
                     toast.success(`Đã bắt đầu tải ${count} tệp${notReady ? ` (bỏ qua ${notReady} chưa xử lý xong)` : ''}.`, { id: tid })
@@ -1001,6 +1039,10 @@ export function TeamBrowser({
 
     const onDropFilesOnAsset = useCallback(
         (assetId: string, dt: DataTransfer) => {
+            if (REVIEW_UPLOAD_MAINTENANCE) {
+                toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                return
+            }
             const asset = assetById.get(assetId)
             void collectDropFiles(dt).then((dropped) => {
                 const { valid, skipped } = filterValid(dropped)
@@ -1136,8 +1178,12 @@ export function TeamBrowser({
     }, [])
 
     /* ---- breadcrumb trail ---- */
-    const trail = useMemo<{ id: string | null; name: string }[]>(() => {
-        const crumbs: { id: string | null; name: string }[] = breadcrumb.map((b) => ({ id: b.id, name: b.name }))
+    const trail = useMemo<{ id: string | null; name: string; deleted?: boolean }[]>(() => {
+        const crumbs: { id: string | null; name: string; deleted?: boolean }[] = breadcrumb.map((b) => ({
+            id: b.id,
+            name: b.name,
+            deleted: b.deleted,
+        }))
         if (crumbs.length === 0) return [{ id: null, name: REVIEW_MODULE_LABEL }]
         crumbs[0] = { id: null, name: REVIEW_MODULE_LABEL }
         return [...crumbs, { id: folderId, name: currentName }]
@@ -1157,13 +1203,81 @@ export function TeamBrowser({
 
     const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth(prefs.cardSize)}px, 1fr))` }
 
+    /* ---- [foldering 2026-07-27] "Bỏ thư mục" ---- */
+    const doResetName = useCallback(
+        async (assetId: string) => {
+            const tid = toast.loading('Đang lấy lại tên từ task…')
+            try {
+                const a = await apiResetAssetName(assetId)
+                toast.success(`Đã đổi tên thành “${a.title}” và bật lại tự đồng bộ theo task.`, { id: tid })
+                setRefreshKey((k) => k + 1)
+            } catch (e) {
+                // 409 when the video is not attached to a task, or the task is gone — both are
+                // actionable, so show what the server said instead of a generic failure.
+                toast.error(e instanceof Error ? e.message : 'Không lấy lại được tên từ task.', { id: tid })
+            }
+        },
+        [],
+    )
+
+    const doUngroup = useCallback(
+        async (targetFolderId: string) => {
+            const tid = toast.loading('Đang bỏ thư mục…')
+            try {
+                const r = await apiUngroupFolder(targetFolderId)
+                toast.success(
+                    r.movedAssetIds.length === 0
+                        ? 'Đã xóa thư mục rỗng.'
+                        : `Đã đưa ${r.movedAssetIds.length} video ra thư mục cha.`,
+                    { id: tid },
+                )
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+                void refreshTree()
+            } catch (e) {
+                // The server refuses on sub-folders and on share-linked folders; surface its reason
+                // verbatim rather than a generic failure — both are actionable by the user.
+                toast.error(e instanceof Error ? e.message : 'Không bỏ được thư mục.', { id: tid })
+            }
+        },
+        [refreshTree],
+    )
+
+    /* ---- [foldering 2026-07-27] "Gộp thành thư mục" ---- */
+    const doGroup = useCallback(
+        async (assetIds: string[], suggestedName: string) => {
+            const tid = toast.loading('Đang gộp…')
+            try {
+                const r = await apiGroupAssets(assetIds, suggestedName)
+                toast.success(`Đã gộp ${assetIds.length} video vào thư mục mới.`, { id: tid })
+                setSelectedIds(new Set())
+                setRefreshKey((k) => k + 1)
+                void refreshTree()
+                // No name dialog: the folder takes the first video's name and drops straight into
+                // inline rename, so the user types over it instead of filling a modal first.
+                setTimeout(() => startRename(r.folderId), 250)
+            } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Không gộp được.', { id: tid })
+            }
+        },
+        [refreshTree, startRename],
+    )
+
     /* ---- context-menu content ---- */
     const renderMenu = useCallback((): ReactNode => {
         if (!menuTarget) {
             return (
                 <CanvasMenuContent
-                    onUploadFiles={() => filesInputRef.current?.click()}
-                    onUploadFolder={() => folderInputRef.current?.click()}
+                    onUploadFiles={() =>
+                        REVIEW_UPLOAD_MAINTENANCE
+                            ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                            : filesInputRef.current?.click()
+                    }
+                    onUploadFolder={() =>
+                        REVIEW_UPLOAD_MAINTENANCE
+                            ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                            : folderInputRef.current?.click()
+                    }
                     onNewFolder={startNewFolder}
                 />
             )
@@ -1180,7 +1294,18 @@ export function TeamBrowser({
             onRename: () => startRename(target.id),
             onDelete: () => requestDelete(acting),
             canDelete: canDeleteItems(acting),
+            // [foldering 2026-07-27] Only for a single folder — ungroup has no sensible meaning
+            // for a multi-select or for an asset.
+            onUngroup:
+                target.type === 'folder' && acting.length === 1 ? () => void doUngroup(target.id) : undefined,
+            onResetName:
+                target.type === 'asset' && acting.length === 1 ? () => void doResetName(target.id) : undefined,
             onManageVersions: soleAsset ? () => openManageVersions(target.id) : undefined,
+            // [kiểm toán 2026-07 · §5.3] Video 1 phiên bản (hoặc 0) thì KHÔNG có gì để quản lý.
+            // Tách khỏi `onManageVersions` có lý do: callback đó undefined còn vì "đang chọn
+            // nhiều mục", và mục menu lúc ấy hiện mờ kèm gợi ý "Chọn đúng một asset" — gợi ý
+            // đúng. Gộp hai lý do vào một cờ sẽ hiện gợi ý SAI cho video 1 phiên bản.
+            canManageVersions: (assetById.get(target.id)?.versionCount ?? 0) >= 2,
             // P5.5 — share the acting selection (multi-select works via right-click).
             onCreateShare: () =>
                 setShareTarget({
@@ -1193,7 +1318,7 @@ export function TeamBrowser({
                 }),
         }
         return target.type === 'folder' ? <FolderMenuContent {...h} /> : <AssetMenuContent {...h} />
-    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, workspaceId, folderById, assetById])
+    }, [menuTarget, selectedIds, toItemRefs, doDownload, doCopyUrl, openMoveCopy, doDuplicate, startRename, requestDelete, canDeleteItems, openManageVersions, doUngroup, doResetName, workspaceId, folderById, assetById])
 
     const selectionActive = selectedIds.size > 0
 
@@ -1282,6 +1407,24 @@ export function TeamBrowser({
                         )}
                     </div>
 
+                    {/* [Tệp closure 2026-08-04] Lời báo 30 ngày — nói TRƯỚC khi người dùng thử
+                        kéo thả hay bấm play. Panel + dữ liệu vẫn nguyên tới ngày đóng. */}
+                    {REVIEW_UPLOAD_MAINTENANCE && (
+                        <div className="flex items-start gap-2.5 border-b border-amber-500/20 bg-amber-500/[0.07] px-4 py-2.5">
+                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-300" />
+                            <div className="min-w-0 text-[12px] leading-relaxed text-amber-100/90">
+                                <span className="font-semibold text-amber-200">
+                                    Tính năng Tệp sẽ ngừng hoạt động vào {REVIEW_SERVICE_CLOSE_DATE_LABEL}.
+                                </span>{' '}
+                                Từ nay không thể tải video lên hoặc xem trực tuyến — chỉ có thể{' '}
+                                <span className="font-semibold text-amber-200">TẢI VỀ</span>.{' '}
+                                Hãy tải toàn bộ video cần giữ về máy trước{' '}
+                                {REVIEW_SERVICE_CLOSE_DATE_LABEL}. Dữ liệu không bị xoá trước ngày đóng; bàn giao
+                                task dùng ô “Link” như cũ.
+                            </div>
+                        </div>
+                    )}
+
                     {/* toolbar */}
                     <div className="flex items-center justify-between gap-2 border-b border-white/5 px-4 py-2.5">
                         <div className="flex items-center gap-2">
@@ -1312,8 +1455,16 @@ export function TeamBrowser({
                                 <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                             </button>
                             <NewMenu
-                                onUploadFiles={() => filesInputRef.current?.click()}
-                                onUploadFolder={() => folderInputRef.current?.click()}
+                                onUploadFiles={() =>
+                                    REVIEW_UPLOAD_MAINTENANCE
+                                        ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                                        : filesInputRef.current?.click()
+                                }
+                                onUploadFolder={() =>
+                                    REVIEW_UPLOAD_MAINTENANCE
+                                        ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                                        : folderInputRef.current?.click()
+                                }
                                 onNewFolder={startNewFolder}
                             />
                         </div>
@@ -1336,7 +1487,12 @@ export function TeamBrowser({
                             ) : isEmpty ? (
                                 <EmptyState
                                     atRoot={folderId === null}
-                                    onUpload={() => filesInputRef.current?.click()}
+                                    scopeEmpty={data?.scopeEmpty}
+                                    onUpload={() =>
+                                        REVIEW_UPLOAD_MAINTENANCE
+                                            ? toast.error(REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+                                            : filesInputRef.current?.click()
+                                    }
                                     onNewFolder={startNewFolder}
                                 />
                             ) : prefs.layout === 'list' ? (
@@ -1373,7 +1529,8 @@ export function TeamBrowser({
                                             asset={selectedAsset}
                                             onClose={clearSelection}
                                             onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
-                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                            // [kiểm toán 2026-07 · §5.3] Không truyền callback = InfoPanel tự bỏ nút.
+                                            onManageVersions={selectedAsset.versionCount >= 2 ? () => openManageVersions(selectedAsset.id) : undefined}
                                         />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
@@ -1434,7 +1591,8 @@ export function TeamBrowser({
                                             asset={selectedAsset}
                                             onClose={clearSelection}
                                             onSetStatus={(s) => doSetStatus(selectedAsset.id, s)}
-                                            onManageVersions={() => openManageVersions(selectedAsset.id)}
+                                            // [kiểm toán 2026-07 · §5.3] Không truyền callback = InfoPanel tự bỏ nút.
+                                            onManageVersions={selectedAsset.versionCount >= 2 ? () => openManageVersions(selectedAsset.id) : undefined}
                                         />
                                     )}
                                     <LoadMore show={!!nextCursor} loading={loadingMore} onClick={loadMore} />
@@ -1458,8 +1616,13 @@ export function TeamBrowser({
                     onDelete={() => requestDelete(toItemRefs([...selectedIds]))}
                     onClear={clearSelection}
                     onManageVersions={
-                        selectedFolders.length === 0 && selectedAssets.length === 1
+                        selectedFolders.length === 0 && selectedAssets.length === 1 && selectedAssets[0].versionCount >= 2
                             ? () => openManageVersions(selectedAssets[0].id)
+                            : undefined
+                    }
+                    onGroup={
+                        selectedFolders.length === 0 && selectedAssets.length >= 2
+                            ? () => void doGroup(selectedAssets.map((a) => a.id), selectedAssets[0].title)
                             : undefined
                     }
                 />
@@ -1589,14 +1752,24 @@ function BreadcrumbTrail({
     trail,
     onNavigate,
 }: {
-    trail: { id: string | null; name: string }[]
+    trail: { id: string | null; name: string; deleted?: boolean }[]
     onNavigate: (id: string | null) => void
 }) {
     const COLLAPSE_AFTER = 4
     const Sep = () => <ChevronRight size={13} className="shrink-0 text-muted-foreground" />
-    const Crumb = ({ c, last }: { c: { id: string | null; name: string }; last: boolean }) =>
+    const Crumb = ({ c, last }: { c: { id: string | null; name: string; deleted?: boolean }; last: boolean }) =>
         last ? (
             <span className="truncate font-semibold text-zinc-100" title={c.name}>
+                {c.name}
+            </span>
+        ) : c.deleted ? (
+            // A trashed ancestor is NOT navigable — getFolder refuses it with 404. Rendering it as
+            // a live link is what turned the 2026-07-27 report into a mystery ("bấm vào thì không
+            // tìm thấy thư mục"). Say what is actually wrong instead.
+            <span
+                className="max-w-[180px] cursor-not-allowed truncate text-amber-400/70 line-through"
+                title={`${c.name} — thư mục này đang ở trong thùng rác`}
+            >
                 {c.name}
             </span>
         ) : (
@@ -1646,8 +1819,12 @@ function BreadcrumbTrail({
                         {hidden.map((c, i) => (
                             <DropdownMenu.Item
                                 key={`${c.id ?? 'h'}-${i}`}
-                                onSelect={() => onNavigate(c.id)}
-                                className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[highlighted]:bg-violet-500/15 data-[highlighted]:text-white"
+                                disabled={c.deleted}
+                                onSelect={() => {
+                                    if (c.deleted) return // trashed → getFolder would 404
+                                    onNavigate(c.id)
+                                }}
+                                className="flex cursor-pointer items-center gap-2 truncate rounded-lg px-2.5 py-[7px] text-[12.5px] outline-none data-[disabled]:cursor-not-allowed data-[highlighted]:bg-violet-500/15 data-[disabled]:text-amber-400/70 data-[disabled]:line-through data-[highlighted]:text-white"
                                 style={{ paddingLeft: 10 + i * 10 }}
                             >
                                 <FolderIcon size={13} className="shrink-0 text-muted-foreground" />
@@ -1695,8 +1872,12 @@ function TreeSidebar({
     const roots = childrenOf.get(null) ?? []
     if (roots.length === 0) {
         return (
+            // [kiểm toán 2026-07 · T-04] Câu cũ "Chưa có thư mục nào." khẳng định về CẢ
+            // workspace, mà cột này chỉ thấy phần trong phạm vi của người xem — với editor
+            // chưa có task, nó nói dối trong khi lưới bên phải đã nói đúng. Câu mới chỉ
+            // nói về những gì hiển thị được, nên đúng ở cả hai trường hợp.
             <p className="px-3 py-6 text-center text-[11.5px] leading-relaxed text-muted-foreground">
-                Chưa có thư mục nào.
+                Không có thư mục nào để hiển thị.
                 <br />
                 Bản dựng tải lên từ task sẽ hiện ở đây.
             </p>
@@ -1721,13 +1902,16 @@ function TreeSidebar({
                         <button
                             type="button"
                             onClick={() => onToggle(node.id)}
-                            className="flex h-6 w-5 items-center justify-center text-muted-foreground hover:text-zinc-200"
+                            // w-6 not w-5: 20px wide fails WCAG 2.2 SC 2.5.8 (24x24 min) and the
+                            // spacing exception does not save it — the navigate button sits gap-1 away.
+                            className="flex h-6 w-6 items-center justify-center text-muted-foreground hover:text-zinc-200"
                             aria-label={isOpen ? 'Thu gọn' : 'Mở rộng'}
                         >
                             {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                         </button>
                     ) : (
-                        <span className="h-6 w-5" />
+                        // Spacer must track the button's width or childless rows lose their indent.
+                        <span className="h-6 w-6" />
                     )}
                     <button
                         type="button"
@@ -1849,23 +2033,46 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
     )
 }
 
-function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUpload: () => void; onNewFolder: () => void }) {
+function EmptyState({ atRoot, scopeEmpty, onUpload, onNewFolder }: { atRoot: boolean; scopeEmpty?: boolean; onUpload: () => void; onNewFolder: () => void }) {
     return (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
                 <Clapperboard size={26} />
             </div>
             <div>
+                {/*
+                  [kiểm toán 2026-07 · T-04] Nhánh thứ ba: phân quyền hoạt động ĐÚNG (chỉ thấy
+                  tài nguyên của task được giao) nhưng cách BÁO thì sai — editor chưa có task nào
+                  nhận đúng câu "chưa có asset nào trong workspace", nghe như hệ thống rỗng hoặc
+                  hỏng, chứ không phải "phần của bạn chưa có gì".
+                */}
                 <p className="text-[14px] font-medium text-zinc-200">
-                    {atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
+                    {scopeEmpty ? 'Bạn chưa được giao task nào' : atRoot ? 'Chưa có asset nào trong workspace này' : 'Thư mục trống'}
                 </p>
                 <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-muted-foreground">
-                    {atRoot
+                    {REVIEW_UPLOAD_MAINTENANCE
+                        ? `Tính năng Tệp sẽ ngừng hoạt động vào ${REVIEW_SERVICE_CLOSE_DATE_LABEL} — chỉ còn tải video về. Bàn giao task dùng ô “Link” như cũ.`
+                        : scopeEmpty
+                        ? 'Video sẽ hiện ở đây khi bạn nhận task. Câu này không nói gì về việc workspace có dữ liệu hay không — chỉ nói phần được giao cho bạn đang trống.'
+                        : atRoot
                         ? 'Upload video từ khối BÀN GIAO của task để hệ thống tự tạo thư mục theo khách hàng, hoặc kéo thả file vào đây.'
                         : 'Kéo thả file vào đây, hoặc dùng nút “+ Mới” để tải lên.'}
                 </p>
             </div>
             <div className="mt-1 flex items-center gap-2">
+                {/*
+                  ⚠️ CHỈ ẨN NÚT TẢI LÊN, KHÔNG ẨN "THƯ MỤC MỚI" — hai nút này có hậu quả TRÁI
+                  NGƯỢC nhau và kế hoạch ban đầu gộp chung là sai:
+
+                  · Tải lên ở gốc → asset rơi thẳng vào thư mục gốc, mà gốc mang systemKey nên
+                    bị chính bộ lọc phạm vi loại ra. Upload THÀNH CÔNG, tốn dung lượng R2 + phí
+                    Mux, rồi lưới vẫn báo rỗng y như cũ. Đó là một cái hố đen im lặng.
+                  · Thư mục mới ở gốc → thư mục được tạo mang createdById = chính họ và KHÔNG có
+                    systemKey, tức đúng hình dạng mà bộ tính phạm vi công nhận. Phạm vi hết rỗng,
+                    màn hình này tự tắt. Đây là LỐI THOÁT TỰ CHỮA DUY NHẤT của editor — ẩn nó đi
+                    là nhốt họ vĩnh viễn trong màn rỗng, phải chờ admin giao task mới ra được.
+                */}
+                {!scopeEmpty && (
                 <button
                     type="button"
                     onClick={onUpload}
@@ -1873,6 +2080,7 @@ function EmptyState({ atRoot, onUpload, onNewFolder }: { atRoot: boolean; onUplo
                 >
                     <UploadCloud size={14} /> Tải asset lên
                 </button>
+                )}
                 <button
                     type="button"
                     onClick={onNewFolder}

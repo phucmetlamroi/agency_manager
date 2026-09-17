@@ -7,6 +7,7 @@ import { validateWorkspaceAccess } from '../auth-context.js'
 import { getWorkspacePrisma } from '../workspace-scoping.js'
 import { enforceAssigneeStatusInvariant } from './invariant.js'
 import { isValidStatus, VALID_TASK_STATUSES, type TaskStatus } from './statuses.js'
+import { writeMcpAudit } from './audit.js'
 
 // ---------------------------------------------------------------------------
 // Status transition blocklist
@@ -93,17 +94,39 @@ export async function updateTaskStatus(
     // 5. Enforce invariant (assigneeId <-> status consistency)
     enforceAssigneeStatusInvariant(updateData, task)
 
-    // 6. Execute update
-    const updated = await wsPrisma.task.update({
-        where: { id: taskId },
-        data: updateData,
-        select: {
-            id: true,
-            status: true,
-            assigneeId: true,
-            version: true,
-            deadline: true,
-        },
+    // 6. Execute update + vết kiểm toán, NGUYÊN TỬ
+    // [AUDIT HT-040] Trước đây đây là một `wsPrisma.task.update` trần: task đổi trạng thái sang
+    // 'Hoàn tất' (⇒ tính lương) mà không sinh dòng AuditLog nào, nên `getStatusHistory` ngay bên
+    // dưới trả về [] và /admin/audit-log mù hoàn toàn với mọi thay đổi đến từ MCP.
+    // Ghi nhật ký nằm TRONG cùng transaction: mutation hỏng thì không có log rác, mà log hỏng thì
+    // mutation cũng không lặng lẽ đi qua.
+    // ⚠️ Phải dùng `prisma` GỐC (không phải wsPrisma) vì extension bơm `profileId` vào mọi
+    // `create` — bảng AuditLog không có cột đó. Đổi lại, hai khoá phạm vi mà extension vẫn tự bơm
+    // cho `update` phải chép lại BẰNG TAY ở `where` dưới đây; bỏ chúng là mở đường sửa chéo-tenant.
+    const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.task.update({
+            where: { id: taskId, workspaceId: wsId, profileId },
+            data: updateData,
+            select: {
+                id: true,
+                status: true,
+                assigneeId: true,
+                version: true,
+                deadline: true,
+            },
+        })
+
+        await writeMcpAudit(tx, {
+            workspaceId: wsId,
+            action: 'task.status_updated',
+            targetType: 'Task',
+            targetId: taskId,
+            before: { status: currentStatus, assigneeId: task.assigneeId },
+            after: { status: row.status, assigneeId: row.assigneeId },
+            mcpProfileId: profileId,
+        })
+
+        return row
     })
 
     return {

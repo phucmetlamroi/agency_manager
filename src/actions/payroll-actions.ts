@@ -61,6 +61,20 @@ export async function confirmPayment(data: {
             return { error: 'Tổng thực nhận phải bằng lương cơ bản + thưởng.' }
         }
 
+        // [AUDIT SWEEP-2026-07-30 fix] `data.userId` đến TỪ CLIENT và trước đây được ghi thẳng vào
+        // hàng Payroll mà không kiểm người đó có thuộc workspace/profile này. Một ADMIN của tenant A
+        // ghi được một hàng Payroll status='PAID' mang tên người dùng của tenant B — hàng đó sống
+        // trong workspace của A nên không rò dữ liệu của B, nhưng nó bẩn dữ liệu tiền và làm mọi
+        // báo cáo theo người sai. Đối chiếu qua client CÓ PHẠM VI: nếu userId không thuộc phạm vi
+        // workspace/profile này thì findUnique trả null.
+        const targetInScope = await workspacePrisma.user.findUnique({
+            where: { id: data.userId },
+            select: { id: true },
+        })
+        if (!targetInScope) {
+            return { error: 'Nhân sự này không thuộc workspace/hồ sơ hiện tại.' }
+        }
+
         const payroll = await workspacePrisma.payroll.upsert({
             where: {
                 userId_month_year_workspaceId: {

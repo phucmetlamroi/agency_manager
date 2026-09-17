@@ -28,7 +28,7 @@ import { Pressable, Reveal, RevealGroup, RevealItem } from "./motion-kit"
 
 export interface McPayrollEditor {
     id: string; name: string; initials: string; avatar: string
-    rank?: string; rankColor?: string
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `rank` + `rankColor`.
     completedCount: number; pendingCount: number; progressPct: number
     taskIncomeVND: number; bonusVND: number; totalVND: number
     isPaid: boolean
@@ -217,7 +217,6 @@ export default function McPayrollBoard({ data }: { data: McPayrollData }) {
                                                 <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                                         <span style={{ fontSize: 13, fontWeight: 700, color: "#F4F4F5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
-                                                        {e.rank && <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 9, fontWeight: 800, color: e.rankColor, border: `1px solid ${e.rankColor}66`, borderRadius: 4, padding: "0 4px" }}>{e.rank}</span>}
                                                     </div>
                                                     <span style={{ fontSize: 10, color: "#71717A" }}>{e.completedCount + e.pendingCount} task · {e.completedCount} hoàn tất</span>
                                                 </div>

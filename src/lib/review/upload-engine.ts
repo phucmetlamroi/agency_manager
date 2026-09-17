@@ -28,6 +28,7 @@ import {
     type PausedReason,
 } from './upload-store'
 import type { UploadStatusDto, VersionDto } from './dto'
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from './upload-maintenance'
 
 // ── Tunables (UPLOAD-PIPELINE §3.1 / §11.2) ──────────────────────────────────
 
@@ -104,7 +105,7 @@ export function nextSpeedEma(prev: number | null, deltaBytes: number, deltaMs: n
     return 0.7 * prev + 0.3 * inst
 }
 
-export type ValidationCode = 'EMPTY' | 'UNSUPPORTED_TYPE' | 'TOO_LARGE' | 'BAD_CONTENT'
+export type ValidationCode = 'EMPTY' | 'UNSUPPORTED_TYPE' | 'TOO_LARGE' | 'BAD_CONTENT' | 'MAINTENANCE'
 export type MetaValidation =
     | { ok: true; kind: MediaKind }
     | { ok: false; code: ValidationCode; message: string }
@@ -208,6 +209,10 @@ interface ItemRuntime {
     file: File
     target: UploadTarget
     mimeType: string
+    /** Files in the same drop/pick as this one — see EnqueueOptions.batchSize. */
+    batchSize?: number
+    /** Uploader-chosen deliverable to version — see EnqueueOptions.targetAssetId. */
+    targetAssetId?: string
     idempotencyKey: string
     contentValidated: boolean
     // set after initiate:
@@ -241,6 +246,14 @@ interface ItemRuntime {
 
 export interface EnqueueOptions {
     targetLabel?: string
+    /** [foldering 2026-07-27] Number of files in the SAME drop/pick this item belongs to. Sent to
+     *  the task-upload initiate so the server can tell "next version of this video" (1) from
+     *  "a set of hooks" (>1). Only meaningful for kind:'task'. */
+    batchSize?: number
+    /** [owner request 2026-07-27] Skip the name matcher entirely and stack onto THIS deliverable.
+     *  Set when the uploader picked the target in the confirm strip; a near-miss filename would
+     *  otherwise mint a new video on a multi-hook task. */
+    targetAssetId?: string
 }
 
 export interface UploadEngine {
@@ -303,7 +316,12 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         // server's own classifier fall back to the extension for it. Sending '' would 400 at initiate
         // — defeating the very VIDEO_EXT_FALLBACK the client + server were built to honor.
         const mimeType = file.type || 'application/octet-stream'
-        const meta = validateFileMeta(file.name, file.size, mimeType)
+        // [Tệp maintenance 2026-08-04] Lưới an toàn CUỐI phía client: mọi UI đều đi qua
+        // enqueue, nên kể cả đường nào quên chặn ở component thì item cũng nằm lại tray
+        // với đúng thông báo bảo trì, không một byte nào rời máy. Chốt thật vẫn ở server.
+        const meta: MetaValidation = REVIEW_UPLOAD_MAINTENANCE
+            ? { ok: false, code: 'MAINTENANCE', message: REVIEW_UPLOAD_MAINTENANCE_MESSAGE }
+            : validateFileMeta(file.name, file.size, mimeType)
         const now = Date.now()
         const base: UploadItem = {
             id,
@@ -332,17 +350,19 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         store.add(base)
         if (!meta.ok) return id
 
-        runtimes.set(id, freshRuntime(file, target, mimeType))
+        runtimes.set(id, freshRuntime(file, target, mimeType, opts.batchSize, opts.targetAssetId))
         // Content sniff (async) before we let it consume a slot.
         void sniffContent(id, file, meta.kind)
         return id
     }
 
-    function freshRuntime(file: File, target: UploadTarget, mimeType: string): ItemRuntime {
+    function freshRuntime(file: File, target: UploadTarget, mimeType: string, batchSize?: number, targetAssetId?: string): ItemRuntime {
         return {
             file,
             target,
             mimeType,
+            batchSize,
+            targetAssetId,
             idempotencyKey: genId(),
             contentValidated: false,
             initiated: false,
@@ -440,7 +460,14 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         if (rt.target.kind === 'task') {
             resp = await postJson<InitiateBody>(
                 TASK_INITIATE_URL,
-                { taskId: rt.target.taskId, fileName: rt.file.name, sizeBytes: String(size), mimeType: rt.mimeType },
+                {
+                    taskId: rt.target.taskId,
+                    fileName: rt.file.name,
+                    sizeBytes: String(size),
+                    mimeType: rt.mimeType,
+                    batchSize: rt.batchSize,
+                    targetAssetId: rt.targetAssetId,
+                },
                 rt.idempotencyKey,
             )
         } else {
@@ -468,6 +495,13 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
     function handleInitiateError(id: string, e: unknown) {
         activeFiles.delete(id)
         if (e instanceof ApiError) {
+            // [Tệp maintenance 2026-08-04] Bundle CŨ (mở tab trước lúc deploy khoá) không có
+            // guard client → server 503 MAINTENANCE. Không rơi vào nhánh retry chung: message
+            // bảo trì của server phải tới mắt người dùng, và Thử lại chỉ lặp lại đúng 503 đó.
+            if (e.code === 'MAINTENANCE') {
+                failFile(id, e.code, e.message)
+                return
+            }
             if (e.code === 'UNSUPPORTED_MEDIA_TYPE' || e.code === 'FILE_TOO_LARGE' || e.code === 'VALIDATION_ERROR') {
                 failFile(id, e.code, e.message)
                 return
@@ -666,7 +700,14 @@ export function createUploadEngine(store: UploadStore): UploadEngine {
         if (rt.target.kind === 'task') {
             resp = await postJson<InitiateBody>(
                 TASK_INITIATE_URL,
-                { taskId: rt.target.taskId, fileName: rt.file.name, sizeBytes: String(size), mimeType: rt.mimeType },
+                {
+                    taskId: rt.target.taskId,
+                    fileName: rt.file.name,
+                    sizeBytes: String(size),
+                    mimeType: rt.mimeType,
+                    batchSize: rt.batchSize,
+                    targetAssetId: rt.targetAssetId,
+                },
                 rt.idempotencyKey,
             )
         } else {

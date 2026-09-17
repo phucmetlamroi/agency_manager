@@ -75,7 +75,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
             assignee: {
                 select: {
                     id: true, username: true, displayName: true, role: true, nickname: true,
-                    monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
                 }
             },
             // [Trial P0] Manager ("Người quản lý") = assignedBy — surfaced in the board + task drawer.
@@ -102,7 +101,6 @@ export default async function AdminDashboard({ params }: { params: Promise<{ wor
         orderBy: [{ username: 'asc' }],
         select: {
             id: true, username: true, displayName: true, role: true, nickname: true,
-            monthlyRanks: { orderBy: { createdAt: 'desc' }, take: 1, select: { rank: true } }
         }
     })
 

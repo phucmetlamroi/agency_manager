@@ -1,0 +1,51 @@
+# Lịch chạy định kỳ của HustlyTasker trên VPS tự quản.
+#
+# Cài:  sudo crontab -e   rồi dán toàn bộ nội dung dưới đây.
+# Cần:  /usr/local/bin/hustly-cron (xem docs/vps/hustly-cron)
+#
+# ĐÂY LÀ BẢN SAO CỦA `vercel.json` → "crons". Vercel Cron là dịch vụ CỦA Vercel;
+# VPS không đọc vercel.json nên rời Vercel là 8 lịch này NGỪNG CHẠY, không một
+# dòng log nào báo. Giữ hai file khớp nhau — sửa một bên thì sửa cả bên kia.
+#
+# ⚠️ docs cũ RAILWAY_MIGRATION.md chỉ liệt kê 6/8 job, thiếu đúng review-janitor
+#    (job giữ tiền Mux/R2) và billing-sweep (job doanh thu). Đừng dùng file đó.
+
+CRON_TZ=UTC
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# ── Mỗi giờ ─────────────────────────────────────────────────────────────────
+# send-digest: nhánh digest HÀNG NGÀY khoá cứng `getUTCHours() === 1`, nên lịch
+# này PHẢI là đúng mỗi giờ một lần. Chạy 2 lần trong giờ UTC 1 = digest gửi ĐÔI;
+# chạy thưa hơn 1 giờ/lần = người chọn digest hàng ngày KHÔNG BAO GIỜ nhận.
+0 * * * *   /usr/local/bin/hustly-cron send-digest
+
+# check-deadline: NƠI DUY NHẤT trong toàn hệ thống ghi trạng thái 'Quá hạn'.
+# Vòng lặp đánh dấu quá hạn KHÔNG có giới hạn số bản ghi ⇒ bật lại sau một thời
+# gian dài ngừng sẽ xả một lượt rất lớn. Đọc mục B2 trong README trước lần đầu.
+0 * * * *   /usr/local/bin/hustly-cron check-deadline
+
+# ── Hằng ngày — GIỜ UTC ─────────────────────────────────────────────────────
+# Dòng CRON_TZ=UTC ở trên là thứ giữ cho các mốc này đúng như hồi chạy Vercel.
+# Không có nó, crontab chạy theo giờ hệ thống: chép `0 20 * * *` vào máy đặt giờ
+# Việt Nam sẽ thành 20:00 tối VN thay vì 03:00 sáng — tức là chạy giữa giờ làm
+# việc trong khi review-janitor đang XOÁ CỨNG asset trên Mux và object trên R2.
+
+0 1 * * *   /usr/local/bin/hustly-cron billing-sweep            # 08:00 VN
+0 2 * * *   /usr/local/bin/hustly-cron cleanup-notifications    # 09:00 VN
+0 3 * * *   /usr/local/bin/hustly-cron hard-delete-workspaces   # 10:00 VN
+30 3 * * *  /usr/local/bin/hustly-cron hard-delete-profiles     # 10:30 VN
+0 4 * * *   /usr/local/bin/hustly-cron auth-cleanup             # 11:00 VN
+
+# review-janitor: 03:00 sáng VN là CỐ Ý (giờ thấp điểm) vì nó xoá cứng dữ liệu
+# bên Mux và R2. Đây là job quan trọng nhất về mặt tiền bạc:
+#   • purge thùng rác quá 30 ngày — không chạy = trả phí lưu trữ MÃI MÃI cho dữ
+#     liệu đã vứt
+#   • bơm lại webhook Mux bị rơi — có HẠN CHÓT CỨNG 7 NGÀY, quá hạn là mất vĩnh
+#     viễn khả năng cứu (src/lib/review/inngest.ts:55)
+0 20 * * *  /usr/local/bin/hustly-cron review-janitor           # 03:00 VN
+
+# ── Giữ cho app còn sống (tuỳ chọn nhưng nên có) ────────────────────────────
+# Restart=always của systemd lo được trường hợp tiến trình CHẾT, nhưng không lo
+# được trường hợp Node còn sống mà không trả lời request nữa.
+*/5 * * * *  curl -fsS -m 20 -o /dev/null https://hustlytasker.xyz/ || systemctl restart hustlytasker

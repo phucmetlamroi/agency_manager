@@ -1,12 +1,17 @@
 import { logout } from '@/lib/auth'
 // Removed duplicate globals.css import
 import { redirect, notFound } from 'next/navigation'
-import { verifyActiveSession, verifyProfileAdminAccess } from '@/lib/security'
+import { verifyActiveSession } from '@/lib/security'
+import { deriveNavAccess } from '@/lib/nav-access'
 import RoleWatcher from '@/components/RoleWatcher'
 import AppShell from '@/components/layout/AppShell'
 import { prisma } from '@/lib/db'
 import EmailMigrationModal from '@/components/auth/EmailMigrationModal'
 import ImpersonationBannerWrapper from '@/components/admin/ImpersonationBannerWrapper'
+import BillingStatusBanner from '@/components/billing/BillingStatusBanner'
+import BillingLockGate from '@/components/billing/BillingLockGate'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
+import { getEntitlements } from '@/lib/billing/entitlements'
 
 // [Workspace ID] Permissive regex — allows UUID format AND legacy slug IDs
 // (vd: 'legacy-feb-2026', 'legacy-mar-2026' của Hustly Team profile được migrate
@@ -53,15 +58,13 @@ export default async function AdminLayout({
     // existed — it never checked the row's ROLE, so a treasurer of profile A who was only a
     // USER/CLIENT of profile B got full /admin in B (salaries + jobPriceUSD revenue).
     // verifyProfileAdminAccess never consults the global flag and requires an OWNER/ADMIN role.
-    let canAccessAdmin = false
-    try {
-        await verifyProfileAdminAccess(workspaceId)
-        canAccessAdmin = true
-    } catch {
-        canAccessAdmin = false
-    }
+    //
+    // [kiểm toán 2026-07 · S2-1] deriveNavAccess gọi ĐÚNG verifyProfileAdminAccess đó và
+    // trả thêm hai cờ con (workspaceAdmin/profileAdmin) để lọc sidebar. Một lời gọi, một
+    // vị từ — cổng vào vẫn y hệt trước.
+    const navAccess = await deriveNavAccess(workspaceId)
 
-    if (!canAccessAdmin) {
+    if (!navAccess.admin) {
         redirect(`/${workspaceId}/dashboard`)
     }
 
@@ -69,8 +72,12 @@ export default async function AdminLayout({
 
     const handleLogout = async () => {
         'use server'
-        await logout()
-        redirect('/login')
+        // [AUDIT HT-018 fix] Trước đây ba layout này gọi thẳng `logout()` — chỉ xoá cookie.
+        // Đây KHÔNG phải đường "đá ra ngoài": nó là nút "Đăng xuất" trong AccountSheet, tức
+        // đường đăng xuất của người dùng TRÊN DI ĐỘNG. Nên bấm nút đó trên điện thoại không thu
+        // hồi gì, còn bấm đúng nút đó trên máy tính thì có — cùng một nhãn, hai kết cục bảo mật.
+        // Nay dồn về đúng một đường /api/auth/logout (ghi nhật ký → thu hồi token → xoá cookie).
+        redirect('/api/auth/logout')
     }
 
     // Auth Phase 3: EmailMigrationModal (blocking) nếu user cũ chưa migrate email.
@@ -80,10 +87,26 @@ export default async function AdminLayout({
     const isImpersonating = (session.user as any).isImpersonating === true
     const impersonationExpiresAt = (session.user as any).impersonationExpiresAt as string | undefined
 
+    // [BILLING P6] LOCKED (đã cưỡng chế) → thay children bằng màn khoá; trang Gói cước
+    // được chừa lối trong BillingLockGate (client biết pathname — layout server thì không,
+    // và redirect ở đây là vòng lặp vì billing nằm dưới chính layout này). React.cache nên
+    // lời gọi getEntitlements này + của BillingStatusBanner chỉ tốn một query.
+    let billingLocked = false
+    try {
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            const ent = await getEntitlements(pid)
+            billingLocked = ent.enforced && ent.status === 'LOCKED'
+        }
+    } catch { /* đọc gói lỗi thì không khoá nhầm — các gate server vẫn đứng */ }
+
     // [Mobile P1] AppShell hợp nhất — tự đọc getDeviceType() chọn desktop/mobile chrome.
     return (
-        <AppShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined} handleLogout={handleLogout}>
+        <AppShell user={user} workspaceId={workspaceId} workspaceRole={workspaceRole ?? undefined} navAccess={navAccess} handleLogout={handleLogout}>
             <RoleWatcher currentRole="ADMIN" isTreasurer={user.isTreasurer} />
+            {/* [BILLING P5] Trạng thái gói: đếm ngược trước ngày thu phí / chỉ-đọc GRACE / LOCKED.
+                ACTIVE thì render null — không tốn pixel nào. */}
+            <BillingStatusBanner workspaceId={workspaceId} />
             {needsEmailMigration && (
                 <EmailMigrationModal displayName={displayName} />
             )}
@@ -94,7 +117,9 @@ export default async function AdminLayout({
                     workspaceId={workspaceId}
                 />
             )}
-            {children}
+            <BillingLockGate locked={billingLocked} workspaceId={workspaceId} canManageBilling={navAccess.profileAdmin}>
+                {children}
+            </BillingLockGate>
         </AppShell>
     )
 }

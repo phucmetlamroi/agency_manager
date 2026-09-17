@@ -21,9 +21,17 @@
 export const FEEDBACK_MAX_LEN = 4000
 /** submitTaskRating / submitRatingViaToken qualitativeFeedback cap */
 export const RATING_FEEDBACK_MAX_LEN = 2000
-/** Client-submitted task title cap (createTaskViaToken) */
+/**
+ * Client-submitted title cap.
+ * [AUDIT SWEEP-2026-07-30] Chú thích cũ ghi nơi dùng là `createTaskViaToken` — hàm đó ĐÃ XOÁ.
+ * Nơi dùng thật hiện nay: `submitClientRequestViaToken` (tiêu đề yêu cầu) và
+ * `createSubClientViaToken` (tên thương hiệu con).
+ */
 export const TITLE_MAX_LEN = 200
-/** Client-submitted resource link cap (createTaskViaToken) */
+/**
+ * Client-submitted resource link cap. Nơi dùng thật: `sanitizePortalLink` trong
+ * share-portal-actions.ts (đường link khách tự điền ở wizard v2).
+ */
 export const LINK_MAX_LEN = 2000
 
 /**

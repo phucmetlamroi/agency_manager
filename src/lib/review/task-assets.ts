@@ -13,6 +13,9 @@ import { apiError } from './errors'
 import { serializeVersion, toUserRef, type VersionDto } from './dto'
 import { buildMediaLinks } from './media-links'
 import { parseVideoTitle } from './parse-task-context'
+import { resolveTaskFolderPreview } from './task-folder'
+import { REVIEW_ACTIVITY } from './activity'
+import { REVIEW_MODULE_LABEL } from './labels'
 import { canAutoTransition } from '@/lib/task-statuses'
 import { REVIEW_STATUS_MAP } from './status-map'
 
@@ -30,11 +33,18 @@ export interface TaskDeliverableDto {
 
 export interface TaskUploadContextDto {
     /** Destination folders top→leaf, e.g. Team / Michael / North… / Bathroom 1. */
-    breadcrumb: { name: string }[]
+    /** `exists: false` = this level does not exist yet and the upload will create it. */
+    breadcrumb: { name: string; exists: boolean }[]
     /** false = the "Khách / Brand · Video" convention didn't parse (show a warning). */
     parsedOk: boolean
-    /** Non-null when a second upload would stack a new version onto an existing card. */
-    existingAsset: { id: string; name: string; nextVersionNumber: number } | null
+    /** Non-null when a second upload would stack a new version onto an existing card.
+     *  `willRenameTo` is set when that card's name no longer matches the task title and the upload
+     *  will bring it back in sync — announced up front so an automatic rename is never a surprise. */
+    existingAsset: { id: string; name: string; nextVersionNumber: number; willRenameTo: string | null } | null
+    /** [owner request 2026-07-27] Every live deliverable on this task, so a multi-hook upload can
+     *  PICK the one to version instead of relying on the filename matching. Automatic matching is a
+     *  guess; on a set of hooks a one-character difference silently mints a new video. */
+    taskAssets: { id: string; name: string; nextVersionNumber: number }[]
 }
 
 /**
@@ -62,6 +72,12 @@ export interface TaskAssetsResult {
     workspaceId: string
     assets: TaskDeliverableDto[]
     uploadContext: TaskUploadContextDto
+    /** [owner request 2026-07-28] Set only when the task has 2+ deliverables that all live in ONE
+     *  folder. The drawer then collapses them into a single tile that opens that folder in Tệp,
+     *  instead of stacking one thumbnail card per video — a set of 10 hooks blew the panel apart.
+     *  Null when there is 1 video (show its thumbnail) or when the videos are spread across
+     *  folders (no single honest destination, so keep the list rather than link somewhere wrong). */
+    deliverableFolder: { id: string; name: string; videoCount: number } | null
     /** Null unless the viewer can confirm a finished feedback round — see TaskFixConfirmDto.
      *  Doubles as the "task is mid-revision AND you may act on it" signal the confirm-strip uses
      *  to offer "đây là bản đã sửa feedback?", so no separate status field is needed here. */
@@ -86,6 +102,9 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             // finance/assignee fields" property of this DTO still holds.
             status: true,
             assigneeId: true,
+            // Read only to resolve the destination folder chain (same clientKey the writer uses);
+            // never serialized into the DTO.
+            clientId: true,
             isArchived: true,
             client: { select: { name: true } },
             workspace: { select: { name: true } },
@@ -186,15 +205,41 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
         }
     })
 
-    // Upload-context preview: mirror parseVideoTitle + the ensureTaskFolderPath breadcrumb
-    // shape (root → client → [brand] → video), WITHOUT creating any folders.
+    // [audit 2026-07-27 · LOW] Upload-context preview. This used to be built purely from the task
+    // title — zero queries — so it named folders that no longer existed under that name and called
+    // the root by the workspace name while Tệp labels that same folder "Tệp". Resolve the real
+    // systemKey chain instead (read-only, creates nothing) and report each level's actual name.
     const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
-    const breadcrumb: { name: string }[] = [{ name: task.workspace?.name || 'Team' }, { name: parsed.client }]
-    if (parsed.brand) breadcrumb.push({ name: parsed.brand })
-    breadcrumb.push({ name: parsed.video })
+    const levels = await resolveTaskFolderPreview({
+        workspaceId,
+        rootName: task.workspace?.name || 'Team',
+        taskId: task.id,
+        clientId: task.clientId != null ? String(task.clientId) : null,
+        parsed,
+    })
+    const breadcrumb: { name: string; exists: boolean }[] = levels.map((l, i) => ({
+        // Crumb 0 is the workspace root, which every Files surface calls "Tệp". Naming it after the
+        // workspace sent the user looking for a folder that appears under a different label.
+        name: i === 0 ? REVIEW_MODULE_LABEL : l.name,
+        exists: l.exists,
+    }))
 
     // Existing-asset match = same rule initiateTaskUpload uses to auto-version.
-    const match = assetRows.find((a) => a.name.trim().toLowerCase() === parsed.video.trim().toLowerCase())
+    let match = assetRows.find((a) => a.name.trim().toLowerCase() === parsed.video.trim().toLowerCase())
+    // [owner request 2026-07-27] Mirror the server's single-deliverable adoption: when the task holds
+    // exactly ONE video, a single upload versions THAT one whatever it is currently named — otherwise
+    // renaming the task forked the stack into a second video. Requires the asset to be visible to
+    // this viewer (assetRows is folder-scoped); if it is not, we simply show no preview rather than
+    // reveal an out-of-scope name. The server still adopts it either way.
+    let willRenameTo: string | null = null
+    if (!match && assetRows.length === 1 && allAssetRows.length === 1) {
+        match = assetRows[0]
+        // Only report a rename when nobody has renamed it by hand — same rule the writer applies.
+        const renamedByHand = await prisma.reviewActivity.count({
+            where: { assetId: match.id, type: REVIEW_ACTIVITY.ASSET_RENAMED },
+        })
+        if (renamedByHand === 0 && match.name !== parsed.video) willRenameTo = parsed.video
+    }
     let existingAsset: TaskUploadContextDto['existingAsset'] = null
     if (match) {
         // Number from MAX(versionNumber) across ALL version rows — EXACTLY like initiateUpload
@@ -206,8 +251,25 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             where: { assetId: match.id },
             _max: { versionNumber: true },
         })
-        existingAsset = { id: match.id, name: match.name, nextVersionNumber: (agg._max.versionNumber ?? 0) + 1 }
+        existingAsset = { id: match.id, name: match.name, nextVersionNumber: (agg._max.versionNumber ?? 0) + 1, willRenameTo }
     }
+
+    // Picker options. Scoped rows only (assetRows), so an editor never sees a deliverable outside
+    // their assigned subtree. MAX(versionNumber) per stack, same rule as above — the head pointer
+    // lags while a version is still PROCESSING, so head+1 would mispredict.
+    const pickerCounts = assetRows.length
+        ? await prisma.reviewVersion.groupBy({
+              by: ['assetId'],
+              where: { assetId: { in: assetRows.map((a) => a.id) } },
+              _max: { versionNumber: true },
+          })
+        : []
+    const maxByAsset = new Map(pickerCounts.map((r) => [r.assetId, r._max.versionNumber ?? 0]))
+    const taskAssets = assetRows.map((a) => ({
+        id: a.id,
+        name: a.name,
+        nextVersionNumber: (maxByAsset.get(a.id) ?? 0) + 1,
+    }))
 
     // [status-audit 2026-07-23] Mirror `confirmFixDone`'s guard exactly: pick whichever of A4/A7
     // is reachable from the CURRENT status, and require assignee-or-admin. `assetRows` is already
@@ -237,10 +299,22 @@ export async function getTaskAssets(taskId: string): Promise<TaskAssetsResult> {
             ? { assetId: fixAsset.id, targetStatus: fixTarget, onBehalf: !isAssignee }
             : null
 
+    // Collapse target: every visible deliverable in the same folder, 2 or more of them.
+    const distinctFolderIds = Array.from(new Set(assetRows.map((a) => a.folderId).filter((x): x is string => !!x)))
+    let deliverableFolder: TaskAssetsResult['deliverableFolder'] = null
+    if (assetRows.length >= 2 && distinctFolderIds.length === 1) {
+        const f = await prisma.reviewFolder.findFirst({
+            where: { id: distinctFolderIds[0], deletedAt: null },
+            select: { id: true, name: true },
+        })
+        if (f) deliverableFolder = { id: f.id, name: f.name, videoCount: assetRows.length }
+    }
+
     return {
         workspaceId,
         assets,
-        uploadContext: { breadcrumb, parsedOk: parsed.matched, existingAsset },
+        deliverableFolder,
+        uploadContext: { breadcrumb, parsedOk: parsed.matched, existingAsset, taskAssets },
         fixConfirm,
     }
 }

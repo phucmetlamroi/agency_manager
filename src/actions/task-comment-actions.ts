@@ -102,6 +102,46 @@ const MENTION_USER_SELECT = { id: true, username: true, nickname: true, avatarUr
  * relation wins (so editor/manager keep their label). Powers both the composer
  * dropdown and server-side mention→notify resolution — one source of truth.
  */
+/**
+ * [AUDIT HT-026] Trong số các userId truyền vào, cái nào là TÀI KHOẢN KHÁCH?
+ *
+ * Gom về một chỗ có chủ đích: hai đường khác nhau đẩy nội dung bình luận ra ngoài (thông báo
+ * @nhắc-tên và thông báo giao-việc), và vòng vá trước chỉ bịt đường thứ nhất. Nếu mỗi đường tự
+ * viết lấy điều kiện "thế nào là khách" thì lần sau chúng lại lệch nhau — đúng cái bẫy đã sinh ra
+ * nửa còn hở này.
+ *
+ * ⚠️ BA dấu hiệu, và phải đủ cả ba — vòng trước tôi chỉ dùng hai và nó hở đúng lớp khách ĐANG
+ * DÙNG hiện nay:
+ *   · `User.role = 'CLIENT'` — tài khoản khách thế hệ cũ.
+ *   · `User.clientId != null` — dấu vết của script backfill một lần; KHÔNG có mã ứng dụng nào ghi
+ *     trường này, và nó bị SET NULL khi xoá cứng Client. Tưởng đây là dấu hiệu của thế hệ hiện
+ *     hành là tôi hiểu ngược.
+ *   · `ProfileAccess.role = 'CLIENT'` — ĐÂY mới là mô hình hiện hành. Script
+ *     migrate-client-role-to-membership hạ `User.role` về USER và KHÔNG ghi `clientId`, nên một
+ *     khách hợp lệ sau di trú có role=USER, clientId=null, chỉ còn dấu ở ProfileAccess. Thiếu vế
+ *     này thì hai vế kia trả về tập RỖNG cho đúng những khách thật.
+ *
+ * Đây cũng chính là vị từ chuẩn mà codebase đã dùng ở nơi khác (tracking-actions.ts, bản vá
+ * HT-034: `user?.role === 'CLIENT' || pa?.role === 'CLIENT'`) — lệch khỏi nó là tự tạo ra chỗ hở.
+ * Không giới hạn theo profile nào: quét MỌI profile là lựa chọn fail-closed.
+ */
+async function findClientAccountIds(userIds: string[]): Promise<Set<string>> {
+    if (!userIds.length) return new Set()
+    const [users, clientAccesses] = await Promise.all([
+        prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, role: true, clientId: true },
+        }),
+        prisma.profileAccess.findMany({
+            where: { userId: { in: userIds }, role: 'CLIENT' },
+            select: { userId: true },
+        }),
+    ])
+    const ids = new Set(users.filter((r) => r.role === 'CLIENT' || r.clientId != null).map((r) => r.id))
+    for (const pa of clientAccesses) ids.add(pa.userId)
+    return ids
+}
+
 async function buildTaskMentionUsers(taskId: string): Promise<MentionTarget[]> {
     const task = await prisma.task.findUnique({
         where: { id: taskId },
@@ -273,14 +313,17 @@ export async function createTaskComment(taskId: string, workspaceId: string, inp
     // targets (portal users have User.clientId set; legacy clients have role='CLIENT') when INTERNAL.
     let notifyTargets = mentions.filter((m) => m !== userId)
     if (visibility === 'INTERNAL' && notifyTargets.length > 0) {
-        const rows = await prisma.user.findMany({
-            where: { id: { in: notifyTargets } },
-            select: { id: true, role: true, clientId: true },
-        })
-        const clientAccountIds = new Set(
-            rows.filter((r) => r.role === 'CLIENT' || r.clientId != null).map((r) => r.id),
-        )
-        notifyTargets = notifyTargets.filter((m) => !clientAccountIds.has(m))
+        const clients = await findClientAccountIds(notifyTargets)
+        const dropped = notifyTargets.filter((m) => clients.has(m))
+        notifyTargets = notifyTargets.filter((m) => !clients.has(m))
+        // Chặn IM LẶNG là chặn không kiểm chứng được. Hai lý do phải ghi lại:
+        // (1) vị từ fail-closed có thể bắt nhầm một nhân viên vốn là khách ở profile khác — người
+        //     đó sẽ lặng lẽ không bao giờ nhận được nhắc tên và không ai truy ra vì sao;
+        // (2) không đo được thì không biết chốt này có bao giờ chạy hay không, và một chốt không ai
+        //     nhìn tới là một chốt sẽ mục đi.
+        if (dropped.length) {
+            console.warn(`[task-comment] HT-026: bỏ ${dropped.length} người nhận là tài khoản khách khỏi thông báo bình luận NỘI BỘ`, { taskId, dropped })
+        }
     }
     for (const uid of notifyTargets) {
         try {
@@ -370,7 +413,8 @@ export async function assignTaskComment(commentId: string, workspaceId: string, 
     const { userId } = await staffCtx(workspaceId)
     const c = await prisma.taskComment.findUnique({
         where: { id: commentId },
-        select: { taskId: true, isDeleted: true, body: true },
+        // [AUDIT HT-026 fix] `visibility` phải được đọc ở đây — xem chốt bên dưới.
+        select: { taskId: true, isDeleted: true, body: true, visibility: true },
     })
     if (!c || c.isDeleted) return { success: false, error: 'Không tìm thấy bình luận.' }
     const t = await taskInWorkspace(c.taskId, workspaceId)
@@ -393,6 +437,27 @@ export async function assignTaskComment(commentId: string, workspaceId: string, 
 
     if (!(await isWorkspaceMember(workspaceId, assigneeUserId))) {
         return { success: false, error: 'Người được giao không thuộc workspace.' }
+    }
+    // [AUDIT HT-026 fix] NỬA CÒN HỞ của finding. Vòng vá trước chỉ bịt đường @nhắc-tên; đường này
+    // vẫn gửi `c.body.slice(0, 140)` — nguyên văn nội dung — qua thông báo COMMENT_ASSIGNED, và
+    // cổng duy nhất là `isWorkspaceMember`, vốn chỉ hỏi "có hàng WorkspaceMember không" chứ không
+    // loại tài khoản khách. Một tài khoản khách còn sót hàng thành viên là nhận được ghi chú nội
+    // bộ (giá, đánh giá editor, kế hoạch) mà đáng lẽ không bao giờ thấy.
+    // Chặn ngay ở BƯỚC GIAO chứ không chỉ ở bước gửi thông báo: giao một ghi chú nội bộ cho khách
+    // làm việc-phải-xử-lý tự nó đã sai, không riêng cái thông báo.
+    if (c.visibility === 'INTERNAL') {
+        const clients = await findClientAccountIds([assigneeUserId])
+        if (clients.has(assigneeUserId)) {
+            // Câu này CỐ Ý không khẳng định "người này là khách hàng". Vị từ quét mọi profile
+            // (fail-closed), nên nó cũng bắt trúng một đồng nghiệp nội bộ vốn là KHÁCH ở profile
+            // KHÁC — nói họ là khách vừa sai vừa không giúp được gì, vì người quản lý không nhìn
+            // thấy quan hệ ở profile kia. Nêu HỆ QUẢ và LỐI RA thay vì phán danh tính: có lối ra
+            // hợp lệ thì người ta không phải lách bằng cách đổi bình luận sang chế độ cho khách.
+            return {
+                success: false,
+                error: 'Không thể giao bình luận nội bộ cho tài khoản này. Hãy chọn người khác, hoặc chuyển bình luận sang chế độ hiển thị cho khách nếu thật sự cần.',
+            }
+        }
     }
 
     await prisma.taskComment.update({

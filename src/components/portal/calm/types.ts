@@ -54,6 +54,16 @@ export interface Deliverable {
      *  watches the cut, leaves timecode comments, annotates and approves. Present ONLY for
      *  client-phase tasks with a live READY task-linked asset (R5-gated). */
     reviewUrl?: string | null
+    /** [Báo cáo 2026-08-02] Số video ĐÃ SẴN SÀNG của task này. `reviewUrl` chỉ trỏ tới MỘT bảng
+     *  duyệt, nên nếu không có con số này thì cổng khách tưởng task nhiều-hook chỉ có một video.
+     *  0 = task chưa tới pha khách xem. */
+    reviewCount?: number
+    /** Thư mục Tệp chứa các video đó — để cổng khách mở đúng chỗ khi `reviewCount > 1`. */
+    reviewFolderId?: string | null
+    /** [Báo cáo 2026-08-03] Bản dựng ĐÃ xong nhưng bảng duyệt đang tắt chờ studio duyệt lại
+     *  (thu hồi theo R5 khi bản cắt mới lên). Phân biệt với "chưa dựng gì" — hai thứ này trước
+     *  đây cùng ra `reviewUrl == null` nên khách bị báo sai là "Not uploaded yet". */
+    reviewPending?: boolean
 }
 
 export interface Invoice {

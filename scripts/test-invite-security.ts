@@ -401,13 +401,13 @@ async function testConfirmedFindings() {
 
   // ── CLB-1 (High): task-assignment gate + mint never admit a CLIENT/LOCKED ──
   check('CLB-1: isAssigneeInWorkspaceProfile(home USER) → true',
-    await wm.isAssigneeInWorkspaceProfile(ids.userA, wsNew, A) === true)
+    await wm.isAssigneeInWorkspaceProfile(ids.userA, wsNew) === true)
   check('CLB-1: isAssigneeInWorkspaceProfile(du-học USER) → true',
-    await wm.isAssigneeInWorkspaceProfile(ids.duhocU, wsNew, A) === true)
+    await wm.isAssigneeInWorkspaceProfile(ids.duhocU, wsNew) === true)
   check('CLB-1: isAssigneeInWorkspaceProfile(CLIENT) → false',
-    await wm.isAssigneeInWorkspaceProfile(ids.clientA, wsNew, A) === false)
+    await wm.isAssigneeInWorkspaceProfile(ids.clientA, wsNew) === false)
   check('CLB-1: isAssigneeInWorkspaceProfile(LOCKED) → false',
-    await wm.isAssigneeInWorkspaceProfile(ids.lockedA, wsNew, A) === false)
+    await wm.isAssigneeInWorkspaceProfile(ids.lockedA, wsNew) === false)
 
   const clientMint = await wm.ensureWorkspaceMembership(ids.clientA, wsNew, 'MEMBER')
   const clientRow = await prisma.workspaceMember.findUnique({ where: { userId_workspaceId: { userId: ids.clientA, workspaceId: wsNew } }, select: { id: true } })

@@ -7,6 +7,7 @@ import { BulkEditTaskModal } from './tasks/BulkEditTaskModal'
 import { deleteTask } from '@/actions/task-management-actions'
 import { useConfirm } from '@/components/ui/ConfirmModal'
 import { toast } from 'sonner'
+import { failureMessage } from '@/lib/ui/action-feedback'
 import { useRouter } from 'next/navigation'
 import { Search, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pen, Trash2, GripVertical, Timer, Undo2, CalendarDays, ChevronDown, MessageSquare } from 'lucide-react'
 import { AssigneeCell } from './tasks/cells/AssigneeCell'
@@ -101,10 +102,15 @@ const NP = {
     borderSubtle: 'rgba(139,92,246,0.10)',
     borderCell: 'rgba(139,92,246,0.12)',
     accent: '#8B5CF6',
+    // [audit 2026-07 §12] Violet one step darker, used ONLY where white text sits on it.
+    // #FFFFFF on accent #8B5CF6 measured 4.23:1, under the 4.5:1 AA floor; #7C3AED is 5.70:1
+    // and reads as the same brand colour. `accent` above still paints glows, borders and
+    // dots, where no text sits and the contrast rule does not apply.
+    accentSolid: '#7C3AED',
     accentGlow: 'rgba(139,92,246,0.35)',
     textPrimary: '#FFFFFF',
     textSecondary: '#A1A1AA',
-    textMuted: '#71717A',
+    textMuted: '#878790',
     lilac: '#D8B4FE',
     pageActive: 'rgba(139,92,246,0.20)',
     pageActiveBorder: 'rgba(139,92,246,0.30)',
@@ -315,13 +321,13 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                     router.refresh()
                 }
             }
-        } catch {
-            toast.error('Cập nhật trạng thái thất bại')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Cập nhật trạng thái thất bại'))
         }
     }, [tasks, workspaceId, router])
 
     // ─── Helpers ────────────────────────────────────────
-    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
+    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#878790' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
         return taskTypeLabel(type) || 'Task'
@@ -372,7 +378,7 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                                 gap: 8,
                                 padding: '10px 20px',
                                 borderRadius: 26,
-                                background: isActive ? NP.accent : NP.surface,
+                                background: isActive ? NP.accentSolid : NP.surface,
                                 border: `1px solid ${isActive ? NP.accent : NP.border}`,
                                 color: isActive ? '#FFFFFF' : NP.textSecondary,
                                 fontSize: 14,
@@ -498,7 +504,9 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
             )}
 
             {/* ─── SEARCH BAR ───────────────────────────── */}
-            <div className="flex items-center" style={{ gap: 10 }}>
+            {/* items-stretch: see the twin row in UserWorkflowTabs — keeps the pill and the button
+                the same height once the input carries its WCAG 2.5.8 minHeight. */}
+            <div className="flex items-stretch" style={{ gap: 10 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{
@@ -522,6 +530,10 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                             color: NP.textPrimary,
                             fontSize: 14,
                             fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            // Byte-for-byte twin of the dashboard search field — same borderless
+                            // input, same pill. It takes its height from the font alone, which puts
+                            // the real pointer target under the WCAG 2.2 SC 2.5.8 24px floor.
+                            minHeight: 24,
                         }}
                     />
                 </div>
@@ -531,7 +543,10 @@ export default function TaskWorkflowTabs({ tasks, users, isMobile, isAdmin, work
                         gap: 8,
                         padding: '12px 20px',
                         borderRadius: 26,
-                        background: NP.accent,
+                        // [kiểm toán 2026-07 · phản biện] Đây là chỗ thứ hai có chữ trắng trên nền
+                        // violet, và đợt F-12 đã bỏ sót nó: accentSolid sinh ra chính vì cặp
+                        // #FFFFFF/#8B5CF6 chỉ đạt 4,23:1, nhưng chỉ được cắm vào viên tab đang chọn.
+                        background: NP.accentSolid,
                         border: 'none',
                         color: '#FFFFFF',
                         fontSize: 14,

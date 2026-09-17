@@ -45,7 +45,7 @@ export default async function CancelledTasksPage({
                     <ArrowLeft size={14} /> Quay lại bảng điều khiển
                 </Link>
                 <h2 className="title-gradient" style={{ marginBottom: 4 }}>Task đã hủy / Lưu trữ</h2>
-                <p style={{ color: '#71717A', fontSize: 13 }}>
+                <p style={{ color: '#878790', fontSize: 13 }}>
                     Task chuyển sang “Đã hủy” được lưu trữ ở đây — không còn tính vào “Tổng task” và
                     ẩn khỏi bảng làm việc. Có thể khôi phục bất cứ lúc nào nếu hủy nhầm.
                 </p>

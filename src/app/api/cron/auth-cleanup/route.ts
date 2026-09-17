@@ -13,16 +13,10 @@
 
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { timingSafeEqual } from 'crypto'
-
-// H1 fix: timingSafeEqual để chống timing-side-channel attack trên secret comparison
-function safeEqual(a: string | null, b: string): boolean {
-    if (!a) return false
-    const aBuf = Buffer.from(a)
-    const bBuf = Buffer.from(b)
-    if (aBuf.length !== bBuf.length) return false
-    return timingSafeEqual(aBuf, bBuf)
-}
+// [AUDIT SWEEP-2026-07-30 · CRON-TIMING] Bản chép cục bộ đã chuyển sang `@/lib/cron-auth` để 6 route
+// cron còn lại tái dùng được — trước đây route này làm ĐÚNG nhưng giữ helper riêng, nên 6 route kia
+// không có gì để import và cả 6 vẫn so bằng `!==`. Helper đúng mà không ở điểm nghẽn thì không giúp ai.
+import { safeEqual } from '@/lib/cron-auth'
 
 export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization')

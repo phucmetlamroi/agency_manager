@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { audit } from '@/lib/audit-log'
+import { safeEqual } from '@/lib/cron-auth'
 
 /**
  * Cron job: hard-delete workspaces whose `hardDeleteAfter` has passed.
@@ -31,7 +32,9 @@ export async function GET(request: Request) {
     if (!secret) {
         return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
     }
-    if (key !== secret) {
+    // [AUDIT SWEEP-2026-07-30 fix · CRON-TIMING] So theo thời-gian-hằng, helper dùng chung ở
+    // @/lib/cron-auth. Phòng thủ chiều sâu — xem chú thích ở đó về mức độ thật.
+    if (!safeEqual(key, secret)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

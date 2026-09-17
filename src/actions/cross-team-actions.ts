@@ -111,12 +111,42 @@ export async function approveCrossTeamAccess(requestId: string, workspaceId: str
             return { success: false, error: 'Bạn không có quyền duyệt yêu cầu vào team này.' }
         }
 
+        // [AUDIT HT-023 fix] Từ chối duyệt khi người đó ĐÃ có quyền truy cập profile này.
+        //
+        // `requestCrossTeamAccess` đã kiểm điều này lúc TẠO yêu cầu (dòng 49-52), nhưng chỗ DUYỆT
+        // thì không — và giữa hai thời điểm đó người ta có thể đã vào profile bằng cửa chính tắc
+        // (lời mời → acceptWorkspaceInvitation), vốn không hề dọn yêu cầu PENDING còn treo.
+        // Khi ấy `upsert` bên dưới là no-op (`update: {}`) nhưng trạng thái vẫn lật thành APPROVED,
+        // tức là ĐÓNG DẤU "du học" lên một thành viên được mời bình thường.
+        //
+        // Nguy hiểm vì kể từ bản vá HT-023, dấu APPROVED CHÍNH LÀ thứ cho phép ADMIN gỡ người đó.
+        // Không có chốt này thì một ADMIN chỉ cần duyệt một yêu cầu cũ là lấy lại được quyền gỡ
+        // thành viên vốn dành riêng cho OWNER — HT-023 mở lại. Và người duyệt cũng chính là người
+        // hưởng lợi, nên không thể trông vào thiện chí.
+        const existingAccess = await prisma.profileAccess.findUnique({
+            where: { userId_profileId: { userId: request.userId, profileId: request.targetProfileId } },
+            select: { role: true },
+        })
+        if (existingAccess) {
+            // Đánh dấu TỪ CHỐI luôn thay vì chỉ báo lỗi: nếu để nguyên PENDING thì yêu cầu này nằm
+            // lại trong hàng chờ của người duyệt, trông như bấm được nhưng bấm là lỗi — vĩnh viễn.
+            // REJECTED cũng là trạng thái DUY NHẤT mà requestCrossTeamAccess hồi sinh lại được,
+            // nên nếu sau này người đó rời profile rồi cần xin lại thì vẫn còn đường.
+            await prisma.profileAccessRequest.update({
+                where: { id: requestId },
+                data: { status: 'REJECTED', approvedById },
+            }).catch(() => { /* không chặn phản hồi vì một lần ghi dọn dẹp */ })
+            return { success: false, error: 'Người này đã có quyền truy cập profile — không cần duyệt yêu cầu du học.' }
+        }
+
         // Thêm quyền truy cập
         await prisma.$transaction([
-            prisma.profileAccess.upsert({
-                where: { userId_profileId: { userId: request.userId, profileId: request.targetProfileId } },
-                update: {},
-                create: { userId: request.userId, profileId: request.targetProfileId }
+            // `create` chứ KHÔNG `upsert(update:{})`: chốt kiểm ở trên chạy TRƯỚC transaction, nên
+            // vẫn còn khe cho một lời mời chính tắc chen vào giữa. Với upsert, khe đó là no-op im
+            // lặng mà trạng thái vẫn lật thành APPROVED — đúng lỗ vừa bịt, chỉ hẹp hơn. Với create,
+            // hàng vừa chen vào gây P2002 và cả transaction rollback: nguyên tử và fail-closed.
+            prisma.profileAccess.create({
+                data: { userId: request.userId, profileId: request.targetProfileId }
             }),
             prisma.profileAccessRequest.update({
                 where: { id: requestId },
@@ -202,6 +232,37 @@ export async function removeCrossTeamAccess(userId: string, profileId: string, w
         // this a profile ADMIN could strip another ADMIN here. Self-removal stays allowed.
         if (targetAccess.role === 'ADMIN' && callerRole !== 'OWNER' && callerId !== userId) {
             return { success: false, error: 'Chỉ chủ sở hữu (OWNER) mới được gỡ quyền của quản trị viên (ADMIN).' }
+        }
+        // [AUDIT HT-023 fix — vế còn thiếu] Chốt trên mới chặn được target ADMIN. Tiêu đề finding
+        // ghi rõ 'gỡ đồng-cấp ADMIN / THÀNH VIÊN', và vế THÀNH VIÊN vẫn hở.
+        //
+        // Đây là cửa gỡ quyền DU HỌC, nhưng nó chưa bao giờ kiểm target có thật sự là người du học
+        // hay không — nó xoá BẤT KỲ hàng ProfileAccess nào khác OWNER. Nên một ADMIN dùng chính
+        // hàm này để gỡ THÀNH VIÊN NHÀ của profile, tức là làm được đúng việc mà ma trận quyền
+        // dành riêng cho OWNER (profile-permissions.ts: 'Xóa member | OWNER ✅ | ADMIN ❌', thực thi
+        // ở removeFromProfileAction). Cửa chính khoá, cửa bên mở.
+        //
+        // ⚠️ Vòng trước tôi phân biệt bằng `User.profileId` — đúng như đề xuất (a) trong FINDINGS.
+        // ĐỀ XUẤT ĐÓ SAI VỚI SCHEMA NÀY, và bản vá theo nó gần như không bao giờ kích hoạt:
+        // `User.profileId` CHỈ được ghi lúc tạo tài khoản và KHÔNG hề được ghi lại khi tham gia
+        // profile khác. Đường tham gia chính tắc (mời → acceptWorkspaceInvitation) chỉ upsert
+        // ProfileAccess; grep `user.update` trong member-actions.ts = 0 kết quả. Nên mọi thành viên
+        // được mời vào P vẫn mang profileId trỏ về profile do chính họ tạo lúc đăng ký ≠ P → điều
+        // kiện cũ luôn false → ADMIN vẫn gỡ được họ y như trước.
+        //
+        // Nay dùng ĐỀ XUẤT (b) của FINDINGS, cài bằng một vị từ KHẲNG ĐỊNH: du học là thứ DUY NHẤT
+        // để lại một ProfileAccessRequest đã APPROVED (approveCrossTeamAccess ghi nó; luồng mời
+        // không bao giờ ghi). Không chứng minh được là du học thì việc gỡ thuộc về cửa chính tắc
+        // removeFromProfileAction, tức OWNER-only.
+        const duHocGrant = await prisma.profileAccessRequest.findUnique({
+            where: { userId_targetProfileId: { userId, targetProfileId: profileId } },
+            select: { status: true },
+        })
+        if (duHocGrant?.status !== 'APPROVED' && callerRole !== 'OWNER' && callerId !== userId) {
+            return {
+                success: false,
+                error: 'Người này không phải diện du học tại profile. Chỉ chủ sở hữu (OWNER) mới được gỡ thành viên.',
+            }
         }
 
         // [AUDIT OGS-1 — fix HIGH] ProfileAccess is NOT the only grant: task assignment mints a

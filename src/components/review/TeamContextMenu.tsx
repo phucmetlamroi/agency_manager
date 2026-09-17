@@ -24,6 +24,8 @@ import {
     UploadCloud,
     FolderUp,
     FolderPlus,
+    FolderOpen,
+    RotateCcw,
 } from 'lucide-react'
 
 export type MenuTargetKind = 'folder' | 'asset'
@@ -88,9 +90,20 @@ export interface ItemMenuHandlers {
     onDuplicate: () => void
     onRename: () => void
     onDelete: () => void
+    /** [foldering 2026-07-27] Folder menu only: lift the videos out and drop the wrapper. */
+    onUngroup?: () => void
+    /** Asset menu only: put the name back to the task title and re-enable automatic sync. */
+    onResetName?: () => void
     canDelete: boolean
     /** P3.4 — asset menu only; present (enabled) when a single asset is the target. */
     onManageVersions?: () => void
+    /**
+     * [kiểm toán 2026-07 · §5.3] false = asset này chỉ có 1 phiên bản (hoặc 0) → ẨN HẲN mục
+     * "Quản lý phiên bản", đừng hiện mờ. Không truyền = giữ hành vi cũ (luôn hiện).
+     * Cố ý KHÔNG gộp vào `onManageVersions`: callback đó cũng undefined khi đang chọn nhiều
+     * mục, và lúc ấy mục hiện mờ kèm gợi ý "Chọn đúng một asset" — gợi ý đúng, phải giữ.
+     */
+    canManageVersions?: boolean
     /** P5.5 — opens the create-share modal for the acting items (FR-F01). */
     onCreateShare?: () => void
 }
@@ -109,6 +122,14 @@ export function FolderMenuContent(h: ItemMenuHandlers) {
             <Item icon={<FolderInput size={15} />} label="Di chuyển tới…" onSelect={h.onMoveTo} />
             <Item icon={<Files size={15} />} label="Nhân bản" onSelect={h.onDuplicate} />
             <Item icon={<Pencil size={15} />} label="Đổi tên" onSelect={h.onRename} />
+            {h.onUngroup && (
+                <Item
+                    icon={<FolderOpen size={15} />}
+                    label="Bỏ thư mục"
+                    onSelect={h.onUngroup}
+                    hint="Đưa video bên trong ra thư mục cha rồi xóa thư mục này"
+                />
+            )}
             <Sep />
             <Item
                 icon={<Trash2 size={15} />}
@@ -128,6 +149,7 @@ export function AssetMenuContent(h: ItemMenuHandlers) {
         <>
             <Item icon={<Share2 size={15} />} label="Tạo link chia sẻ" onSelect={h.onCreateShare} disabled={!h.onCreateShare} />
             <Item icon={<ListPlus size={15} />} label="Thêm vào link chia sẻ" disabled hint="Có ở bản sau (P6)" trailing={SOON} />
+            {h.canManageVersions !== false && (
             <Item
                 icon={<Layers size={15} />}
                 label="Quản lý phiên bản"
@@ -135,6 +157,7 @@ export function AssetMenuContent(h: ItemMenuHandlers) {
                 disabled={!h.onManageVersions}
                 hint={h.onManageVersions ? undefined : 'Chọn đúng một asset để quản lý phiên bản'}
             />
+            )}
             <Sep />
             <Item icon={<Download size={15} />} label="Tải xuống" onSelect={h.onDownload} hint="Tải bản gốc phiên bản hiện tại" />
             <Item icon={<LinkIcon size={15} />} label="Sao chép URL asset" onSelect={h.onCopyUrl} />
@@ -143,6 +166,14 @@ export function AssetMenuContent(h: ItemMenuHandlers) {
             <Item icon={<FolderInput size={15} />} label="Di chuyển tới…" onSelect={h.onMoveTo} />
             <Item icon={<Files size={15} />} label="Nhân bản" onSelect={h.onDuplicate} />
             <Item icon={<Pencil size={15} />} label="Đổi tên" onSelect={h.onRename} />
+            {h.onResetName && (
+                <Item
+                    icon={<RotateCcw size={15} />}
+                    label="Reset về tên Task"
+                    onSelect={h.onResetName}
+                    hint="Lấy lại tên từ task, và bật lại tự đồng bộ khi task đổi tên về sau"
+                />
+            )}
             <Sep />
             <Item
                 icon={<Trash2 size={15} />}

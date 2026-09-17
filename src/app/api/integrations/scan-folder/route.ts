@@ -66,6 +66,16 @@ export async function POST(req: Request) {
             { status: 401 },
         )
     }
+    // [AUDIT SWEEP-2026-07-30 fix · N8(c)] Route này chạy quét đệ quy tốn tiền (maxDuration dài,
+    // gọi API Dropbox/Drive) nên phải chặn tài khoản đã bị khoá / phiên đã thu hồi — getSession()
+    // một mình không thấy hai điều đó vì nó không đọc DB.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) {
+        return NextResponse.json(
+            { error: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.' },
+            { status: 401 },
+        )
+    }
 
     // ---------------------------------------------------------------------------
     // 2. Parse and validate request body
@@ -107,6 +117,24 @@ export async function POST(req: Request) {
             )
         }
         throw err
+    }
+
+    // ---------------------------------------------------------------------------
+    // 3a-bis. [BILLING P6] Velox scan = tính năng gói (VELOX, Studio trở lên) — đây là
+    //         endpoint đắt nhất hệ thống (đệ quy provider 300s), đúng thứ phải trả tiền.
+    //         requireFeature tự cho qua khi BILLING_ENFORCEMENT_START chưa bật.
+    // ---------------------------------------------------------------------------
+    {
+        const { requireFeature, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        const { resolveWorkspaceProfileId } = await import('@/lib/prisma-workspace')
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            try { await requireFeature(pid, 'VELOX') } catch (e) {
+                const msg = billingErrorMessage(e)
+                if (msg) return NextResponse.json({ error: msg }, { status: 402 })
+                throw e
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------

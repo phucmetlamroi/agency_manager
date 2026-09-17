@@ -91,7 +91,7 @@ export default function ShareLinkSection({ clientId, clientName, workspaceId, on
                     <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Link2 className="w-4 h-4" style={{ color: '#c4b5fd' }} /> Link chia sẻ — {clientName}
                     </h3>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717a' }}><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#878790' }}><X className="w-4 h-4" /></button>
                 </div>
                 <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#a1a1aa', lineHeight: 1.55 }}>
                     Gửi link công khai cho khách — họ bấm vào là xem được <b>toàn bộ tiến độ & lịch sử</b> (mọi workspace),
@@ -123,7 +123,7 @@ export default function ShareLinkSection({ clientId, clientName, workspaceId, on
                 </button>
 
                 {/* Existing links */}
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#71717a', marginBottom: 8 }}>Link đã tạo</div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#878790', marginBottom: 8 }}>Link đã tạo</div>
                 {links === null ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a1a1aa', fontSize: 13, padding: '10px 0' }}>
                         <Loader2 className="w-4 h-4 animate-spin" /> Đang tải…
@@ -131,7 +131,7 @@ export default function ShareLinkSection({ clientId, clientName, workspaceId, on
                 ) : loadErr ? (
                     <p style={{ fontSize: 13, color: '#f87171', margin: 0 }}>{loadErr}</p>
                 ) : links.length === 0 ? (
-                    <p style={{ fontSize: 13, color: '#71717a', margin: 0 }}>Chưa có link nào cho khách này.</p>
+                    <p style={{ fontSize: 13, color: '#878790', margin: 0 }}>Chưa có link nào cho khách này.</p>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {links.map((l) => {
@@ -139,10 +139,10 @@ export default function ShareLinkSection({ clientId, clientName, workspaceId, on
                             return (
                                 <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${dead ? 'rgba(255,255,255,0.06)' : 'rgba(139,92,246,0.22)'}`, opacity: dead ? 0.55 : 1 }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 12.5, fontWeight: 600, color: dead ? '#71717a' : '#e4e4e7' }}>
+                                        <div style={{ fontSize: 12.5, fontWeight: 600, color: dead ? '#878790' : '#e4e4e7' }}>
                                             {dead ? '🚫 Đã thu hồi' : '🟢 Đang hoạt động'} · tạo {fmtDate(l.createdAt)} bởi {l.createdByName}
                                         </div>
-                                        <div style={{ fontSize: 11.5, color: '#71717a', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        <div style={{ fontSize: 11.5, color: '#878790', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
                                             <Eye className="w-3 h-3" /> {l.accessCount} lượt mở · lần cuối {fmtDate(l.lastAccessedAt)}
                                         </div>
                                     </div>

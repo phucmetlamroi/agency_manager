@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
     'Hoàn tất':     { label: 'Hoàn tất',     color: '#10B981' },
     // Cron auto-set khi deadline qua → cần dedicated tab cho admin theo dõi
     'Quá hạn':      { label: 'Quá hạn',      color: '#DC2626' },
-    'Đã hủy':       { label: 'Đã hủy',       color: '#52525B' },
+    'Đã hủy':       { label: 'Đã hủy',       color: '#878790' },
 }
 
 const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -222,7 +222,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
     }
 
     // ─── Helpers ────────────────────────────────────────
-    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#71717A' }
+    const getStatusInfo = (status: string) => STATUS_COLORS[status] || { label: status, color: '#878790' }
     const getTypeInfo = (type: string) => TYPE_COLORS[type] || TYPE_DEFAULT
     const getTypeLabel = (type: string) => {
         return taskTypeShort(type) || 'TASK'
@@ -269,7 +269,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 borderRadius: 999,
                                 background: isActive ? `color-mix(in srgb, ${tab.color} 9.41%, transparent)` : 'transparent',
                                 border: isActive ? `1px solid color-mix(in srgb, ${tab.color} 20.78%, transparent)` : '1px solid rgba(255,255,255,0.08)',
-                                color: isActive ? tab.color : '#71717A',
+                                color: isActive ? tab.color : '#878790',
                                 fontSize: 12,
                                 fontWeight: 600,
                                 cursor: 'pointer',
@@ -277,7 +277,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                         >
                             <span style={{
                                 width: 5, height: 5, borderRadius: '50%',
-                                background: isActive ? tab.color : '#52525B',
+                                background: isActive ? tab.color : '#878790',
                                 flexShrink: 0,
                             }} />
                             {tab.label}
@@ -375,7 +375,9 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
             )}
 
             {/* ─── SEARCH ROW ────────────────────────────── */}
-            <div className="flex items-center" style={{ gap: 8 }}>
+            {/* items-stretch: see the twin row in UserWorkflowTabs — keeps the pill and the button
+                the same height once the input carries its WCAG 2.5.8 minHeight. */}
+            <div className="flex items-stretch" style={{ gap: 8 }}>
                 <div
                     className="flex-1 flex items-center"
                     style={{
@@ -386,7 +388,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                         border: '1px solid rgba(255,255,255,0.06)',
                     }}
                 >
-                    <Search style={{ width: 14, height: 14, color: '#52525B', flexShrink: 0 }} />
+                    <Search style={{ width: 14, height: 14, color: '#878790', flexShrink: 0 }} />
                     <input
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -398,6 +400,10 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             outline: 'none',
                             color: '#F4F4F5',
                             fontSize: 12,
+                            // Same borderless-input defect as the other two search fields, and the
+                            // shortest of the three at fontSize 12 — furthest under the WCAG 2.2
+                            // SC 2.5.8 24px floor.
+                            minHeight: 24,
                         }}
                     />
                 </div>
@@ -469,7 +475,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                             style={{
                                 fontSize: 10,
                                 fontWeight: 700,
-                                color: '#52525B',
+                                color: '#878790',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.08em',
                             }}
@@ -655,7 +661,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                 {task.assignedBy && (
                                     <div
                                         title={`Người quản lý: ${(task.assignedBy as any).nickname || task.assignedBy.username}`}
-                                        style={{ fontSize: 10, color: '#71717A', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                        style={{ fontSize: 10, color: '#878790', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                                     >
                                         QL: {(task.assignedBy as any).nickname || task.assignedBy.username}
                                     </div>
@@ -814,7 +820,7 @@ export default function DesktopTaskTable({ tasks, isAdmin = false, users = [], w
                                     width: 30, height: 30, borderRadius: 8,
                                     background: page === n ? 'rgba(99,102,241,0.20)' : 'transparent',
                                     border: page === n ? '1px solid rgba(99,102,241,0.30)' : '1px solid transparent',
-                                    color: page === n ? '#A5B4FC' : '#52525B',
+                                    color: page === n ? '#A5B4FC' : '#878790',
                                     fontSize: 11,
                                     fontWeight: page === n ? 800 : 500,
                                     cursor: 'pointer',

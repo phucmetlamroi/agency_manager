@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { failureMessage } from "@/lib/ui/action-feedback"
 import { statusLabel, statusShort } from "@/lib/display-labels"
 import {
     Select,
@@ -74,7 +75,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
             toast.success(`Đã chuyển trạng thái sang ${newStatus}`)
             router.refresh()
         } catch (error) {
-            toast.error("Cập nhật trạng thái thất bại")
+            toast.error(failureMessage(error, "Cập nhật trạng thái thất bại"))
         }
     }
 
@@ -90,7 +91,7 @@ export function StatusCell({ task, isAdmin, workspaceId }: StatusCellProps) {
             toast.success("Đã gửi phản hồi Revision")
             router.refresh()
         } catch (error) {
-            toast.error("Gửi phản hồi thất bại")
+            toast.error(failureMessage(error, "Gửi phản hồi thất bại"))
         }
     }
 

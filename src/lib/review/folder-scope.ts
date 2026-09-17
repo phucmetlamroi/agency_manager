@@ -26,6 +26,19 @@ export interface FolderScope {
     allowedPrefixes: string[]
 }
 
+/**
+ * [kiểm toán 2026-07 · T-04] Người này chưa được giao GÌ CẢ trong workspace.
+ *
+ * Đây là tín hiệu AN TOÀN để gửi ra giao diện, và điều đó không hiển nhiên: nó chỉ suy từ
+ * quyền của CHÍNH người gọi, không phụ thuộc thư mục họ đang mở. Các cờ "anh em" như
+ * isPathVisible/isPathMutable thì phụ thuộc container — đưa chúng ra client sẽ biến mọi id
+ * thư mục nhặt được thành một phép thử "cái này có tồn tại không", thứ hôm nay KHÔNG có
+ * (thư mục ngoài phạm vi và thư mục rỗng thật đều trả về 200 + rỗng, không phân biệt nổi).
+ */
+export function isScopeEmpty(scope: FolderScope): boolean {
+    return !scope.unrestricted && scope.allowedPrefixes.length === 0
+}
+
 /** Compute an editor's folder scope in a workspace. Admin/owner → unrestricted. */
 export async function getFolderScope(input: {
     userId: string
@@ -54,7 +67,18 @@ export async function getFolderScope(input: {
               })
             : Promise.resolve([] as { folder: { path: string } | null }[]),
         prisma.reviewFolder.findMany({
-            where: { workspaceId: input.workspaceId, createdById: input.userId },
+            // [audit 2026-07-27 · HIGH] `systemKey: null` is load-bearing. Auto-created folders
+            // (root → client → [brand] → video) are stamped with the id of whoever triggered the
+            // upload that minted them. The ROOT is minted by the FIRST task upload in a workspace,
+            // so if that was an editor, this query returned the root's path `/rootId/` — which as an
+            // allowed prefix is the ENTIRE workspace tree. That one editor silently gained read,
+            // write and delete scope over every other client's deliverables.
+            //
+            // Filtering here (rather than only ceasing to stamp) is what fixes workspaces that
+            // ALREADY have an editor's id on their root — the stamp is in the data, not just in
+            // future writes. "Folders I made" means folders a human deliberately created in the
+            // browser; a folder the upload pipeline conjured is nobody's grant.
+            where: { workspaceId: input.workspaceId, createdById: input.userId, systemKey: null },
             select: { path: true },
         }),
     ])
@@ -88,7 +112,10 @@ export function isPathMutable(scope: FolderScope, path: string): boolean {
 }
 
 function outOfScope() {
-    return apiError(403, 'FORBIDDEN', 'Bạn không có quyền trên mục ngoài phạm vi được giao.')
+    // [kiểm toán 2026-07 · §11] Câu cũ — "…trên mục ngoài phạm vi được giao" — vừa từ chối
+    // vừa XÁC NHẬN rằng mục đó CÓ THẬT và chỉ nằm ngoài phần của bạn. Với một id đoán được,
+    // đó là phép thử tồn tại. Câu trung tính không nói gì về sự tồn tại của mục.
+    return apiError(403, 'FORBIDDEN', 'Bạn không có quyền xem nội dung này.')
 }
 
 /** Throw 403 unless the folder path is mutable for this scope. */

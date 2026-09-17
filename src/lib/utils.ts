@@ -37,10 +37,16 @@ import DOMPurify from 'dompurify';
  * Ensures all <a> tags in an HTML string have target="_blank" and rel="noopener noreferrer"
  * and sanitizes the HTML to prevent XSS.
  *
- * CLIENT-ONLY: browser dompurify has no DOM during SSR. The single caller
- * (TaskDrawer, 'use client', renders on user interaction post-hydration)
- * never runs this on the server; the guard below fails CLOSED (empty
- * string, never unsanitized HTML) if a future server caller appears.
+ * CLIENT-ONLY: browser dompurify has no DOM during SSR. Both callers
+ * (mobile/TaskDrawer and the AddTaskModal notes preview — 'use client',
+ * rendered on user interaction post-hydration) never run this on the
+ * server; the guard below fails CLOSED (empty string, never unsanitized
+ * HTML) if a future server caller appears.
+ *
+ * [AUDIT SWEEP-2026-07-30] Chú thích cũ viết "the single caller" — nay có
+ * HAI nơi gọi. Ghi lại cho đúng: một chú thích sai về bề mặt bảo mật là
+ * cách người sau lập luận sai (đợt vá trước đã trả giá 5 lần vì tin mô tả
+ * thay vì đọc cơ chế).
  */
 export function ensureExternalLinks(html: string | null | undefined): string {
     if (!html) return '';

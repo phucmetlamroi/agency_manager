@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import { updateTaskDetails } from '../src/actions/update-task-details'
 import { retryTaskTranslation } from '../src/actions/retry-translation-action'
-import { getFrameAccount } from '../src/actions/global-settings' // just to check if it's there
+// [AUDIT HT-022] global-settings.ts đã bị gỡ — credential Frame.io dùng chung đọc được
+// bởi mọi tài khoản đăng nhập, và tích hợp Frame.io đã được module review thay thế.
 import fs from 'fs'
 import path from 'path'
 

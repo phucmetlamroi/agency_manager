@@ -68,7 +68,25 @@ export default function BonusCalculator({ workspaceId }: { workspaceId: string }
 
         setIsLoading(true)
         try {
-            const res = await revertMonthlyBonus(workspaceId)
+            let res: any = await revertMonthlyBonus(workspaceId)
+
+            // [AUDIT SWEEP fix] Kỳ đã TRẢ LƯƠNG cần một lần xác nhận riêng, nói rõ SỐ NGƯỜI và
+            // TỔNG TIỀN đang bị mở lại. Hộp thoại đầu tiên chỉ cảnh báo chung "xoá thưởng đã tính";
+            // nó không hề nói rằng tiền đã trả cho người thật cũng đang được mở khoá.
+            if (res?.requiresConfirmation) {
+                const ok = await confirm({
+                    title: 'Kỳ lương này ĐÃ TRẢ TIỀN',
+                    message:
+                        `${res.paidCount} người đã được trả, tổng ${Number(res.paidTotal || 0).toLocaleString('vi-VN')}đ.\n\n` +
+                        `Mở lại kỳ sẽ cho phép sửa lại số tiền của kỳ đã trả. Thao tác này được ghi vào nhật ký kèm số người và tổng tiền.\n\nVẫn mở?`,
+                    type: 'danger',
+                    confirmText: 'Tôi hiểu, vẫn mở kỳ đã trả',
+                    cancelText: 'Hủy',
+                })
+                if (!ok) return
+                res = await revertMonthlyBonus(workspaceId, { confirmUnlockPaid: true })
+            }
+
             if (res.success) {
                 toast.success(res.message)
                 setIsLocked(false)

@@ -22,6 +22,7 @@ import { randomInt } from 'crypto'
 import { generateOtp, hashOtp, verifyOtp } from '@/lib/otp'
 import { validateEmailForSignup } from '@/lib/email-validator'
 import { checkOtpEmail, checkOtpIp } from '@/lib/rate-limit-upstash'
+import { getRequestIpFromHeaders } from '@/lib/request-ip'
 import { sendEmail } from '@/lib/email'
 import { buildPasswordResetOtpEmail } from '@/lib/notification-emails/templates/auth/password-reset-otp'
 import { getSession } from '@/lib/auth'
@@ -46,7 +47,9 @@ async function getRequestMeta() {
     let userAgent: string | null = null
     try {
         const h = await headers()
-        ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown-ip'
+        // [AUDIT HT-002 fix] Was x-forwarded-for[0] — same checkOtpIp bucket as password reset,
+        // same bypass.
+        ip = await getRequestIpFromHeaders()
         userAgent = h.get('user-agent')
     } catch { /* edge */ }
     return { ip, userAgent }

@@ -62,7 +62,17 @@ export async function computeWorkspaceFinance(
     // ignores the include (only sums numbers).
     const [completedTasks, allTasks] = await Promise.all([
         wsPrisma.task.findMany({
-            where: { status: 'Hoàn tất' },
+            // [AUDIT SWEEP-2026-07-30 fix] `isArchived: false` — quyết định của chủ dự án
+            // (2026-07-30): task ĐÃ LƯU TRỮ không tính là tiền đã kiếm.
+            // Trước đây tập "thực tế" đếm MỌI task 'Hoàn tất' kể cả đã lưu trữ, còn tập "dự kiến"
+            // (allTasks bên dưới) lại loại task lưu trữ ⇒ "thực tế" KHÔNG phải tập con của "dự kiến":
+            // lưu trữ một task đã hoàn tất làm nó biến mất khỏi dự kiến nhưng vẫn tính vào thực tế,
+            // nên thực tế có thể LỚN HƠN dự kiến và `pendingCount` (= allTasks - completedTasks) ra
+            // SỐ ÂM. Năm trang tiền đều đọc con số này.
+            // ⚠️ HỆ QUẢ KHI PHÁT HÀNH: con số "thực tế" trên dashboard sẽ GIẢM ngay, đúng bằng tổng
+            // doanh thu các task đang ở trạng thái lưu-trữ-và-hoàn-tất. Đây là số ĐÚNG, không phải
+            // mất dữ liệu.
+            where: { status: 'Hoàn tất', isArchived: false },
             include: { assignee: { select: { id: true, username: true, role: true, nickname: true, displayName: true } } },
             orderBy: { updatedAt: 'desc' },
         }),

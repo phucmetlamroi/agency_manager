@@ -47,11 +47,23 @@ export async function toggleMarketplace(workspaceId: string) {
 
     const workspace = await prisma.workspace.findUnique({
         where: { id: workspaceId },
-        select: { marketplaceOpen: true }
+        select: { marketplaceOpen: true, profileId: true }
     })
     if (!workspace) return { error: 'Workspace không tồn tại' }
 
     const newStatus = !workspace.marketplaceOpen
+
+    // [BILLING P6] ĐĂNG task lên chợ = tính năng gói (MARKETPLACE_PUBLISH, Studio trở lên).
+    // Chỉ gate chiều MỞ — đóng chợ thì gói nào cũng được (không ai bị nhốt trong trạng thái mở).
+    // NHẬN task từ chợ vẫn tự do cho mọi gói (plans.ts ghi rõ).
+    if (newStatus && workspace.profileId) {
+        const { requireFeature, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        try { await requireFeature(workspace.profileId, 'MARKETPLACE_PUBLISH') } catch (e) {
+            const msg = billingErrorMessage(e)
+            if (msg) return { error: msg }
+            throw e
+        }
+    }
     await prisma.workspace.update({
         where: { id: workspaceId },
         data: { marketplaceOpen: newStatus }

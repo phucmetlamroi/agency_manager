@@ -157,7 +157,14 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
             // Update Task Status
             const updateData = {
                 status: newStatus,
-                ...(newNotes ? { notes_vi: newNotes } : {}),
+                // [AUDIT SWEEP-2026-07-30 · H2 fix — NGUỒN của lỗ XSS] `notes_vi` là brief nội bộ và
+                // theo `update-task-details.ts` nó là cột CHỈ ADMIN được ghi. Nhưng đây là đường ghi
+                // duy nhất KHÔNG role-gate: tham số `newNotes` đi thẳng vào DB, không lọc, và không
+                // một UI nào trong repo truyền nó vào (mã chết trên giao diện, nhưng server action là
+                // POST endpoint gọi trực tiếp được). Kết hợp với công tắc "kế thừa ghi chú" của Velox,
+                // đó chính là cách HTML của một MEMBER tới được ô xem trước trong phiên ADMIN.
+                // Gác bằng đúng vị từ mà chính hàm này đã dùng cho các chốt khác.
+                ...(newNotes && isWorkspaceAdmin ? { notes_vi: newNotes } : {}),
                 ...deadlineUpdate,
                 ...poolReset,
                 ...archiveUpdate,
@@ -232,13 +239,22 @@ export async function updateTaskStatus(id: string, newStatus: string, workspaceI
         const isUserStart = newStatus === 'Đang thực hiện'
             && isAssignee
             && (oldStatus === 'Nhận task' || oldStatus === 'Đã nhận task')
-        const isUserDelivery = newStatus === 'Revision'
+        // [Đồng bộ nộp bài 2026-08-04] Editor nộp bài giờ đáp xuống 'Đã nộp video (nội bộ)' (A2)
+        // — CÙNG ô với đường up video (F7 Mux READY), vì Tệp đã khoá upload nên link là đường
+        // giao duy nhất. Giữ 'Revision' trong điều kiện này cho các bản ghi/tab cũ và cho bất kỳ
+        // client cũ nào còn gửi status đó: cả hai đều phải bắn email + thông báo GĐ4 cho quản lý,
+        // nếu không thì đổi trạng thái xong quản lý KHÔNG biết là có bài mới.
+        const SUBMIT_STATUSES = ['Đã nộp video (nội bộ)', 'Revision']
+        const isUserDelivery = SUBMIT_STATUSES.includes(newStatus)
             && isAssignee
             && oldStatus === 'Đang thực hiện'
             && !!updatedTaskResult.productLink?.trim()
         // [Sprint P audit-fix] Add `!isAssignee` — không gửi taskFeedback email
         // cho user khi chính user là actor (admin reject ≠ user self-action).
-        const isAdminResume = newStatus === 'Đang thực hiện' && oldStatus === 'Revision' && !isAssignee
+        // [Đồng bộ nộp bài 2026-08-04] Bài nộp giờ nằm ở A2, nên "quản lý trả bài về làm tiếp"
+        // là A2 → Đang thực hiện, không còn chỉ Revision → Đang thực hiện. Thiếu vế này thì
+        // editor offline KHÔNG nhận email nào khi bài bị trả — chỉ có thông báo trong app.
+        const isAdminResume = newStatus === 'Đang thực hiện' && SUBMIT_STATUSES.includes(oldStatus) && !isAssignee
         const isAdminReject = newStatus === 'Revision' && !isUserDelivery && !isAssignee
         const isComplete = newStatus === 'Hoàn tất'
 

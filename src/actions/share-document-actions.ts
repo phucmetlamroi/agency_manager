@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { limitDb } from '@/lib/review/rate-limit-db'
 import { audit } from '@/lib/audit-log'
 import { clientLabelOf, isClientDeliveredPhase } from '@/lib/portal-derive'
+import { SALARY_COMPLETED_STATUS } from '@/lib/task-statuses'
 import { buildMediaLinks } from '@/lib/review/media-links'
 import { presignGetObject } from '@/lib/review/r2'
 import { findClientReviewSlugs, getOrCreateClientReviewSlug } from '@/lib/review/shares'
@@ -160,7 +161,7 @@ async function buildClientDocuments(
     // Videos in scope that have not reached the client at all. Computed once, up here,
     // so EVERY return below reports the same number — an empty state that contradicts
     // the populated one is how a client concludes the system is lying.
-    const inProgressCount = scopedTasks.filter(
+    let inProgressCount = scopedTasks.filter(
         (t) => !visibleTaskIds.includes(t.id) && t.status !== 'Đã hủy',
     ).length
 
@@ -396,6 +397,38 @@ async function buildClientDocuments(
                     reviewUrl = null
                 }
             }
+        }
+
+        /* [Báo cáo chủ sản phẩm 2026-08-03 · R5] "vào file master vẫn hiện đủ 2 video, bấm vào
+           không thể xem, mà chỉ có thể download. Nếu như vậy nó sẽ sai — khách hàng phải xem
+           trước và phải duyệt thì mới nên download."
+
+           Ông ấy tìm ra một lỗ THẬT. Hai bề mặt của cùng một bản cắt đang nói ngược nhau:
+             • Bảng duyệt /r/ ĐÃ bị thu hồi khi bản cắt mới lên (revokeClientExposureOnNewVersion),
+               và getOrCreateClientReviewSlug từ chối đúc lại — đúng theo R5.
+             • Tệp & bản gốc thì vẫn phát HEAD của kho phiên bản, tức là chính bản cắt vừa bị giấu.
+           Kết quả: khách KHÔNG xem được nhưng VẪN tải được nguyên bản master chưa ai duyệt —
+           đảo ngược đúng thứ tự mà R5 tồn tại để bảo vệ.
+
+           Chỉ chặn đúng ô đó, không rộng hơn:
+             • video (ảnh không có bảng duyệt),
+             • đã lên Mux (muxPlaybackId có mặt ⇒ ta ĐÃ thử tra bảng duyệt; null nghĩa là Mux hỏng,
+               đó là hàng đã giao thật, không được giấu),
+             • bảng duyệt trả null ⇒ công tắc ngắt đã bật,
+             • task CHƯA 'Hoàn tất' ⇒ việc đã nghiệm thu thì khách giữ trọn thư viện, y như cũ.
+           Bản cắt bị giữ lại được đếm vào inProgressCount nên trạng thái rỗng vẫn nói thật, thay
+           vì im lặng làm file biến mất — đúng nỗi lo "stuff is going missing". Admin bấm
+           "Duyệt & gửi khách" là nó quay lại ngay. */
+        const ownerTask = asset.taskId ? scopedTaskById.get(asset.taskId) : null
+        const heldForApproval =
+            asset.mediaKind === 'VIDEO' &&
+            !!version.muxPlaybackId &&
+            reviewUrl === null &&
+            !!ownerTask &&
+            ownerTask.status !== SALARY_COMPLETED_STATUS
+        if (heldForApproval) {
+            inProgressCount += 1
+            continue
         }
 
         const resolvedClientId = typeof clientId === 'number' && Number.isFinite(clientId) ? clientId : null

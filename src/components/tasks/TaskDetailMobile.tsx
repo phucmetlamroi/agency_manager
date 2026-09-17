@@ -11,6 +11,8 @@ import React, { useEffect, useState } from "react"
 import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { REVIEW_STATUS_MAP } from "@/lib/review/status-map"
+import { failureMessage, isNetworkFailure } from "@/lib/ui/action-feedback"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
@@ -154,7 +156,7 @@ export function TaskDetailMobile({
             const res = await saveHookGraph(task.id, editGraph)
             if ('error' in res) toast.error(res.error || 'Không lưu được Multi-Hook Map.')
             else { setHookGraph(editGraph); setEditingMap(false); toast.success('Đã lưu Multi-Hook Map.') }
-        } catch { toast.error('Lưu Multi-Hook Map thất bại.') } finally { setSavingMap(false) }
+        } catch (e) { toast.error(failureMessage(e, 'Lưu Multi-Hook Map thất bại.')) } finally { setSavingMap(false) }
     }
 
     /* ── Single-task save (mobile detail has no bulk mode) ── */
@@ -209,14 +211,24 @@ export function TaskDetailMobile({
             !isAdmin && !!currentUserId && localTask.assigneeId === currentUserId && localTask.status === 'Đang thực hiện'
         if (shouldAutoSubmit) {
             try {
-                const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
+                // [Đồng bộ nộp bài 2026-08-04] Xem chú thích cùng chỗ ở TaskDetailModal: link và
+                // video cùng đáp xuống 'Đã nộp video (nội bộ)' (A2); server vẫn xoá deadline
+                // (A2 thuộc STATUS_REQUIRES_NULL_DEADLINE) nên state phải theo cho khỏi lệch.
+                const res = await updateTaskStatus(localTask.id, REVIEW_STATUS_MAP.submitted, workspaceId)
                 if (res?.success) {
-                    toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
-                    setLocalTask((prev) => ({ ...prev, status: 'Revision', deadline: null }))
+                    toast.success('Đã nộp bài — task chuyển sang “Đã nộp video (nội bộ)”, quản lý sẽ duyệt. Deadline đã tạm dừng.')
+                    setLocalTask((prev) => ({ ...prev, status: REVIEW_STATUS_MAP.submitted, deadline: null }))
                 } else {
                     toast.error(res?.error || 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
                 }
-            } catch { toast.error('Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.') }
+            } catch (e) {
+                // Xem chú thích cùng lỗi ở TaskDetailModal: link đã nằm trong DB, đừng nói "chưa lưu".
+                toast.error(
+                    isNetworkFailure(e)
+                        ? 'Link đã lưu. Mất kết nối nên chưa chuyển status — thử lại khi có mạng.'
+                        : 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.',
+                )
+            }
         }
         setSavingCard(false)
     }
@@ -286,7 +298,7 @@ export function TaskDetailMobile({
             } else {
                 toast.error(res?.error || 'Không thể bắt đầu task. Vui lòng thử lại.')
             }
-        } catch { toast.error('Không thể bắt đầu task. Vui lòng thử lại.') } finally { setStarting(false) }
+        } catch (e) { toast.error(failureMessage(e, 'Không thể bắt đầu task. Vui lòng thử lại.')) } finally { setStarting(false) }
     }
 
     const statusInfo = getStatusInfo(localTask.status)

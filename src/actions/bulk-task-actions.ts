@@ -4,9 +4,12 @@ import { prisma } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { parseVietnamDate } from '@/lib/date-utils'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
+import { sanitizeExternalUrl } from '@/lib/safe-url'
 import { createNotificationInternal } from './notification-actions'
 import { broadcastNotificationToUser } from '@/lib/notification-broadcast'
 import { enforceAssigneeStatusInvariant, enforceStatusDeadlineInvariant, STATUS_REQUIRES_NULL_DEADLINE } from '@/lib/task-invariants'
+import { resolvePayrollCycle, getPaidAssigneeIds } from '@/lib/payroll-lock'
 
 type BatchTaskInput = {
     titles: string[]
@@ -64,8 +67,12 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
 
         // Get current profile ID for isolation
         const { user } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-        // Authorization checked above
-        const currentProfileId = (user as any)?.sessionProfileId
+        // [PHẢN BIỆN 2026-07-30 · CS-4] Phạm vi dữ liệu lấy từ profile CỦA WORKSPACE — cùng nguồn
+        // cổng vừa chấm — chứ KHÔNG từ claim `sessionProfileId`. Với claim, hàm này ghi được N hàng
+        // Task đóng dấu profile của tenant khác, và bắn `createNotificationInternal` một lần MỖI
+        // tiêu đề (do kẻ tấn công soạn) vào chuông của editor thuộc tenant đó. Guard `!currentProfileId`
+        // ngay dưới đã fail-closed sẵn — chỉ đầu vào của nó là sai.
+        const currentProfileId = await resolveWorkspaceProfileId(workspaceId)
 
         // [Sprint T] GUARD: workspaceId + profileId BẮT BUỘC phải có để tránh
         // orphan tasks (root cause của bug "task bị ẩn khỏi admin workspace").
@@ -76,8 +83,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             return { error: 'Lỗi nội bộ: workspaceId thiếu — task không thể tạo orphan.' }
         }
         if (!currentProfileId || typeof currentProfileId !== 'string') {
-            console.error('[createBatchTasks] BLOCK: profileId missing from session', { workspaceId, userId: (user as any)?.id })
-            return { error: 'Lỗi nội bộ: profileId thiếu — vui lòng chọn lại profile rồi thử lại.' }
+            console.error('[createBatchTasks] BLOCK: workspace chưa gắn profileId', { workspaceId, userId: (user as any)?.id })
+            return { error: 'Workspace này chưa gắn Profile — không thể tạo task. Báo quản trị viên.' }
         }
 
         // [QA R2 fix] Pre-validate the (single, shared) assignee exists so a stale id
@@ -94,7 +101,7 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
             // [AUDIT R14 — fix] The assignee must belong to THIS workspace's profile —
             // don't let an admin glue a batch of tasks to a foreign-tenant user.
             const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
-            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId, currentProfileId)
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId)
             if (!assigneeAllowed) {
                 return { error: 'Editor được chọn không thuộc workspace/profile này. Hãy mời họ vào workspace trước khi giao việc.' }
             }
@@ -145,7 +152,8 @@ export async function createBatchTasks(data: BatchTaskInput, workspaceId: string
                         // Additional fields
                         fileLink: data.fileLink || null,
                         submissionFolder: data.submissionFolder || null,
-                        productLink: data.productLink || null,
+                        // [AUDIT HT-031 fix] lọc scheme trước khi lưu.
+                        productLink: sanitizeExternalUrl(data.productLink) || null,
                         frameUsername: data.frameUsername || null,
                         framePassword: data.framePassword || null,
                         frameNote: data.frameNote || null,
@@ -262,7 +270,8 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         if ('references' in data) updateData.references = data.references || null
         if ('notes' in data) updateData.notes_vi = data.notes || null
         if ('notes_en' in data) updateData.notes_en = data.notes_en || null
-        if ('productLink' in data) updateData.productLink = data.productLink || null
+        // [AUDIT HT-031 fix] lọc scheme trước khi lưu.
+        if ('productLink' in data) updateData.productLink = sanitizeExternalUrl(data.productLink) || null
         if ('deadline' in data) updateData.deadline = data.deadline ? parseVietnamDate(data.deadline) : null
         if ('jobPriceUSD' in data) updateData.jobPriceUSD = data.jobPriceUSD
         if ('value' in data) updateData.value = data.value
@@ -275,10 +284,103 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
             return { error: 'Không có field nào được chỉnh' }
         }
 
+        // [PHẢN BIỆN CS 2026-07-31 · CS4-1] CỬA GÁN VIỆC THỨ TƯ — TRƯỚC ĐÂY KHÔNG CÓ CHỐT R14.
+        //
+        // Hàm này ghi thẳng `assigneeId` từ tham số mà không hỏi người đó có thuộc profile của
+        // workspace không, trong khi 3 đường còn lại (createTask, createTasksFromBatch,
+        // bulkAssignTasks) đều có chốt. Đợt vá CS-4 sửa nguồn profileId ngay trong file này mà
+        // không thấy cửa này — đúng lỗi lặp lại của cả chiến dịch: vá chỗ mình đang nhìn, không rà
+        // hết các cửa cùng loại.
+        //
+        // Khai thác không cần lỗ hổng nào khác: kẻ tấn công tự tạo profile B + workspace W_B (hợp
+        // lệ, hắn là OWNER), tạo lô task với tiêu đề do hắn soạn, gán cho userId của nạn nhân ở
+        // tenant khác, rồi đẩy status sang 'Hoàn tất'. Hệ thống gửi email digest tới ĐỊA CHỈ THẬT
+        // của nạn nhân, xưng đúng tên họ, nội dung là chuỗi tiêu đề của kẻ tấn công, gửi từ tên
+        // miền HustlyTasker. Hàng Task mang assigneeId của nạn nhân còn lọt vào truy vấn lương của
+        // workspace lạ.
+        //
+        // Dùng khuôn của `bulkAssignTasks` trong chính file này, đặt TRƯỚC transaction.
+        //
+        // 📌 Ghi chú lịch sử: bản vá CS4-R1 từng thêm ở đây một chốt THẺ ĐỎ (Rank D) nữa. Chốt đó
+        // đã bị gỡ ngày 2026-07-31; phần còn lại của khuôn — chốt R14 — vẫn nguyên.
+        if ('assigneeId' in data && data.assigneeId) {
+            const { isAssigneeInWorkspaceProfile } = await import('@/lib/workspace-membership')
+            const assigneeAllowed = await isAssigneeInWorkspaceProfile(data.assigneeId, workspaceId)
+            if (!assigneeAllowed) {
+                return { error: 'Editor được chọn không thuộc workspace/profile này.' }
+            }
+            // [GỠ THẺ ĐỎ 2026-07-31] Chốt Rank D đã bị gỡ khỏi mọi cửa giao việc theo quyết định
+            // của chủ dự án — xem chú thích ở `task-management-actions.ts` (nhánh ASSIGN TO USER)
+            // để biết đủ danh sách và những gì được giữ lại.
+            // Chốt R14 phía trên (người được giao phải thuộc profile của workspace) GIỮ NGUYÊN: đó là
+            // hàng rào tenant, không phải luật thưởng-phạt.
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────────────
+        // [AUDIT SWEEP-2026-07-30 fix] SỬA TIỀN HÀNG LOẠT — HAI KHIẾM KHUYẾT CÙNG CHỖ.
+        //
+        // (1) Đường một-task (update-task-details.ts) có chốt "kỳ lương đã đóng"; đường này KHÔNG
+        //     có một truy vấn Payroll nào. Cùng một nút bấm trên giao diện, chỉ khác số dòng được
+        //     tick, mà một đường bị chặn còn đường kia ghi thẳng vào kỳ đã trả lương.
+        // (2) Nó ghi `value` nhưng KHÔNG ghi `wageVND`/`profitVND`, trong khi đường một-task đồng bộ
+        //     cả ba (`wageVND = value`, profit tính lại). Bảng Tài chính đọc `wageVND ?? value` nên
+        //     chi phí/lợi nhuận đứng ở số CŨ vĩnh viễn, còn bảng lương đã dùng số MỚI. Hai cột tiền
+        //     lệch nhau ngay sau một lần sửa lô — và `wageVND` được ghi ngay lúc TẠO task nên
+        //     chênh lệch là chắc chắn, không phải giả định.
+        //
+        // Quyết định của chủ dự án (2026-07-30): BỎ QUA task thuộc kỳ đã đóng, ghi phần còn lại, và
+        // trả về danh sách bị bỏ để giao diện nói rõ. Không huỷ cả lô — biến chốt thành vật cản là
+        // cách người ta đi tìm đường lách.
+        const touchesMoney = 'jobPriceUSD' in data || 'value' in data
+        const cycle = touchesMoney ? await resolvePayrollCycle(workspaceId) : null
+        const paidAssigneeIds =
+            touchesMoney && cycle && !cycle.isLocked
+                ? await getPaidAssigneeIds(workspaceId, cycle.month, cycle.year)
+                : new Set<string>()
+        const skippedTitles: string[] = []
+
+        // [AUDIT SWEEP-2026-07-30 — TỰ SỬA BẢN VÁ CỦA CHÍNH TÔI] Vòng vá tiền trước đó đặt một
+        // `tx.task.findUnique` cho TỪNG task BÊN TRONG `prisma.$transaction`. `src/lib/db.ts` KHÔNG
+        // set `transactionOptions`, nên Prisma dùng mặc định timeout 5s / maxWait 2s: một lô lớn =
+        // N round-trip tuần tự trong đúng 5 giây đó, và khi vượt thì P2028 làm rollback TOÀN BỘ lô —
+        // người dùng thấy "sửa hàng loạt thất bại" mà không biết vì sao. Đó chính là rủi ro sổ kiểm
+        // toán đã cảnh báo cho mục BULK-WAGE-DESYNC, và tôi vẫn dựng lại nó.
+        // Nay nạp MỘT lần trước transaction; trong transaction chỉ tra Map trong bộ nhớ.
+        const moneyRows = touchesMoney
+            ? await prisma.task.findMany({
+                  where: { id: { in: taskIds }, workspaceId },
+                  select: {
+                      id: true, assigneeId: true, title: true,
+                      jobPriceUSD: true, value: true, exchangeRate: true,
+                  },
+              })
+            : []
+        const moneyById = new Map(moneyRows.map((r) => [r.id, r]))
+
         // Bump version + commit in transaction
         await prisma.$transaction(async (tx) => {
             for (const id of taskIds) {
                 let taskUpdateData = { ...updateData }
+
+                if (touchesMoney && cycle) {
+                    const money = moneyById.get(id)
+                    if (!money) continue
+                    const blocked =
+                        cycle.isLocked ||
+                        (money.assigneeId ? paidAssigneeIds.has(money.assigneeId) : false)
+                    if (blocked) {
+                        skippedTitles.push(money.title)
+                        continue
+                    }
+                    // Đồng bộ y hệt đường một-task để hai cột tiền không lệch.
+                    const newJobPriceUSD =
+                        'jobPriceUSD' in data ? data.jobPriceUSD : (money.jobPriceUSD || 0)
+                    const newValue = 'value' in data ? data.value : (money.value || 0)
+                    const rate = money.exchangeRate || 26300
+                    taskUpdateData.wageVND = newValue
+                    taskUpdateData.profitVND =
+                        (Number(newJobPriceUSD) * Number(rate)) - Number(newValue)
+                }
 
                 // [Z+1.fix8] Enforce assigneeId ↔ status invariant per-task.
                 // Chỉ fetch current task khi assigneeId thay đổi (zero overhead cho edit thường).
@@ -330,7 +432,14 @@ export async function bulkUpdateTaskDetails(taskIds: string[], data: any, worksp
         revalidatePath(`/${workspaceId}/admin/queue`)
         revalidatePath(`/${workspaceId}/admin`)
         revalidatePath(`/${workspaceId}/dashboard`)
-        return { success: true, count: taskIds.length }
+        // [AUDIT SWEEP fix] `count` nay là số task THẬT SỰ được ghi, không phải số task được tick —
+        // nếu vẫn trả taskIds.length thì người dùng được báo "đã sửa 20 task" trong khi 3 task bị
+        // chốt kỳ lương chặn, tức giao diện nói dối về một thao tác chạm tiền.
+        return {
+            success: true,
+            count: taskIds.length - skippedTitles.length,
+            skippedPayrollLocked: skippedTitles,
+        }
     } catch (error: any) {
         console.error("Bulk Update Error:", error)
         if (error?.message?.startsWith('SECURITY_VIOLATION')) {
@@ -485,7 +594,7 @@ export async function bulkUpdateTaskStatus(
     newStatus: string,
     workspaceId: string,
 ): Promise<
-    | { success: true; count: number; rejectedCount: number; emailsSent: number }
+    | { success: true; count: number; rejectedCount: number; emailsSent: number; staleCount: number }
     | { error: string }
 > {
     if (!taskIds || taskIds.length === 0) return { error: 'No tasks selected' }
@@ -548,10 +657,47 @@ export async function bulkUpdateTaskStatus(
             updateData.isArchived = true
         }
 
-        await prisma.task.updateMany({
-            where: { id: { in: validTasks.map((t) => t.id) }, workspaceId },
-            data: updateData,
+        // [AUDIT SWEEP-2026-07-30 fix] GHI ĐÈ MÙ. Trước đây hàm đọc `t.status` của từng task, kiểm
+        // FSM trên giá trị đó, rồi ghi bằng MỘT `updateMany` KHÔNG mang theo điều kiện nào về status
+        // đã đọc. Bất kỳ thay đổi xảy ra giữa lúc đọc và lúc ghi đều bị xoá âm thầm — và 'Hoàn tất'
+        // là status tính lương, nên "âm thầm" ở đây đụng tiền.
+        //
+        // Vá bằng so-sánh-rồi-đặt (compare-and-set) trên chính trường đang đổi, KHÔNG dùng
+        // `version` predicate: đường một-task cũng không bật lock (tham số opt-in, đa số nơi gọi bỏ
+        // trống), nên siết `version` chỉ ở đây sẽ làm hai đường lệch hành vi. Gom theo status đã đọc
+        // để vẫn chỉ vài truy vấn thay vì N.
+        const idsByReadStatus = new Map<string, string[]>()
+        for (const t of validTasks) {
+            const arr = idsByReadStatus.get(t.status) ?? []
+            arr.push(t.id)
+            idsByReadStatus.set(t.status, arr)
+        }
+        for (const [fromStatus, ids] of idsByReadStatus) {
+            await prisma.task.updateMany({
+                where: { id: { in: ids }, workspaceId, status: fromStatus },
+                data: updateData,
+            })
+        }
+
+        // Chỉ những task ĐÃ ghi được mới đi vào nhật ký + email. Nếu vẫn dùng `validTasks` thì hệ
+        // thống gửi email "task đã đổi trạng thái" cho một thay đổi không hề xảy ra.
+        const appliedRows = await prisma.task.findMany({
+            where: { id: { in: validTasks.map((t) => t.id) }, workspaceId, status: newStatus },
+            select: { id: true },
         })
+        const appliedIds = new Set(appliedRows.map((r) => r.id))
+        const staleCount = validTasks.length - appliedIds.size
+        // Lọc TẠI CHỖ có chủ đích: mọi đoạn phía dưới (audit, digest email, số trả về) đều đọc
+        // `validTasks`, nên lọc ở đây là cách duy nhất đảm bảo không sót một nơi nào.
+        const applied = validTasks.filter((t) => appliedIds.has(t.id))
+        validTasks.length = 0
+        validTasks.push(...applied)
+
+        if (validTasks.length === 0) {
+            return {
+                error: `Không task nào được cập nhật — ${staleCount} task đã bị người khác đổi trạng thái trong lúc bạn đang chọn. Hãy tải lại và thử lại.`,
+            }
+        }
 
         // Audit log per-task (forensics) + 1 entry tổng
         try {
@@ -653,6 +799,8 @@ export async function bulkUpdateTaskStatus(
             count: validTasks.length,
             rejectedCount: rejectedIds.length,
             emailsSent,
+            // [AUDIT SWEEP fix] Số task bị người khác đổi trạng thái giữa lúc đọc và lúc ghi.
+            staleCount,
         }
     } catch (error: any) {
         console.error('Bulk Update Status Error:', error)
@@ -679,14 +827,20 @@ export async function bulkAssignTasks(taskIds: string[], assigneeId: string | nu
         const notifications: any[] = []
 
         if (cleanAssigneeId) {
-            // Check Rank D
-            const latestRank = await prisma.monthlyRank.findFirst({
-                where: { userId: cleanAssigneeId, workspaceId },
-                orderBy: { createdAt: 'desc' }
-            })
-            if (latestRank && latestRank.rank === 'D') {
-                return { error: 'Kh\u00f4ng th\u1ec3 giao Task: Nh\u00e2n s\u1ef1 \u0111ang b\u1ecb C\u1ea3nh c\u00e1o \u0110\u1ecf (Rank D).' }
-            }
+            // [RED CARD REMOVED / GO THE DO 2026-07-31] Chot Rank D da bi go o day va o moi cua
+            // giao viec khac. Xem chu thich day du o `task-management-actions.ts` (nhanh ASSIGN TO
+            // USER): no liet ke con lai nhung gi va nhac dung cam lai mot minh mot ben.
+            //
+            // Viet KHONG DAU o day la co y. File nay TRON hai loi ghi ky tu ngoai ASCII trong
+            // comment: co dong ghi THO va doc binh thuong (dong 802), co dong ghi bang escape
+            // \uXXXX (dong ngay ben duoi, "AUDIT R14"). Escape chi duoc giai ma trong chuoi va
+            // dinh danh, KHONG duoc giai ma trong comment hai gach cheo -- dong nao ghi kieu do
+            // se hien ra la mot dong ky tu rac.
+            //
+            // LUU Y cho nguoi sau: KHONG phai vung nay "khong mang duoc dau". Mang duoc -- dong
+            // 802 la bang chung. Viet khong dau chi de khoi phai doan minh dang roi vao loi nao.
+            // Muon viet co dau thi cu viet, nhung kiem lai bang mat xem no co bi ghi thanh \uXXXX
+            // hay khong.
 
             // [AUDIT R14 \u2014 fix] Assignee must belong to THIS workspace's profile \u2014 don't
             // let an admin bulk-assign tasks to a foreign-tenant userId passed via RPC.

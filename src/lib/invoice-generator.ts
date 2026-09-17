@@ -2,6 +2,8 @@ import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 import handlebars from 'handlebars'
 import fs from 'fs'
+import os from 'os'
+import path from 'path'
 
 // Invoice Template (Inline for now, can move to file later)
 const INVOICE_TEMPLATE = `
@@ -200,6 +202,20 @@ export type InvoiceData = {
 
 export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
     let browser
+    // [FIX 2026-08-24 · VPS] Thư mục nhà TẠM, ghi được, riêng cho mỗi lần chạy.
+    //
+    // Sau khi rời Vercel sang VPS tự quản, xuất hóa đơn chết ngay lúc mở Chrome:
+    //   chrome_crashpad_handler: --database is required
+    // Crashpad là bộ thu thập sự cố của Chrome; nó CHẠY TRƯỚC cả khi trang được
+    // dựng, và bắt buộc phải tạo được thư mục cơ sở dữ liệu riêng dưới $HOME /
+    // $XDG_CONFIG_HOME. Tiến trình Node trên VPS thường chạy bằng tài khoản dịch
+    // vụ KHÔNG có $HOME ghi được (hoặc HOME trỏ vào chỗ chỉ đọc) ⇒ crashpad tạo
+    // thư mục thất bại ⇒ Chrome chết ⇒ Puppeteer báo "Code: null".
+    // Trên Vercel không lộ vì môi trường lambda luôn có /tmp ghi được làm HOME.
+    //
+    // Không sửa biến môi trường của CẢ tiến trình Node (ảnh hưởng thứ khác); chỉ
+    // truyền HOME/XDG riêng cho tiến trình Chrome con qua `env` của launch().
+    let chromeHome: string | null = null
 
     try {
         const compiled = handlebars.compile(INVOICE_TEMPLATE)
@@ -258,10 +274,32 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
                 executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
             }
 
+            chromeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hustly-chrome-'))
+
             browser = await puppeteer.launch({
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    // /dev/shm trên VPS/Docker thường chỉ 64MB — Chrome đổ ảnh trang
+                    // vào đó rồi chết giữa chừng với hóa đơn nhiều dòng. Ép dùng /tmp.
+                    '--disable-dev-shm-usage',
+                    // Tắt hẳn bộ thu thập sự cố: mình không đọc báo cáo sự cố của
+                    // Chrome bao giờ, mà chính nó là thứ đang chặn khởi động.
+                    '--disable-crash-reporter',
+                    '--no-first-run',
+                    `--user-data-dir=${path.join(chromeHome, 'profile')}`,
+                ],
                 executablePath: executablePath || undefined,
-                headless: true
+                headless: true,
+                // Đây mới là chỗ chữa gốc: crashpad tìm $HOME/$XDG_* để tạo thư mục
+                // cơ sở dữ liệu. Trỏ cả ba vào thư mục tạm ghi được.
+                env: {
+                    ...process.env,
+                    HOME: chromeHome,
+                    XDG_CONFIG_HOME: chromeHome,
+                    XDG_CACHE_HOME: chromeHome,
+                },
             })
         }
 
@@ -285,5 +323,14 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         throw new Error(`Failed to generate PDF: ${error.message || 'Unknown'}`)
     } finally {
         if (browser) await browser.close()
+        // Dọn thư mục tạm — mỗi lần xuất hóa đơn tạo một cái, không dọn thì /tmp
+        // phình dần cho tới khi đầy đĩa (VPS không tự xoá như lambda).
+        if (chromeHome) {
+            try {
+                fs.rmSync(chromeHome, { recursive: true, force: true })
+            } catch {
+                /* dọn hụt không được làm hỏng việc xuất hóa đơn */
+            }
+        }
     }
 }

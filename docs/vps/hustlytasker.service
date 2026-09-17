@@ -1,0 +1,61 @@
+# Trình quản lý tiến trình cho HustlyTasker trên VPS tự quản.
+#
+# Chép vào /etc/systemd/system/hustlytasker.service rồi:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hustlytasker
+#
+# VÌ SAO systemd chứ không PM2/Docker: nó có sẵn trên mọi VPS, không cài thêm gì,
+# và KHÔNG thêm/sửa một file nào trong thư mục dự án. Toàn bộ cấu hình nằm ở đây.
+#
+# Vấn đề nó giải quyết (đều là chuyện đã xảy ra thật, không phải giả thuyết):
+#   1. VPS reboot → site không tự bật lại, nằm chết tới khi có người phát hiện.
+#   2. /api/review/download-zip từng bị hệ thống giết vì hết RAM với video 964MB
+#      (xem comment đầu file route đó). Trên Vercel chỉ chết MỘT function; trên VPS
+#      đó là CÙNG MỘT tiến trình Node đang phục vụ cả website ⇒ một người tải thư
+#      mục nặng làm sập site cho tất cả mọi người.
+#   3. ssh vào chạy `npm run start` rồi thoát terminal → tiến trình chết theo.
+
+[Unit]
+Description=HustlyTasker (Next.js)
+After=network-online.target
+Wants=network-online.target
+# Chết đi chết lại quá 5 lần trong 60 giây thì dừng hẳn, để còn đọc log —
+# thay vì đốt CPU khởi động lại vô hạn với một lỗi cấu hình.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+User=hustly
+WorkingDirectory=/srv/hustlytasker
+
+Environment=NODE_ENV=production
+# TZ=UTC là CỐ Ý, không phải bỏ quên giờ Việt Nam.
+# src/lib/payroll-cycle.ts tính kỳ lương bằng giờ MÁY CHỦ. Vercel chạy UTC.
+# Đặt VPS sang giờ VN (UTC+7) sẽ dịch ranh giới tháng đi 7 tiếng — task tạo lúc
+# 23h ngày 31 rơi sang tháng sau so với hành vi cũ. UTC = giữ nguyên như Vercel.
+Environment=TZ=UTC
+
+# -H 127.0.0.1 BẮT BUỘC: không có nó Next bind 0.0.0.0, ai cũng vào thẳng
+# http://<IP-VPS>:3000 được, đi vòng qua Caddy — mất TLS và mất luôn phần
+# ghi đè X-Real-IP chống giả mạo (xem docs/vps/Caddyfile).
+ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3000
+
+# Rời Vercel là mất tích hợp tự đồng bộ Inngest. Không đăng ký lại thì hai hàm
+# review-janitor và ent-janitor (không có nguồn kích hoạt nào khác ngoài cron)
+# sẽ không tồn tại với Inngest Cloud: cron vẫn trả 200, sự kiện bay vào hư không,
+# không một dòng log nào. Dòng dưới tự lo việc đó sau MỖI lần khởi động.
+ExecStartPost=/bin/sh -c 'sleep 15; curl -fsS -X PUT https://hustlytasker.xyz/api/inngest || true'
+
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hustly
+
+# KHÔNG dùng EnvironmentFile=.env — `next start` tự đọc .env trong WorkingDirectory,
+# và MUX_SIGNING_PRIVATE_KEY dài ~2200 ký tự (khối PEM nhiều dòng) rất dễ bị
+# systemd phân tích sai thành giá trị cụt.
+
+[Install]
+WantedBy=multi-user.target

@@ -156,6 +156,17 @@ export async function resolveShareToken(
     if (!link.client || (link.client.status !== 'ACTIVE' && link.client.status !== 'MERGED')) return null
     if (!link.profile || link.profile.status !== 'ACTIVE') return null
 
+    // [BILLING P6 · D6] Agency hết cả GRACE (LOCKED) → cổng khách của HỌ đóng — khách thấy
+    // đúng màn "link không còn hiệu lực" như link bị thu hồi, không lộ chuyện tiền nong của
+    // agency cho khách của agency. GRACE (chỉ-đọc 30 ngày) portal VẪN MỞ nguyên — khách không
+    // có lỗi gì trong việc agency chậm gia hạn. Chokepoint này gác MỌI bề mặt /share/[token]
+    // (desk, documents, zip, invoice PDF) trong một chỗ. Chưa cưỡng chế = cho qua.
+    {
+        const { getEntitlements } = await import('@/lib/billing/entitlements')
+        const ent = await getEntitlements(link.profileId)
+        if (ent.enforced && ent.status === 'LOCKED') return null
+    }
+
     // Tier 2, charged only now that the token is proven real — so a random string can never
     // create a bucket row.
     //

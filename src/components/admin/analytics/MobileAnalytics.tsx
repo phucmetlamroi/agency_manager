@@ -41,8 +41,6 @@ type UserAnalytics = {
     username: string
     completedTasks: number
     totalPenalty: number
-    errorRate: number
-    rank: string
 }
 
 type MobileAnalyticsProps = {
@@ -51,37 +49,8 @@ type MobileAnalyticsProps = {
     workspaceId: string
 }
 
-/** vi-VN ratio ("0,84") — errorRate là điểm phạt / task; 2 chữ số như action tính. */
-function fmtRate(value: number): string {
-    const n = Number(value ?? 0)
-    if (!isFinite(n)) return '0'
-    return n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
-}
-
-/** Tông màu theo hạng — thang chất lượng bằng TOKEN (không hardcode hue như desktop):
- *  S/A = success · B = primary-accent · C = warning · D = destructive · else = muted. */
-function rankTone(rank: string): string {
-    switch (rank) {
-        case 'S':
-        case 'A':
-            return 'border-success/30 bg-success/10 text-success'
-        case 'B':
-            return 'border-primary/30 bg-primary/10 text-primary-accent'
-        case 'C':
-            return 'border-warning/30 bg-warning/10 text-warning'
-        case 'D':
-            return 'border-destructive/30 bg-destructive/10 text-destructive'
-        default:
-            return 'border-white/10 bg-white/5 text-muted-foreground'
-    }
-}
-
-/** Màu tỷ lệ lỗi — mirror ngưỡng desktop (<0.5 tốt · >1.5 xấu · giữa là cảnh báo). */
-function rateTone(rate: number): string {
-    if (rate < 0.5) return 'text-success'
-    if (rate > 1.5) return 'text-destructive'
-    return 'text-warning'
-}
+// [BỎ HẠNG S/A/B/C/D 2026-07-31] Xoá ba hàm `fmtRate`, `rankTone`, `rateTone` — cả ba chỉ phục vụ
+// việc hiển thị hạng và tỉ lệ lỗi. Bản di động nay bám đúng bản máy tính: chỉ còn số lỗi thô.
 
 export default function MobileAnalytics({ data, workspaceId }: MobileAnalyticsProps) {
     const staff = data ?? []
@@ -97,13 +66,13 @@ export default function MobileAnalytics({ data, workspaceId }: MobileAnalyticsPr
         const count = rows.length
         const totalTasks = rows.reduce((sum, r) => sum + Number(r.completedTasks || 0), 0)
         const totalPenalty = rows.reduce((sum, r) => sum + Number(r.totalPenalty || 0), 0)
-        const avgRate = count > 0 ? rows.reduce((sum, r) => sum + Number(r.errorRate || 0), 0) / count : 0
-        return { count, totalTasks, totalPenalty, avgRate }
+        // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ KPI `avgRate` (tỉ lệ lỗi trung bình).
+        return { count, totalTasks, totalPenalty }
     }, [rows])
 
-    // ── Danh sách: hạng nặng lỗi lên đầu (quét & mở) — mirror sort mặc định desktop (errorRate desc). ──
+    // ── Danh sách: nhiều lỗi nhất lên đầu — mirror sort mặc định desktop (totalPenalty desc). ──
     const listRows = useMemo(
-        () => [...rows].sort((a, b) => b.errorRate - a.errorRate),
+        () => [...rows].sort((a, b) => b.totalPenalty - a.totalPenalty),
         [rows],
     )
 
@@ -118,14 +87,16 @@ export default function MobileAnalytics({ data, workspaceId }: MobileAnalyticsPr
         [rows],
     )
 
-    // ── Chart 2: tỷ lệ lỗi cao nhất (top 12) — màu bar theo ngưỡng ──
+    // ── Chart 2: nhiều lỗi nhất (top 12) ──
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Biểu đồ này trước vẽ theo `errorRate` (điểm phạt / task).
+    // Nay vẽ theo `totalPenalty` — tổng số lỗi thô, cùng đại lượng với cột "Tổng Lỗi" bản máy tính.
     const errorChart = useMemo(
         () =>
             [...rows]
-                .filter((r) => r.errorRate > 0)
-                .sort((a, b) => b.errorRate - a.errorRate)
+                .filter((r) => r.totalPenalty > 0)
+                .sort((a, b) => b.totalPenalty - a.totalPenalty)
                 .slice(0, 12)
-                .map((r) => ({ name: r.name, value: r.errorRate })),
+                .map((r) => ({ name: r.name, value: r.totalPenalty })),
         [rows],
     )
 
@@ -162,11 +133,7 @@ export default function MobileAnalytics({ data, workspaceId }: MobileAnalyticsPr
                                 value={formatCompactCount(kpis.totalPenalty)}
                                 context="Tổng điểm phạt"
                             />
-                            <KpiStatCard
-                                label="Tỷ lệ lỗi TB"
-                                value={fmtRate(kpis.avgRate)}
-                                context="Trung bình / nhân sự"
-                            />
+                            {/* [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ thẻ KPI "Tỷ lệ lỗi TB". */}
                         </div>
                     </div>
 
@@ -217,11 +184,11 @@ export default function MobileAnalytics({ data, workspaceId }: MobileAnalyticsPr
                                             axisLine={false}
                                             tickLine={false}
                                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                                            tickFormatter={(v: number) => fmtRate(v)}
+                                            tickFormatter={(v: number) => formatCompactCount(v)}
                                         />
                                         <Tooltip
                                             cursor={{ fill: 'hsl(var(--foreground) / 0.04)' }}
-                                            content={<StaffTooltip unit="điểm lỗi/task" rate />}
+                                            content={<StaffTooltip unit="điểm lỗi" />}
                                         />
                                         <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={28}>
                                             {errorChart.map((d, i) => (
@@ -275,18 +242,8 @@ export default function MobileAnalytics({ data, workspaceId }: MobileAnalyticsPr
                                         </p>
                                     </div>
 
-                                    <div className="flex shrink-0 flex-col items-end gap-1">
-                                        <span
-                                            className={`inline-flex min-w-7 items-center justify-center rounded-md border px-1.5 py-0.5 text-caption font-bold ${rankTone(
-                                                r.rank,
-                                            )}`}
-                                        >
-                                            {r.rank}
-                                        </span>
-                                        <span className={`text-caption font-medium tabular-nums ${rateTone(r.errorRate)}`}>
-                                            {fmtRate(r.errorRate)}
-                                        </span>
-                                    </div>
+                                    {/* [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ cụm huy hiệu hạng + tỉ lệ lỗi bên phải mỗi dòng.
+                                        Số điểm lỗi vẫn còn, nằm ngay trên dòng phụ bên trái. */}
 
                                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                                 </Link>
@@ -304,15 +261,16 @@ function StaffTooltip({
     active,
     payload,
     unit,
-    rate = false,
-}: TooltipProps<ValueType, NameType> & { unit: string; rate?: boolean }) {
+}: TooltipProps<ValueType, NameType> & { unit: string }) {
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ cờ `rate` — không còn biểu đồ nào vẽ theo tỉ lệ, cả hai
+    // biểu đồ nay đều là số đếm (task hoàn tất / điểm lỗi) nên dùng chung một cách định dạng.
     if (!active || !payload || !payload.length) return null
     const p = payload[0].payload as { name: string; value: number }
     return (
         <div className="glass-3 rounded-xl border border-white/10 px-3 py-2 shadow-2xl">
             <p className="mb-0.5 max-w-[200px] truncate text-caption text-muted-foreground">{p.name}</p>
             <p className="font-mono text-body-sm font-bold tabular-nums text-foreground">
-                {rate ? fmtRate(p.value) : formatCompactCount(p.value)} {unit}
+                {formatCompactCount(p.value)} {unit}
             </p>
         </div>
     )

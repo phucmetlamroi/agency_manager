@@ -1,7 +1,23 @@
 // [Review module] GET /api/review/download-zip?folders=<ids>&assets=<ids>
-// Streams a single .zip of the selected Team "Tệp" items straight from R2 — no server buffering,
-// nothing re-encoded (STORE method → lossless; a zip never reduces video quality, it just bundles
-// many files into one download). Replaces the old "download each file one-by-one" behaviour.
+//
+// ⚠️ [sự cố 2026-07-29] ĐỌC TRƯỚC KHI MỞ RỘNG ĐƯỜNG NÀY.
+// Câu "no server buffering … bounded memory even for multi-GB folders" ở bản trước là SAI, và
+// nó khiến lỗi lọt tới tận production. Sự thật: byte phải chui qua function, nên bộ nhớ function
+// tiêu tốn = (byte ĐỌC được từ R2) − (byte trình duyệt ĐÃ NHẬN). R2 đọc rất nhanh, mạng người
+// dùng thì không, nên hiệu số đó phình lên xấp xỉ kích thước file. Vòng `await entryDone` bên
+// dưới chỉ chặn giữa CÁC file — bên trong MỘT file thì không có gì ghìm cả.
+// Log production đã chứng minh: "instance was killed because it ran out of available memory"
+// trên chính route này, với một video 964 MB. Bị giết thì KHÔNG có phản hồi HTTP nào — trình
+// duyệt treo request, người dùng thấy vòng xoay quay vĩnh viễn và không hiểu vì sao.
+//
+// Vì vậy: ASSET KHÔNG còn đi qua đây nữa (TeamBrowser tải thẳng từ R2 bằng URL ký sẵn — 0 MB RAM).
+// Đường này giờ chỉ còn phục vụ TẢI CẢ THƯ MỤC, và vẫn mang đúng rủi ro trên. Đã nâng memory lên
+// 3009 MB trong vercel.json để mua thêm khoảng thở, nhưng ĐÓ LÀ GIẢM NHẸ, KHÔNG PHẢI CHỮA KHỎI:
+// một thư mục đủ lớn vẫn giết được function. Cách chữa thật là đừng proxy byte — trả về danh sách
+// URL ký sẵn cho client tự tải, hoặc dựng zip bằng job nền. Chưa làm.
+//
+// Nothing is re-encoded (STORE method → lossless; a zip never reduces video quality, it just
+// bundles many files into one download).
 //   • a folder → the whole subtree, relative paths preserved
 //   • assets   → each asset's current READY version
 // Auth + FR-03 folder scope are enforced by collectZipFiles (reuses getFolderManifest / assertAssetInScope).

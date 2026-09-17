@@ -91,6 +91,16 @@ export default function UserHomeTopBar({
         return () => clearTimeout(handler)
     }, [searchValue])
 
+    // [kiểm toán 2026-07 · S2-6] Chiều ngược lại: nút "Xóa bộ lọc" ở trạng thái rỗng của
+    // bảng task nằm trong MỘT component khác, mà ô nhập lại sống ở đây. Không có đường về
+    // này thì bấm xóa sẽ lọc lại bảng nhưng chữ vẫn nằm nguyên trong ô tìm kiếm — người
+    // dùng thấy hai thứ nói ngược nhau.
+    useEffect(() => {
+        function clear() { setSearchValue("") }
+        window.addEventListener("user-home-search-clear", clear)
+        return () => window.removeEventListener("user-home-search-clear", clear)
+    }, [])
+
     const handleProfileSwitch = async (newProfileId: string) => {
         if (newProfileId === currentProfileId || switching) return
         setSwitching(true)
@@ -169,6 +179,10 @@ export default function UserHomeTopBar({
                                     color: "#FFFFFF",
                                     fontSize: 13,
                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                    // See UserWorkflowTabs' twin field: a borderless input is only as
+                                    // tall as its font, which put the real pointer target under the
+                                    // WCAG 2.2 SC 2.5.8 24px floor despite the roomy pill around it.
+                                    minHeight: 24,
                                 }}
                             />
                         </div>
@@ -273,7 +287,7 @@ export default function UserHomeTopBar({
                                     <p
                                         className="mb-1 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest"
                                         style={{
-                                            color: "#71717A",
+                                            color: "#878790",
                                             fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         }}
                                     >
@@ -341,7 +355,7 @@ export default function UserHomeTopBar({
                                                             </span>
                                                             <span
                                                                 className="truncate text-[11px]"
-                                                                style={{ color: "#71717A" }}
+                                                                style={{ color: "#878790" }}
                                                             >
                                                                 {isActive ? "Đang hoạt động" : "Chuyển sang tổ chức này"}
                                                             </span>

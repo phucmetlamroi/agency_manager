@@ -28,10 +28,12 @@ function displayName(user: { username: string; displayName?: string | null; nick
     return user.displayName?.trim() || user.username
 }
 
-function rankFlag(entity: any): string | null {
-    const r = entity?.monthlyRanks?.[0]?.rank
-    return r === 'C' ? 'bg-yellow-500' : r === 'D' ? 'bg-red-500' : null
-}
+// [BỎ HẠNG S/A/B/C/D 2026-07-31] Xoá `rankFlag` + `rankFlagTitle` và chấm màu vàng/đỏ trên avatar.
+//
+// Lịch sử ngắn để người sau khỏi dựng lại: chấm này đọc `monthlyRanks[0].rank`, vàng cho hạng C và
+// đỏ cho hạng D. Khi luật thẻ đỏ còn hiệu lực nó là chỉ dấu của một lệnh cấm có thật. Gỡ luật xong,
+// nó thành một dấu hiệu thị giác không dẫn tới hậu quả nào — mà lại nằm ngay TRONG danh sách chọn
+// người giao việc, nên vẫn khiến người giao tự né. Nay bỏ luôn cả hạng lẫn chấm.
 
 export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspaceId, onSelectionCleared }: AssigneeCellProps) {
     const router = useRouter()
@@ -131,25 +133,24 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
             onSelectionCleared?.()
             router.refresh()
         } else {
-            toast.error("Giao task thất bại")
+            // [GỠ THẺ ĐỎ 2026-07-31] Trước đây câu này nuốt luôn `assignRes.error`. Khi còn luật thẻ
+            // đỏ thì admin ít nhất còn đoán được ("chắc người này bị phạt"); nay lý do từ chối DUY
+            // NHẤT còn lại là chốt tenant ("Editor được chọn không thuộc workspace/profile này"), mà
+            // nó thì không đoán nổi — admin bấm lại mãi vẫn thất bại, không hiểu vì sao.
+            // Đường giao HÀNG LOẠT ngay phía trên vốn đã hiện `res.error`; hai nhánh nay nói giống nhau.
+            toast.error(assignRes?.error || "Giao task thất bại")
         }
     }
 
     // ── Non-admin: read-only ────────────────────────────────────────────────
     if (!isAdmin) {
         if (task.assignee) {
-            const flagColor = rankFlag(task.assignee as any)
             return (
                 <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Avatar className="h-6 w-6">
-                            <AvatarImage src={(task.assignee as any).avatarUrl || `https://avatar.vercel.sh/${task.assignee.username}`} className="object-cover" />
-                            <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
-                        </Avatar>
-                        {flagColor && (
-                            <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-zinc-900 ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${(task.assignee as any).monthlyRanks?.[0]?.rank}`} />
-                        )}
-                    </div>
+                    <Avatar className="h-6 w-6">
+                        <AvatarImage src={(task.assignee as any).avatarUrl || `https://avatar.vercel.sh/${task.assignee.username}`} className="object-cover" />
+                        <AvatarFallback>{displayName(task.assignee)[0]}</AvatarFallback>
+                    </Avatar>
                     <span className="text-sm">{displayName(task.assignee)}</span>
                 </div>
             )
@@ -252,7 +253,6 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                         )}
                         {filtered.length > 0 ? (
                             filtered.map((u, idx) => {
-                                const flagColor = rankFlag(u as any)
                                 const isCurrent = task.assignee?.id === u.id
                                 const isActive = idx === activeIndex
                                 return (
@@ -263,15 +263,10 @@ export function AssigneeCell({ task, users, isAdmin, selectedIds = [], workspace
                                         onMouseEnter={() => setActiveIndex(idx)}
                                         className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${isActive ? 'bg-white/10 text-white' : isCurrent ? 'bg-primary/10 text-white' : 'text-zinc-300 hover:bg-white/5'}`}
                                     >
-                                        <div className="relative">
-                                            <Avatar className="h-5 w-5">
-                                                <AvatarImage src={(u as any).avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
-                                                <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
-                                            </Avatar>
-                                            {flagColor && (
-                                                <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-surface-1 ${flagColor} shadow-sm`} title={`Cảnh báo hạng ${(u as any).monthlyRanks?.[0]?.rank}`} />
-                                            )}
-                                        </div>
+                                        <Avatar className="h-5 w-5">
+                                            <AvatarImage src={(u as any).avatarUrl || `https://avatar.vercel.sh/${u.username}`} className="object-cover" />
+                                            <AvatarFallback>{displayName(u)[0]}</AvatarFallback>
+                                        </Avatar>
                                         <span className="truncate">{displayName(u)}</span>
                                     </button>
                                 )

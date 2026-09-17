@@ -20,6 +20,13 @@ export type { AnnotationShape } from './annotation'
 export type UploadStatusDto = 'uploading' | 'uploaded' | 'processing' | 'ready' | 'failed'
 export type ReviewStateDto = 'draft' | 'awaiting_review' | 'changes_requested' | 'approved'
 export type ItemType = 'folder' | 'asset'
+
+/** What the TRASH surface can hold. Deliberately wider than ItemType: a single version deleted
+ *  from a multi-version stack is trashed on its own (versions.ts deleteVersion), and the confirm
+ *  dialog promises it is restorable for 30 days — so it needs a row in Recently Deleted and a
+ *  restore path. ItemType itself stays 'folder' | 'asset' because share links (shares.ts) can
+ *  only ever point at those two. */
+export type TrashItemType = ItemType | 'version'
 export type MediaKindDto = 'video' | 'image'
 
 export interface UserRef {

@@ -317,7 +317,22 @@ export async function inviteToWorkspace(
         return { error: `Bạn đang gửi lời mời quá nhanh. Vui lòng thử lại sau ${callerRate.retryAfter ?? 3600} giây.` }
     }
 
-    // [Sprint B] Subscription gating removed — tất cả admin có quyền mời member.
+    // [Sprint B] Subscription gating removed. [BILLING P6] Cắm lại đúng chỗ marker cũ:
+    // trần GHẾ của gói (checkSeatCap tự cho qua khi BILLING_ENFORCEMENT_START chưa bật).
+    // Đây là gate SỚM cho UX — chokepoint thật nằm ở acceptWorkspaceInvitation, nơi ghế
+    // thực sự được tiêu (lời mời có thể nằm chờ qua một lần hạ gói).
+    {
+        const { checkSeatCap, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        const { resolveWorkspaceProfileId } = await import('@/lib/prisma-workspace')
+        const pid = await resolveWorkspaceProfileId(workspaceId)
+        if (pid) {
+            try { await checkSeatCap(pid) } catch (e) {
+                const msg = billingErrorMessage(e)
+                if (msg) return { error: msg }
+                throw e
+            }
+        }
+    }
 
     // Validate role — can't invite as OWNER directly
     if (role === 'OWNER') {
@@ -745,6 +760,25 @@ export async function acceptWorkspaceInvitation(invitationId: string) {
                     return { error: 'Lời mời này đã được chấp nhận trước đó.' }
                 }
                 return { error: `Lời mời ở trạng thái "${probe.status}" — không thể chấp nhận.` }
+            }
+        }
+
+        // [BILLING P6] CHOKEPOINT GHẾ THẬT — ghế được tiêu Ở ĐÂY, không phải lúc mời:
+        // lời mời có thể nằm chờ qua một lần hạ gói/hết hạn, nên phải đếm lại ngay trước
+        // khi mint WorkspaceMember. Khách mời (isClientInvite) không phải ghế — bỏ qua.
+        // checkSeatCap tự cho qua khi chưa cưỡng chế.
+        if (!probe.isClientInvite) {
+            const wsProfile = await prisma.workspace.findUnique({
+                where: { id: probe.workspaceId },
+                select: { profileId: true },
+            })
+            if (wsProfile?.profileId) {
+                const { checkSeatCap, billingErrorMessage } = await import('@/lib/billing/entitlements')
+                try { await checkSeatCap(wsProfile.profileId) } catch (e) {
+                    const msg = billingErrorMessage(e)
+                    if (msg) return { error: `Không tham gia được: ${msg}` }
+                    throw e
+                }
             }
         }
 
@@ -1226,6 +1260,16 @@ export async function removeWorkspaceMember(workspaceId: string, targetUserId: s
                 await tx.profileAccess.deleteMany({
                     where: { userId: targetUserId, profileId: revokeProfileId, role: 'USER' },
                 })
+                // [AUDIT HT-023 fix] BẤT BIẾN: dấu ProfileAccessRequest APPROVED KHÔNG được sống
+                // lâu hơn quyền ProfileAccess mà nó chứng nhận.
+                // Kể từ HT-023, dấu APPROVED chính là thứ cho phép ADMIN gỡ một người. Nếu ở đây
+                // chỉ xoá quyền mà để dấu lại, thì lần sau người đó được mời vào bằng CỬA CHÍNH
+                // TẮC, dấu cũ vẫn nằm đó và được "nhận vơ" cho quyền mới — ADMIN lại gỡ được một
+                // thành viên bình thường, tức HT-023 mở lại mà không cần race nào.
+                // removeCrossTeamAccess đã xoá cả hai trong một transaction; hai cửa này thì chưa.
+                await tx.profileAccessRequest.deleteMany({
+                    where: { userId: targetUserId, targetProfileId: revokeProfileId },
+                })
             }
         }
     })
@@ -1299,6 +1343,11 @@ export async function leaveWorkspace(workspaceId: string) {
             if (remaining === 0) {
                 await tx.profileAccess.deleteMany({
                     where: { userId, profileId: revokeProfileId, role: 'USER' },
+                })
+                // [AUDIT HT-023 fix] Cùng bất biến như removeWorkspaceMember ở trên: dấu APPROVED
+                // không được sống lâu hơn quyền nó chứng nhận. Xem chú thích dài ở đó.
+                await tx.profileAccessRequest.deleteMany({
+                    where: { userId, targetProfileId: revokeProfileId },
                 })
             }
         }

@@ -33,6 +33,7 @@ import { validatePasswordFull } from '@/lib/password-validator'
 import { validateEmailForSignup } from '@/lib/email-validator'
 import { checkBotId } from 'botid/server'
 import { checkSignupIp, checkSignupEmail } from '@/lib/rate-limit-upstash'
+import { getRequestIpFromHeaders } from '@/lib/request-ip'
 import { sendEmail } from '@/lib/email'
 import { buildVerifyEmailEmail } from '@/lib/notification-emails/templates/auth/verify-email'
 
@@ -75,7 +76,9 @@ async function getRequestMeta() {
     let userAgent: string | null = null
     try {
         const h = await headers()
-        ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown-ip'
+        // [AUDIT HT-002 fix] Was x-forwarded-for[0] — attacker-chosen, so rotating the header
+        // opened a fresh rl:signup:ip bucket per request and the 5/h cap did nothing.
+        ip = await getRequestIpFromHeaders()
         userAgent = h.get('user-agent')
     } catch { /* edge */ }
     return { ip, userAgent }
@@ -244,7 +247,10 @@ export async function signupAction(input: SignupInput): Promise<SignupResponse> 
     let rawToken: string
     try {
         const result = await prisma.$transaction(async (tx) => {
-            // [Sprint B] Tạo Profile mới — free + full features (bỏ trial/subscription)
+            // [Sprint B] Tạo Profile mới. [BILLING P6 · D1] KHÔNG tạo Subscription — không có
+            // bản ghi = LOCKED khi BILLING_ENFORCEMENT_START bật: người mới đăng nhập lần đầu
+            // gặp màn chọn gói (trả SePay hoặc nhập trial/gift code) trong BillingLockGate.
+            // Trước ngày cưỡng chế thì vẫn dùng đủ như cũ, chỉ thấy banner đếm ngược.
             const profile = await tx.profile.create({
                 data: {
                     name: `${displayName}'s Profile`,

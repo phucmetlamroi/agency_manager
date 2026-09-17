@@ -102,6 +102,34 @@ export async function resolveActiveProfileId(
     return profileId
 }
 
+/**
+ * [PHẢN BIỆN 2026-07-30 · CS-2] Profile SỞ HỮU workspace này — nguồn DUY NHẤT cho các đường GHI.
+ *
+ * Khác `resolveActiveProfileId` ở trên: hàm đó dành cho TRANG hiển thị, và khi người gọi không có
+ * ProfileAccess trên profile của workspace thì nó GIỮ claim để trang không trắng trơn. Với các
+ * đường GHI (tạo task, tạo hoá đơn, khoá tài khoản) thì hành vi "giữ claim" chính là lỗ hổng:
+ * cổng `verifyWorkspaceAccess` chấm trên `workspace.profileId`, nên dữ liệu cũng PHẢI lấy từ đúng
+ * hàng đó, không có nhánh lùi nào.
+ *
+ * Trả `null` khi workspace không tồn tại hoặc chưa gắn profile ⇒ nơi gọi FAIL CLOSED.
+ * (`createWorkspaceAction` luôn gán profileId non-null, nên `null` chỉ xảy ra với dữ liệu legacy —
+ * và với một thao tác GHI thì dừng lại là đúng, không phải đoán.)
+ */
+export async function resolveWorkspaceProfileId(workspaceId: string): Promise<string | null> {
+    if (!workspaceId) return null
+    try {
+        const ws = await globalPrisma.workspace.findUnique({
+            where: { id: workspaceId },
+            select: { profileId: true },
+        })
+        return ws?.profileId ?? null
+    } catch (e) {
+        // Fail closed: lỗi tra cứu KHÔNG được biến thành "dùng tạm claim".
+        console.error('[resolveWorkspaceProfileId] lookup failed:', e)
+        return null
+    }
+}
+
 export function getWorkspacePrisma(currentWorkspaceId: string, currentProfileId?: string) {
     if (!currentWorkspaceId) {
         throw new Error("getWorkspacePrisma requires a valid currentWorkspaceId")

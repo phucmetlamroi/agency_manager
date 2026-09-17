@@ -28,7 +28,19 @@ const clean = (s: string | undefined | null, cap = 300): string | null => {
 async function access(workspaceId: string) {
     const a = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
     const userId = (a as any)?.userId ?? (a as any)?.user?.id ?? null
-    const profileId = (a as any)?.user?.sessionProfileId ?? null
+    // [PHẢN BIỆN CS 2026-07-31 · CS-C4] profileId đóng dấu lên hàng Payment phải là profile CỦA
+    // WORKSPACE, không phải claim JWT. Trước đây lấy thẳng claim: kẻ tấn công là OWNER của W_B trỏ
+    // claim về profile nạn nhân A rồi ghi nhận thanh toán trong W_B ⇒ hàng Payment mang
+    // `profileId = A`, tức sổ tiền của W_B bị đóng dấu tenant khác. Chốt Client ở recordPayment
+    // dùng `ws.profileId` nên KHÔNG chạm được khách của A (đó là lý do đây chỉ là dữ liệu sai nhãn,
+    // chưa rò đọc) — nhưng đúng lớp lỗi mà CS-4 vừa vá cho Task, và bất kỳ báo cáo theo profile nào
+    // thêm sau này đều thừa hưởng nguyên nó.
+    // Giữ nhánh lùi về claim CHỈ khi workspace chưa gắn profile (dữ liệu legacy), không đảo lại.
+    const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { profileId: true },
+    })
+    const profileId = ws?.profileId ?? (a as any)?.user?.sessionProfileId ?? null
     return { userId, profileId }
 }
 
@@ -51,9 +63,19 @@ export async function recordPayment(input: RecordPaymentInput, workspaceId: stri
         if (!Number.isInteger(clientId)) return { success: false as const, error: 'Khách hàng không hợp lệ.' }
 
         // Anti cross-tenant: the client must be ACTIVE and in this workspace's profile.
+        // [PHẢN BIỆN vòng 3 · BP-3] Chốt này TỰ TAN khi `ws.profileId` là NULL: `...( ? : {})` bỏ
+        // luôn điều kiện, biến truy vấn thành tra `Client` theo id TOÀN CỤC — không hàng rào tenant
+        // nào (Client nằm trong bypassModels). Chú thích CS-C4 ở helper `access()` khẳng định chốt
+        // này "cross-tenant-safe" là SAI đúng ở tình huống mà nhánh lùi về claim tồn tại để phục vụ.
+        // Nay FAIL CLOSED: không xác định được profile thì từ chối ghi tiền, không đoán.
+        // ⚠️ `ws` cũng chính là hàng mà `access()` vừa đọc — giữ hai lần đọc ở đây là cố ý: hàm này
+        // cần `ws.profileId` THÔ (không qua nhánh lùi claim) để chốt không bị nhánh lùi làm mềm đi.
         const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+        if (!ws?.profileId) {
+            return { success: false as const, error: 'Workspace chưa gắn Profile — không thể ghi nhận thanh toán.' }
+        }
         const client = await prisma.client.findFirst({
-            where: { id: clientId, status: 'ACTIVE', ...(ws?.profileId ? { profileId: ws.profileId } : {}) },
+            where: { id: clientId, status: 'ACTIVE', profileId: ws.profileId },
             select: { id: true, name: true },
         })
         if (!client) return { success: false as const, error: 'Khách hàng không tồn tại trong workspace này.' }
@@ -71,11 +93,38 @@ export async function recordPayment(input: RecordPaymentInput, workspaceId: stri
             if (inv) linkedInvoiceId = inv.id
         }
 
+        // [AUDIT SWEEP-2026-07-30 fix] CHỐNG GHI TRÙNG. `recordPayment` không có idempotency và
+        // bảng Payment không có ràng buộc unique nào, nên một lần double-click / retry mạng tạo HAI
+        // dòng: tổng "đã thu" của khách phồng lên đúng số đó và "còn lại" tụt xuống tương ứng — sai
+        // số tiền báo cho khách.
+        // Quyết định của chủ dự án: cửa sổ thời gian, KHÔNG đổi schema (thêm cột idempotency là
+        // migration, ngoài phạm vi vòng vá này). 60 giây đủ chặn double-click và retry, mà vẫn cho
+        // ghi hai khoản thu thật trùng số nếu cách nhau hơn một phút.
+        const DEDUP_WINDOW_MS = 60_000
+        const duplicate = await prisma.payment.findFirst({
+            where: {
+                workspaceId,
+                clientId,
+                amount,
+                invoiceId: linkedInvoiceId,
+                createdAt: { gte: new Date(Date.now() - DEDUP_WINDOW_MS) },
+            },
+            select: { id: true },
+        })
+        if (duplicate) {
+            return {
+                success: false as const,
+                error: 'Khoản thu giống hệt vừa được ghi cách đây dưới một phút. Kiểm tra lại danh sách trước khi ghi thêm.',
+            }
+        }
+
         const payment = await prisma.payment.create({
             data: {
                 clientId,
                 workspaceId,
-                profileId: profileId ?? ws?.profileId ?? null,
+                // [PHẢN BIỆN vòng 3 · BP-5] `?? ws?.profileId` là nhánh CHẾT: helper `access()` đã ưu tiên
+                // `ws.profileId` rồi, nên nếu nó null thì biểu thức này cũng null. Bỏ cho khỏi đánh lừa.
+                profileId: profileId ?? null,
                 amount,
                 paidAt,
                 method: clean(input.method, 60),

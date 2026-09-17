@@ -31,7 +31,7 @@ export async function GET() {
     const res = NextResponse.redirect(authUrl.toString())
     res.cookies.set('g_oauth_state', state, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !process.env.ELECTRON_DESKTOP,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax', // must be lax so the cookie survives the redirect back from Google
         path: '/',
         maxAge: 300, // 5 minutes

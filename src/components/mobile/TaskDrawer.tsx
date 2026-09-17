@@ -19,6 +19,7 @@ import { getValidNextStatuses, type ActorRole } from "@/lib/task-state-machine"
 import { taskTypeLabel } from "@/lib/display-labels"
 import { isReviewPhaseStatus } from "@/lib/task-statuses"
 import { assignTask } from "@/actions/task-management-actions"
+import { safeHref } from "@/lib/safe-url"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { useHistoryBackClose } from "@/hooks/useHistoryBackClose"
@@ -47,7 +48,10 @@ const STATUS_BUTTON_CONFIG: Record<string, {
 }> = {
     // [bug-report #2] 'Gửi lại' / 'Tạm ngưng' / 'Sửa frame' action buttons removed.
     'Đang thực hiện': { label: 'Bắt đầu / Tiếp tục', icon: Play, variant: 'primary' },
-    'Revision': { label: 'Nộp bài (→ Revision)', icon: Send, variant: 'warning' },
+    // [Đồng bộ nộp bài 2026-08-04] Nộp bài = 'Đã nộp video (nội bộ)' (A2), trùng đích với
+    // đường lưu link ở task detail. 'Revision' giữ lại cho QUẢN LÝ (trả bài về sửa).
+    'Đã nộp video (nội bộ)': { label: 'Nộp bài (chờ duyệt)', icon: Send, variant: 'warning' },
+    'Revision': { label: 'Trả về sửa lại', icon: Send, variant: 'warning' },
     'Hoàn tất': { label: 'Hoàn tất', icon: CheckCircle2, variant: 'success' },
     'Đang đợi giao': { label: 'Trả về hàng chờ', icon: AlertTriangle, variant: 'neutral' },
     'Nhận task': { label: 'Nhận task', icon: Play, variant: 'primary' },
@@ -209,7 +213,10 @@ export function TaskDrawer({
                                 {/* Product Link */}
                                 {task.productLink && (
                                     <a
-                                        href={task.productLink}
+                                        /* [AUDIT HT-031 fix] Phòng tuyến thứ hai: các đường ghi nay
+                                           đã lọc scheme, nhưng giá trị độc lưu TRƯỚC bản vá vẫn
+                                           còn trong DB và vẫn render ở đây. */
+                                        href={safeHref(task.productLink)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center justify-center gap-2 w-full p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors"

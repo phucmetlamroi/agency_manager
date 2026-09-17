@@ -30,6 +30,7 @@ import Link from 'next/link'
 import {
     Settings, Plug, Building2, TriangleAlert, Trash2, RotateCcw, Loader2,
     CloudUpload, HardDrive, Link2, Unlink, ExternalLink, ShieldCheck,
+    Clapperboard, ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -388,6 +389,22 @@ export default function MobileWorkspaceSettings({
                             </Button>
                         )}
                     </div>
+
+                    {/* [Giải trí] Lối vào kho phim (parity với WorkspaceSettingsPanel).
+                        Tính năng ẨN — sau card này còn một cửa mã truy cập nữa. */}
+                    <Link
+                        href="/entertainment"
+                        className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card p-4 active:bg-accent/50"
+                    >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+                            <Clapperboard className="h-5 w-5" strokeWidth={1.5} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="text-body font-bold">Giải trí</div>
+                            <div className="text-caption text-muted-foreground">Khu vực riêng — cần mã truy cập.</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
 
                     {/* ── VÙNG NGUY HIỂM (LUÔN CUỐI, ≥24px cách card trên) ── */}
                     {isOwner && !isSoftDeleted && (

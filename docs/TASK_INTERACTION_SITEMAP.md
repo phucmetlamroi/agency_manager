@@ -487,7 +487,20 @@ Grid 2 cột.
   - `"-- Hủy giao (Unassign User) --"` → Tương tự
   - **Team members** (lọc bỏ CLIENT, LOCKED): Avatar + username + rank dot
 
-- **Chặn giao cho rank D**: Error toast "Không thể giao Task: Nhân sự đang bị Phạt thẻ đỏ (Rank D)."
+- ~~**Chặn giao cho rank D**~~ — **ĐÃ GỠ 2026-07-31.** Rank D không còn chặn giao việc ở đường web
+  và MCP, cũng không còn khoá nút trong Mission Control. Hai việc đó nằm ở HAI commit khác nhau —
+  nếu ai revert riêng commit Mission Control thì câu này sai một nửa trở lại. Dot cảnh báo ở §7.1
+  vẫn còn: nó là chỉ dấu hiệu suất, không phải hàng rào.
+  Trên đường giao việc vẫn còn chốt khác, không phải chỉ một: `isAssigneeInWorkspaceProfile` —
+  người được giao phải thuộc profile của workspace, và bên trong nó loại luôn CLIENT/LOCKED. Phía
+  MCP là `assertWorkspaceMember`. ⚠️ Đừng nói gọn "MCP chặt hơn" — hai bên chặt lỏng KHÁC CHIỀU
+  nhau: MCP đòi hàng `WorkspaceMember` thật (web thì không), nhưng MCP **không** loại CLIENT/LOCKED
+  còn web thì có. Hệ quả dựng được: `deactivateUser` đặt `role='LOCKED'` mà **không xoá** hàng
+  WorkspaceMember, nên một editor đã bị vô hiệu hoá sẽ bị web từ chối giao việc, trong khi 5 tool
+  MCP vẫn giao được. Và MCP **không phát thông báo nào cả** (`grep -rni notif mcp-server/src` = 0;
+  nó chỉ ghi `AuditLog`) — nên task rơi vào một tài khoản không đăng nhập được mà **không ai được
+  báo**, chỉ còn một dòng nhật ký. Đây là khoảng lệch CÓ TỪ TRƯỚC, không phải hệ quả của việc gỡ
+  thẻ đỏ; ghi lại ở đây để không ai vá nhầm chiều.
 
 - **Khi đang chọn nhiều task (bulk)**:
 

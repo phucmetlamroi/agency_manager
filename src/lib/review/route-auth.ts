@@ -31,12 +31,19 @@ export function withReviewRoute<C = unknown>(handler: Handler<C>): Handler<C> {
                 reviewLog('error', 'route.mux_upstream', { path: safePath(req), status: e.status, msg: e.message })
                 return apiError(502, 'UPSTREAM_ERROR', 'Lỗi dịch vụ xử lý video.', { provider: 'mux' })
             }
+            // [2026-08-05] Kèm một MÃ THAM CHIẾU ngắn vào phản hồi. Trước đây màn hình
+            // chỉ hiện "Lỗi hệ thống." — không có gì để đối chiếu với log, nên mỗi lần
+            // người dùng báo lỗi là phải đoán. Mã này KHÔNG tiết lộ nội dung lỗi (vẫn
+            // giấu chi tiết nội bộ), chỉ đủ để tra đúng dòng log.
+            const ref = Math.random().toString(36).slice(2, 8).toUpperCase()
             reviewLog('error', 'route.unhandled', {
+                ref,
                 path: safePath(req),
                 reqId: getRequestId(req),
                 error: e instanceof Error ? e.message : String(e),
+                stack: e instanceof Error ? e.stack?.split('\n').slice(0, 4).join(' | ') : undefined,
             })
-            return apiError(500, 'INTERNAL', 'Lỗi hệ thống.')
+            return apiError(500, 'INTERNAL', `Lỗi hệ thống (mã ${ref}).`, { ref })
         }
     }
 }

@@ -18,6 +18,8 @@ import { TaskWithUser } from "@/types/admin"
 import { updateTaskDetails } from "@/actions/update-task-details"
 import { bulkUpdateTaskDetails, bulkUpdateTaskResourceSubfields } from "@/actions/bulk-task-actions"
 import { updateTaskStatus } from "@/actions/task-actions"
+import { REVIEW_STATUS_MAP } from "@/lib/review/status-map"
+import { failureMessage, isNetworkFailure } from "@/lib/ui/action-feedback"
 import { getHookGraph, saveHookGraph } from "@/actions/raw-footage-actions"
 import type { HookGraph } from "@/lib/velox/hook-graph-types"
 import { toast } from "sonner"
@@ -141,8 +143,8 @@ export function TaskDetailModal({
                 setEditingMap(false)
                 toast.success('Đã lưu Multi-Hook Map.')
             }
-        } catch {
-            toast.error('Lưu Multi-Hook Map thất bại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Lưu Multi-Hook Map thất bại.'))
         } finally {
             setSavingMap(false)
         }
@@ -256,6 +258,31 @@ export function TaskDetailModal({
         if (isBulkMode && bulkSelectedIds) {
             const res = await bulkUpdateTaskDetails(bulkSelectedIds, patch, workspaceId) as any
             if (res?.success) {
+                // [PHẢN BIỆN 2026-07-30 · R3-4] CHỐT KỲ LƯƠNG PHẢI ĐƯỢC NÓI RA Ở ĐÂY NỮA.
+                //
+                // `bulkUpdateTaskDetails` trả `{ success: true, count: 0, skippedPayrollLocked: [...] }`
+                // khi MỌI task bị chốt lương chặn — không có khoá `error`. Nhánh cũ chỉ đọc
+                // `res.success` nên bắn toast MÀU XANH "Đã cập nhật 0 task", rồi `handleSaveFinance`
+                // dùng giá trị trả về `true` để chạy setForm/setLocalTask với số tiền MỚI. Kết quả:
+                // admin sửa giá 300→500 cho 5 task thuộc kỳ đã trả lương, thấy báo thành công và
+                // thấy 500 trên màn hình, trong khi DB vẫn là 300. Con số đó chỉ tồn tại trong state
+                // React và admin ra quyết định (báo giá, đối soát) dựa trên nó.
+                //
+                // Bản vá gốc CÓ dạy `BulkEditTaskModal` đọc `skippedPayrollLocked` — nhưng đây là
+                // NƠI GỌI THỨ HAI của cùng một action và đã bị bỏ sót. Dùng lại đúng khuôn thông báo
+                // của BulkEditTaskModal để hai chỗ nói cùng một câu.
+                const skipped: string[] = res.skippedPayrollLocked ?? []
+                if (skipped.length > 0) {
+                    toast.warning(
+                        `${skipped.length} task KHÔNG đổi được số tiền vì kỳ lương đã đóng: ` +
+                        skipped.slice(0, 5).join(', ') +
+                        (skipped.length > 5 ? `… (+${skipped.length - 5})` : ''),
+                        { duration: 8000 },
+                    )
+                }
+                // Không một task nào được ghi ⇒ KHÔNG cập nhật lạc quan, nếu không giao diện sẽ
+                // hiển thị giá trị chưa bao giờ tới database.
+                if (res.count === 0) return false
                 toast.success(`Đã cập nhật ${res.count ?? bulkSelectedIds.length} task`)
                 return true
             }
@@ -268,7 +295,11 @@ export function TaskDetailModal({
             toast.success(successMsg)
             return true
         }
-        toast.error('Lưu thất bại')
+        // [PHẢN BIỆN 2026-07-30 · R3-4] Nhánh một-task trước đây nuốt luôn `res.error` bằng một câu
+        // cứng, tức nuốt đúng câu `payrollClosedMessage(gate)` mà bản vá kỳ lương viết ra
+        // (update-task-details.ts). Admin thấy "Lưu thất bại" và không bao giờ biết lý do là kỳ lương
+        // đã đóng — một chốt đúng nhưng câm thì vẫn dẫn tới quyết định sai.
+        toast.error((res as any)?.error ?? 'Lưu thất bại')
         return false
     }
 
@@ -403,18 +434,34 @@ export function TaskDetailModal({
 
         if (shouldAutoSubmit) {
             try {
-                const res = await updateTaskStatus(localTask.id, 'Revision', workspaceId)
+                // [Đồng bộ nộp bài 2026-08-04] Nộp bài bằng LINK giờ đáp xuống ĐÚNG ô của
+                // đường up video: 'Đã nộp video (nội bộ)' (A2). Trước đây link → 'Revision'
+                // còn video → A2, nên cùng một hành động "nộp bài" lại nằm ở hai tab khác
+                // nhau; Tệp đã khoá upload nên link là đường giao duy nhất và phải khớp quy
+                // trình duyệt A2→A3→A4→A5. Deadline VẪN bị xoá y như trước: A2 nằm trong
+                // STATUS_REQUIRES_NULL_DEADLINE (task-invariants.ts — mọi status pha duyệt),
+                // nên phải phản chiếu `deadline: null` vào state, không thì thẻ Deadline còn
+                // hiện hạn cũ tới lần refetch sau (modal này không gọi router.refresh()).
+                const res = await updateTaskStatus(localTask.id, REVIEW_STATUS_MAP.submitted, workspaceId)
                 if (res?.success) {
-                    toast.success('Đã nộp bài — admin sẽ review sớm. Deadline đã được tạm dừng.')
-                    setLocalTask((prev) => (prev ? { ...prev, status: 'Revision', deadline: null } : prev))
+                    toast.success('Đã nộp bài — task chuyển sang “Đã nộp video (nội bộ)”, quản lý sẽ duyệt. Deadline đã tạm dừng.')
+                    setLocalTask((prev) => (prev ? { ...prev, status: REVIEW_STATUS_MAP.submitted, deadline: null } : prev))
                 } else {
                     // Save succeeded in DB but transition failed — user can retry by
                     // re-saving the same link (idempotent on productLink, FSM still
                     // allows Đang thực hiện → Revision).
                     toast.error(res?.error || 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
                 }
-            } catch {
-                toast.error('Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.')
+            } catch (e) {
+                // [kiểm toán 2026-07 · phản biện] KHÔNG dùng failureMessage ở đây. Tới được dòng
+                // này nghĩa là saveSingle() đã thành công — link NẰM TRONG database rồi. Câu mất
+                // kết nối dùng chung ("Thay đổi chưa được lưu") sẽ đè lên sự thật đó và nói ngược,
+                // khiến người dùng tưởng mất bài và nhập lại. Mất mạng chỉ chặn bước ĐỔI TRẠNG THÁI.
+                toast.error(
+                    isNetworkFailure(e)
+                        ? 'Link đã lưu. Mất kết nối nên chưa chuyển status — thử lại khi có mạng.'
+                        : 'Link đã lưu, nhưng chưa chuyển status. Vui lòng thử lại.',
+                )
             }
         }
 
@@ -511,8 +558,8 @@ export function TaskDetailModal({
             } else {
                 toast.error(res?.error || 'Không thể bắt đầu task. Vui lòng thử lại.')
             }
-        } catch {
-            toast.error('Không thể bắt đầu task. Vui lòng thử lại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Không thể bắt đầu task. Vui lòng thử lại.'))
         } finally {
             setStarting(false)
         }

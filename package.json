@@ -7,11 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate && prisma db push",
+    "postinstall": "prisma generate && node scripts/maybe-db-push.mjs",
     "build:mcp": "cd mcp-server && npm run build",
-    "build:electron": "cd electron && npm run build",
-    "build:desktop": "cross-env ELECTRON_DESKTOP=1 next build && cd mcp-server && npm run build && cd ../electron && npm run build",
-    "dev:electron": "cross-env ELECTRON_DESKTOP=1 next dev",
     "test:signup": "node --test tests/auth/signup.test.mjs",
     "test:invite-security": "tsx scripts/test-invite-security.ts",
     "test:client-invariant": "tsx scripts/test-client-name-invariant.ts",
@@ -20,7 +17,12 @@
     "test:auto-transition": "tsx scripts/test-auto-transition.ts",
     "test:folder-scope": "tsx scripts/test-folder-scope.ts",
     "test:folder-scope-db": "tsx scripts/test-folder-scope-db.ts",
-    "test:portal-notify": "tsx scripts/test-portal-notify.ts"
+    "test:portal-notify": "tsx scripts/test-portal-notify.ts",
+    "test:offline-message": "npx tsx scripts/test-offline-message.ts",
+    "test:linkify": "tsx scripts/test-linkify.ts",
+    "test:comment-markdown": "tsx scripts/test-comment-markdown.ts",
+    "test:entitlements": "tsx scripts/billing/test-entitlements.ts",
+    "test:sepay-hmac": "tsx scripts/billing/test-sepay-hmac.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

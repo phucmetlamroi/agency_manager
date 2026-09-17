@@ -43,8 +43,11 @@ async function main() {
     console.log(`Updated ${wRes.count} Workspaces.`)
 
     console.log('Migrating Tasks...')
+    // [AUDIT HT-022 fix] Xem ghi chú cùng mã ở migrate-to-workspaces.ts — hàng cài đặt hệ thống
+    // phải giữ nguyên trạng thái "không thuộc profile nào", nếu không credential dạng thô trong
+    // notes_vi sẽ lọt vào bảng task của một tenant.
     const tRes = await prisma.task.updateMany({
-        where: { profileId: null },
+        where: { profileId: null, id: { not: 'global-system-settings' } },
         data: { profileId: pId }
     })
     console.log(`Updated ${tRes.count} Tasks.`)

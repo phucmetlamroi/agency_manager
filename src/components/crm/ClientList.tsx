@@ -151,7 +151,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient, clarify
                             left: 14,
                             width: 15,
                             height: 15,
-                            color: '#52525b',
+                            color: '#878790',
                             pointerEvents: 'none',
                         }}
                     />
@@ -211,7 +211,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient, clarify
                         style={{
                             fontSize: 10,
                             fontWeight: 700,
-                            color: '#52525b',
+                            color: '#878790',
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em',
                         }}
@@ -227,7 +227,7 @@ export default function ClientList({ clients, workspaceId, onOpenClient, clarify
                     style={{
                         textAlign: 'center',
                         padding: '48px 20px',
-                        color: '#52525b',
+                        color: '#878790',
                         fontSize: 13,
                     }}
                 >
@@ -307,7 +307,7 @@ function StatusPill({ status, clarify = false }: { status: 'ACTIVE' | 'PENDING' 
         PENDING: clarify
             ? { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.25)', color: '#a5b4fc', dot: '#6366f1' }
             : { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)', color: '#fbbf24', dot: '#fbbf24' },
-        INACTIVE: { bg: 'rgba(113,113,122,0.10)', border: 'rgba(113,113,122,0.25)', color: '#71717a', dot: '#71717a' },
+        INACTIVE: { bg: 'rgba(113,113,122,0.10)', border: 'rgba(113,113,122,0.25)', color: '#878790', dot: '#878790' },
     }
     const c = config[status]
     const labels: Record<'ACTIVE' | 'PENDING' | 'INACTIVE', string> = {
@@ -495,7 +495,7 @@ function ClientItem({
                     {!isSubsidiary && (
                         <div
                             style={{
-                                color: '#52525b',
+                                color: '#878790',
                                 display: 'flex',
                                 alignItems: 'center',
                                 flexShrink: 0,
@@ -521,7 +521,7 @@ function ClientItem({
                             cursor: 'pointer',
                             flexShrink: 0,
                             transition: 'background 0.15s',
-                            color: '#71717a',
+                            color: '#878790',
                             padding: 0,
                         }}
                     >
@@ -595,21 +595,21 @@ function ClientItem({
                                     border: 'none',
                                     padding: 0,
                                     cursor: 'pointer',
-                                    color: '#52525b',
+                                    color: '#878790',
                                     display: 'flex',
                                     alignItems: 'center',
                                     transition: 'color 0.15s',
                                     flexShrink: 0,
                                 }}
                                 onMouseEnter={(e) => { e.currentTarget.style.color = '#c4b5fd' }}
-                                onMouseLeave={(e) => { e.currentTarget.style.color = '#52525b' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.color = '#878790' }}
                                 title="Sửa tên"
                             >
                                 <Pencil style={{ width: 11, height: 11 }} />
                             </button>
                         </div>
                         {!isSubsidiary && subCount > 0 && (
-                            <div style={{ fontSize: 10, color: '#52525b', marginTop: 1 }}>
+                            <div style={{ fontSize: 10, color: '#878790', marginTop: 1 }}>
                                 {subCount} brand con
                             </div>
                         )}
@@ -874,7 +874,7 @@ function ClientItem({
                             style={{
                                 padding: '16px 20px 16px 80px',
                                 fontSize: 12,
-                                color: '#52525b',
+                                color: '#878790',
                                 fontStyle: 'italic',
                             }}
                         >

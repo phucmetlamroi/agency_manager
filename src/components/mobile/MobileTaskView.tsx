@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { TaskWithUser } from '@/types/admin'
 import { deleteTask } from '@/actions/task-management-actions'
 import { updateTaskStatus } from '@/actions/task-actions'
+import { failureMessage } from '@/lib/ui/action-feedback'
 import { bulkAssignTasks, bulkUpdateStatus, bulkUpdateTaskStatus } from '@/actions/bulk-task-actions'
 import MobileTaskCard from './MobileTaskCard'
 import MobileTaskCardSkeleton from './MobileTaskCardSkeleton'
@@ -18,6 +19,7 @@ import { PreStartBlockModal } from '@/components/tasks/PreStartBlockModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause, CheckCircle2, Send, Play, Check, UserPlus, ArrowLeftRight, X as XIcon } from 'lucide-react'
 import { getValidNextStatuses, type ActorRole } from '@/lib/task-state-machine'
+import { REVIEW_STATUS_MAP } from '@/lib/review/status-map'
 import { BOARD_PHASES, type BoardPhaseId, countTasksInPhase, pickInitialPhase } from '@/lib/task-board-phases'
 import {
     DropdownMenu,
@@ -56,6 +58,12 @@ function hexA(hex: string, a: number): string {
  * Right swipe = primary positive action (Bắt đầu / Nộp bài / Hoàn tất / Gửi lại).
  * Left swipe = pause / return.
  */
+/** Đích của thao tác "nộp bài" — CÙNG một hằng với ô Link ở task detail + đường up video.
+ *  Khai báo `string`: REVIEW_STATUS_MAP.submitted mang union CANONICAL (17 status của
+ *  task-statuses.ts), còn getValidNextStatuses trả union HẸP của task-state-machine.ts —
+ *  hai union khác nhau nên phải so ở mức chuỗi. */
+const SUBMITTED_STATUS: string = REVIEW_STATUS_MAP.submitted
+
 function buildSwipeActions(
     task: TaskWithUser,
     isAdmin: boolean,
@@ -72,12 +80,16 @@ function buildSwipeActions(
             color: 'bg-primary text-white',
             onAction: () => onChange('Đang thực hiện'),
         }
-    } else if (valid.includes('Revision') && task.status === 'Đang thực hiện') {
+    } else if ((valid as string[]).includes(SUBMITTED_STATUS) && task.status === 'Đang thực hiện') {
+        // [Đồng bộ nộp bài 2026-08-04] Vuốt "Nộp bài" đi cùng đích với ô Link ở task
+        // detail: 'Đã nộp video (nội bộ)'. Trước khi sửa, nhánh này còn dò 'Revision'
+        // — với editor thì không khớp gì cả (mất luôn cử chỉ nộp bài), còn với quản lý
+        // thì vuốt "Nộp bài" lại ghi 'Revision' = trả bài về sửa, ngược hẳn nhãn.
         right = {
             label: 'Nộp bài',
             icon: Send,
             color: 'bg-amber-600 text-white',
-            onAction: () => onChange('Revision'),
+            onAction: () => onChange(SUBMITTED_STATUS),
         }
     } else if (valid.includes('Hoàn tất') && isAdmin) {
         right = {
@@ -289,9 +301,9 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
                 toast.success(`Đã chuyển trạng thái sang "${status}"`)
                 startTransition(() => router.refresh())
             }
-        } catch {
+        } catch (e) {
             rollback()
-            toast.error('Không thể cập nhật trạng thái. Vui lòng thử lại.')
+            toast.error(failureMessage(e, 'Không thể cập nhật trạng thái. Vui lòng thử lại.'))
         } finally {
             setPendingStatusIds(prev => {
                 const next = new Set(prev)
@@ -341,8 +353,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             toast.success(assigneeId ? `Đã giao ${res?.count ?? ids.length} task` : `Đã trả ${res?.count ?? ids.length} task về kho`)
             exitSelection()
             startTransition(() => router.refresh())
-        } catch {
-            toast.error('Giao task thất bại. Vui lòng thử lại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Giao task thất bại. Vui lòng thử lại.'))
         }
     }
     const runBulkStatus = async (status: string) => {
@@ -360,8 +372,8 @@ export default function MobileTaskView({ tasks, isAdmin, workspaceId, users, min
             toast.success(`Đã chuyển ${res?.count ?? ids.length} task → "${status}"`)
             exitSelection()
             startTransition(() => router.refresh())
-        } catch {
-            toast.error('Đổi trạng thái thất bại. Vui lòng thử lại.')
+        } catch (e) {
+            toast.error(failureMessage(e, 'Đổi trạng thái thất bại. Vui lòng thử lại.'))
         }
     }
 

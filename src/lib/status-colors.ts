@@ -18,10 +18,16 @@ export const STATUS_COLORS: Record<string, { label: string; color: string; bg: s
     'Revision': { label: 'Sửa lại', color: '#EF4444', bg: 'rgba(239,68,68,0.10)' }, // [L18a] display only; value stays 'Revision'
     'Sửa frame': { label: 'Sửa frame', color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
     'Gửi lại': { label: 'Gửi lại', color: '#F97316', bg: 'rgba(249,115,22,0.10)' },
-    'Tạm ngưng': { label: 'Tạm ngưng', color: '#71717A', bg: 'rgba(113,113,122,0.10)' },
+    // [audit 2026-07 F-12] The two GREY statuses were the only pill labels failing WCAG AA, and
+    // 'Tạm ngưng' was already fixed ONCE -- globals.css:76 raised --status-paused to zinc-400
+    // #A1A1AA "(nâng từ #71717A fail contrast)" but this twin copy never got the same bump, so the
+    // app has been shipping two different greys for one status ever since. Values below keep the
+    // original relationship (cancelled reads dimmer than paused) with both now legible:
+    //   'Tạm ngưng' #A1A1AA 7.72:1  ·  'Đã hủy' #878790 5.56:1  (was 4.10:1 and 2.56:1 on #0A0A0A)
+    'Tạm ngưng': { label: 'Tạm ngưng', color: '#A1A1AA', bg: 'rgba(161,161,170,0.10)' },
     'Hoàn tất': { label: 'Hoàn tất', color: '#10B981', bg: 'rgba(16,185,129,0.10)' },
     'Quá hạn': { label: 'Quá hạn', color: '#DC2626', bg: 'rgba(220,38,38,0.10)' },
-    'Đã hủy': { label: 'Đã hủy', color: '#52525B', bg: 'rgba(82,82,91,0.10)' },
+    'Đã hủy': { label: 'Đã hủy', color: '#878790', bg: 'rgba(135,135,144,0.10)' },
     // [P2-P4] 6 video-lifecycle statuses (A2–A7). Hues mirror TaskWorkflowTabs
     // (--status-* tokens); hex + matching rgba to stay consistent with entries above.
     'Đã nộp video (nội bộ)':      { label: 'Đã nộp video (nội bộ)',      color: '#6366F1', bg: 'rgba(99,102,241,0.10)' },  // --status-submitted (indigo)
@@ -41,7 +47,7 @@ export const TYPE_COLORS: Record<string, { color: string; bg: string }> = {
 }
 
 export function getStatusInfo(status: string) {
-    return STATUS_COLORS[status] || { label: status, color: '#71717A', bg: 'rgba(113,113,122,0.10)' }
+    return STATUS_COLORS[status] || { label: status, color: '#878790', bg: 'rgba(135,135,144,0.10)' }
 }
 export function getTypeInfo(type: string) {
     return TYPE_COLORS[type] || { color: '#A1A1AA', bg: 'rgba(161,161,170,0.10)' }

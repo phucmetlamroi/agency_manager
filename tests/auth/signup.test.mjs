@@ -62,6 +62,10 @@ for (const [name, env, enabled] of deployments) {
 
 function signupAction({ env = {}, bot = false, limited = false } = {}) {
     const calls = []
+    const requestHeaders = { headers: async () => new Headers({
+        'x-real-ip': '203.0.113.10',
+        'x-forwarded-for': '198.51.100.20, 203.0.113.10',
+    }) }
     const create = model => ({ create: async () => { calls.push(model); return { id: model } } })
     const tx = Object.fromEntries(
         ['profile', 'user', 'workspace', 'workspaceMember', 'profileAccess', 'emailVerificationToken'].map(model => [model, create(model)]),
@@ -72,7 +76,8 @@ function signupAction({ env = {}, bot = false, limited = false } = {}) {
             $transaction: callback => callback(tx), auditLog: create('audit'),
         } },
         bcryptjs: { hash: async () => 'test-hash' },
-        'next/headers': { headers: async () => new Headers() },
+        'next/headers': requestHeaders,
+        '@/lib/request-ip': loadModule('src/lib/request-ip.ts', { 'next/headers': requestHeaders }),
         crypto: { randomInt: () => 0 },
         '@/lib/otp': { generateRandomToken: () => 'test-token', hashToken: () => 'test-token-hash' },
         '@/lib/password-validator': { validatePasswordFull: async () => { calls.push('password'); return { valid: true } } },
@@ -85,7 +90,11 @@ function signupAction({ env = {}, bot = false, limited = false } = {}) {
             return { isBot: bot }
         } },
         '@/lib/rate-limit-upstash': {
-            checkSignupIp: async () => { calls.push('ip-limit'); return { success: !limited, retryAfter: limited ? 60 : undefined } },
+            checkSignupIp: async ip => {
+                assert.equal(ip, '203.0.113.10', 'Rate limits must use the trusted proxy IP')
+                calls.push('ip-limit')
+                return { success: !limited, retryAfter: limited ? 60 : undefined }
+            },
             checkSignupEmail: async () => { calls.push('email-limit'); return { success: true } },
         },
         '@/lib/email': { sendEmail: async () => { calls.push('email') } },

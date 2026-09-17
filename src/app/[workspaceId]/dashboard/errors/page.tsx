@@ -25,15 +25,10 @@ export default async function UserErrorsPage({ params }: { params: Promise<{ wor
 
     const performance = await getUserPerformanceScore(workspaceId, userId)
     const errorDetails = await getStaffErrorLogsDetail(workspaceId, userId)
-    const errorRate = performance?.errorRate ?? 0
-
-    // Determine alert level
-    const isClean = !errorDetails || errorDetails.length === 0
-    const alertConfig = errorRate < 0.6
-        ? { border: 'border-emerald-500/25', glow: 'from-emerald-500/15 to-transparent', title: 'text-emerald-400', text: 'Tiêu đề hoàn hảo!' }
-        : errorRate < 1.0
-        ? { border: 'border-amber-500/30', glow: 'from-amber-500/10 to-transparent', title: 'text-amber-400', text: 'Cảnh báo — cần chú ý!' }
-        : { border: 'border-red-500/30', glow: 'from-red-500/10 to-transparent', title: 'text-red-400', text: 'Cần cải thiện ngay!' }
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Xoá khối `errorRate` + `alertConfig` + `isClean`.
+    // Ba biến này chấm mức cảnh báo theo tỉ lệ lỗi (xanh / vàng / đỏ) — cùng lớp với luật hạng.
+    // Đáng chú ý: chúng vốn đã là MÃ CHẾT từ trước, mỗi tên chỉ xuất hiện đúng một lần trong file
+    // (chính dòng khai báo), không có JSX nào đọc tới. Nên xoá không làm mất gì trên màn hình.
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 p-4 md:p-0">

@@ -217,7 +217,7 @@ export function ManageVersionsModal({
                                 </div>
                                 <p className="mb-5 text-[12.5px] leading-relaxed text-zinc-400">
                                     {pending.kind === 'delete'
-                                        ? `Phiên bản v${pending.version.versionNumber} sẽ chuyển vào “Đã xóa gần đây” (khôi phục được trong 30 ngày).`
+                                        ? `Phiên bản v${pending.version.versionNumber} sẽ chuyển vào “Đã xóa gần đây” — khôi phục được trong 30 ngày, sau đó xóa vĩnh viễn.`
                                         : `Phiên bản v${pending.version.versionNumber} sẽ trở thành một asset riêng trong cùng thư mục. Bình luận sẽ đi theo phiên bản.`}
                                 </p>
                                 <div className="flex items-center justify-end gap-2">

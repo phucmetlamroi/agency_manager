@@ -124,6 +124,17 @@ export async function inviteToProfileAction(
         return { error: 'Bạn không có quyền mời thành viên vào Profile này.' }
     }
 
+    // [BILLING P6] Trần ghế gói — cửa mời thứ hai (org-level). Gate sớm cho UX;
+    // chokepoint thật vẫn là acceptProfileInvitation/acceptWorkspaceInvitation.
+    {
+        const { checkSeatCap, billingErrorMessage } = await import('@/lib/billing/entitlements')
+        try { await checkSeatCap(profileId) } catch (e) {
+            const msg = billingErrorMessage(e)
+            if (msg) return { error: msg }
+            throw e
+        }
+    }
+
     // [AUDIT R5 — fix] Privilege-escalation: canInviteMember allows OWNER *or* ADMIN,
     // but the requested `role` was applied verbatim → an ADMIN could mint another
     // ADMIN. Only a profile OWNER may grant the ADMIN role (mirrors the OWNER-only
@@ -213,6 +224,18 @@ export async function removeFromProfileAction(profileId: string, targetUserId: s
         // `role: { not: 'OWNER' }`, that race deletes 0 rows and the OWNER invariant is preserved.
         prisma.profileAccess.deleteMany({
             where: { userId: targetUserId, profileId, role: { not: 'OWNER' } },
+        }),
+        // [AUDIT HT-023 fix] BẤT BIẾN: dấu ProfileAccessRequest APPROVED KHÔNG được sống lâu hơn
+        // quyền ProfileAccess mà nó chứng nhận.
+        // Kể từ HT-023, dấu APPROVED chính là thứ cho phép ADMIN gỡ một người. Đây lại là CỬA
+        // CHÍNH TẮC để gỡ thành viên, nên cũng là đường mà một người du học hay mất quyền nhất.
+        // Nếu ở đây chỉ xoá quyền mà để dấu lại, thì lần sau người đó được mời vào bằng luồng mời
+        // bình thường, dấu cũ vẫn nằm đó và bị nhận vơ cho quyền mới — ADMIN lại gỡ được một thành
+        // viên bình thường, tức HT-023 mở lại mà không cần race nào.
+        // Bốn nơi xoá ProfileAccess đều phải xoá kèm: ở đây, removeCrossTeamAccess, và hai đường
+        // trong member-actions (removeWorkspaceMember + leaveWorkspace).
+        prisma.profileAccessRequest.deleteMany({
+            where: { userId: targetUserId, targetProfileId: profileId },
         }),
     ])
 

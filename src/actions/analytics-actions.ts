@@ -51,31 +51,16 @@ export async function getAnalyticsData(workspaceId: string) {
         const taskCount = completedTasksAggregate.find(t => t.assigneeId === u.id)?._count.id || 0
         const totalPenalty = errorLogsAggregate.find((e: any) => e.userId === u.id)?._sum.calculatedScore || 0
         
-        // Calculate Error Rate: if 0 tasks, rate is set to the penalty count to highlight issues
-        const errorRate = taskCount > 0 ? Number((totalPenalty / taskCount).toFixed(2)) : (totalPenalty > 0 ? totalPenalty : 0)
-
-        // Rank Logic:
-        // S: Rate < 0.3
-        // A: Rate < 0.6
-        // B: Rate < 1.0
-        // C: Rate < 1.5
-        // D: Rate >= 1.5 or (0 tasks but has penalties)
-        let rank = 'S'
-        if (taskCount >= 8) {
-            if (errorRate < 0.3) rank = 'S'
-            else if (errorRate < 0.6) rank = 'A'
-            else if (errorRate < 1.0) rank = 'B'
-            else if (errorRate < 1.5) rank = 'C'
-            else rank = 'D'
-        } else if (taskCount > 0) {
-            // Low volume but still check rate
-            if (errorRate < 1.0) rank = 'N/A' 
-            else rank = 'D'
-        } else if (totalPenalty > 0) {
-            rank = 'D' // Errors with 0 tasks is always D
-        } else {
-            rank = 'N/A'
-        }
+        // [BỎ HẠNG S/A/B/C/D 2026-07-31] Trước đây chỗ này tính `errorRate` (điểm phạt / task) rồi
+        // quy ra hạng S/A/B/C/D. Cả hai đã bỏ theo quyết định của chủ dự án.
+        //
+        // ⚠️ Ghi lại vì nó từng gây nhầm lẫn thật: hạng ở ĐÂY được TỰ TÍNH LẠI từ errorRate sống,
+        // KHÔNG đọc bảng MonthlyRank, và dùng ngưỡng KHÁC (`<` thay vì `<=`) cộng thêm hai nhánh
+        // riêng cho người dưới 8 task. Nên cùng một người có thể hiện hạng khác nhau ở hai màn.
+        // Bỏ cả hai đường là hết luôn khoảng lệch đó.
+        //
+        // GIỮ LẠI `totalPenalty` — đó là TỔNG SỐ LỖI thô, không phải tỉ lệ và không phải hạng.
+        // Sổ ghi lỗi vẫn chạy, cột "Tổng Lỗi" vẫn cần nó.
 
         return {
             id: u.id,
@@ -83,8 +68,6 @@ export async function getAnalyticsData(workspaceId: string) {
             username: (u as any).displayName?.trim() || (u as any).nickname?.trim() || u.username,
             completedTasks: taskCount,
             totalPenalty: totalPenalty,
-            errorRate,
-            rank
         }
     })
 
@@ -162,38 +145,19 @@ export async function getUserPerformanceScore(workspaceId: string, userId: strin
     })
 
     const totalPenalty = errorSum._sum.calculatedScore || 0
-    const errorRate = taskCount > 0 ? Number((totalPenalty / taskCount).toFixed(2)) : (totalPenalty > 0 ? totalPenalty : 0)
 
-    // Match the rank logic from getAnalyticsData
-    let rank = 'S'
-    if (taskCount >= 8) {
-        if (errorRate < 0.3) rank = 'S'
-        else if (errorRate < 0.6) rank = 'A'
-        else if (errorRate < 1.0) rank = 'B'
-        else if (errorRate < 1.5) rank = 'C'
-        else rank = 'D'
-    } else if (taskCount > 0) {
-        if (errorRate < 1.0) rank = 'N/A' 
-        else rank = 'D'
-    } else if (totalPenalty > 0) {
-        rank = 'D'
-    } else {
-        rank = 'N/A'
-    }
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `errorRate` và `rank` — bản sao thứ hai của cùng phép
+    // chấm hạng tự tính (xem chú thích ở getAnalyticsData). Giữ `totalPenalty` = tổng số lỗi thô.
 
     return {
         taskCount,
         totalPenalty,
-        errorRate,
-        rank
     }
     } catch(e) {
         console.error('[getUserPerformanceScore Error]', e)
         return {
             taskCount: 0,
             totalPenalty: 0,
-            errorRate: 0,
-            rank: 'N/A'
         }
     }
 }

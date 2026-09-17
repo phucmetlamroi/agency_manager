@@ -6,11 +6,18 @@ import * as bcrypt from 'bcryptjs'
 import { revalidatePath } from 'next/cache'
 import { UserRole } from '@prisma/client'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { resolveWorkspaceProfileId } from '@/lib/prisma-workspace'
 import { audit } from '@/lib/audit-log'
 
 export async function changePassword(formData: FormData, workspaceId: string) {
     const session = await getSession()
     if (!session) return { error: 'Unauthorized' }
+    // [AUDIT HT-033 fix] Đổi mật khẩu bằng token của một phiên ĐÃ BỊ THU HỒI là đúng thứ mà việc
+    // thu hồi phiên sinh ra để chặn: admin bấm "đăng xuất mọi thiết bị" hoặc đặt lại mật khẩu cho
+    // một tài khoản nghi bị chiếm, thao tác đó bump sessionVersion — nhưng getSession() không đọc
+    // DB nên cookie cũ vẫn qua, và kẻ đang giữ cookie đó đặt lại mật khẩu trước chủ tài khoản.
+    const { isSessionLive } = await import('@/lib/profile-permissions')
+    if (!(await isSessionLive(session))) return { error: 'Phiên đăng nhập đã hết hiệu lực hoặc tài khoản đã bị khóa.' }
 
     // [AUDIT R14 — fix] Refuse credential changes inside an impersonation session — the
     // session principal is the impersonated victim, so this would silently plant a
@@ -103,7 +110,15 @@ export async function updateUserRole(userId: string, newRole: string, workspaceI
         if (!targetUser) return { success: false, error: 'Người dùng không tồn tại.' }
         // [AUDIT R5 — fix] No JWT role==='ADMIN' escape hatch (Sprint Z removed the
         // global super-admin); the cross-profile check is unconditional.
-        const callerProfileId = (session?.user as any)?.sessionProfileId
+        // [PHẢN BIỆN 2026-07-30 · CS-3] So theo profile CỦA WORKSPACE, không theo claim JWT.
+        // Claim đặt được tuỳ ý qua /api/profile/select (route chỉ kiểm hàng ProfileAccess TỒN TẠI,
+        // không đọc vai), trong khi cổng verifyWorkspaceAccess chấm trên workspace.profileId. Lấy
+        // hai nguồn khác nhau cho hai việc chính là thứ biến chốt này thành cửa mở: đưa claim của
+        // tenant nạn nhân vào thì `targetUser.profileId !== callerProfileId` trả false ⇒ qua chốt.
+        const callerProfileId = await resolveWorkspaceProfileId(workspaceId)
+        if (!callerProfileId) {
+            return { success: false, error: 'Workspace chưa gắn Profile — không thể đổi vai trò.' }
+        }
         if (targetUser.profileId && targetUser.profileId !== callerProfileId) {
             return { success: false, error: 'Bạn không thể đổi vai trò của user thuộc Profile khác.' }
         }
@@ -198,7 +213,19 @@ export async function deactivateUser(userId: string, workspaceId: string) {
         // super-admin, so a JWT-asserted role==='ADMIN' must NOT bypass tenant isolation
         // (a stray seed/restore ADMIN account would otherwise re-acquire unscoped
         // cross-tenant deactivate power). The checks are now unconditional.
-        const callerProfileId = (session?.user as any)?.sessionProfileId
+        // [PHẢN BIỆN 2026-07-30 · CS-3] ĐÂY LÀ MẮT CUỐI CỦA CHUỖI KHOÁ TÀI KHOẢN — xem lý do đầy đủ
+        // ở `isAssigneeInWorkspaceProfile` (lib/workspace-membership.ts).
+        //
+        // Trước đây so với claim JWT. Kẻ tấn công trỏ claim về profile nạn nhân A rồi gọi hàm này
+        // với workspaceId = W_B (workspace hắn tự tạo, hắn là OWNER): cổng PASS, và chốt này so
+        // `nạn nhân.profileId (A) !== claim (A)` ⇒ FALSE ⇒ QUA. Ghi tiếp `role='LOCKED'` +
+        // sessionVersion++ khiến nạn nhân mất quyền đăng nhập TOÀN NỀN TẢNG, kể cả vào tenant của
+        // chính họ. Chốt "không được khoá OWNER" bên dưới không cứu, vì nó chỉ soi vai trên profile B.
+        // Gọi bằng nguồn ĐÚNG thì chính chốt này chặn — nên nguồn không còn là lựa chọn.
+        const callerProfileId = await resolveWorkspaceProfileId(workspaceId)
+        if (!callerProfileId) {
+            return { success: false, error: 'Workspace chưa gắn Profile — không thể deactivate.' }
+        }
         if (targetUser.profileId && targetUser.profileId !== callerProfileId) {
             return {
                 success: false,

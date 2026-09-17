@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
     Settings, Edit3, Trash2, RotateCcw, Loader2,
     Shield, AlertTriangle, Clock, Check, Plug, DollarSign,
+    Clapperboard, ArrowUpRight,
 } from 'lucide-react'
 import { renameWorkspaceAction, deleteWorkspaceAction, restoreWorkspaceAction } from '@/actions/workspace-actions'
 import { toast } from 'sonner'
@@ -297,6 +298,25 @@ export default function WorkspaceSettingsPanel({
                     </div>
                 </div>
             </div>
+
+            {/* [Giải trí] Lối vào kho phim — tính năng ẨN, sau đây còn một cửa mã truy cập
+                nữa. Card này chỉ là đường đi; không có mã thì bấm vào chỉ gặp ô nhập mã,
+                không lộ gì về nội dung bên trong. Trang cài đặt vốn đã gate ADMIN. */}
+            {activeTab === 'general' && (
+                <a
+                    href="/entertainment"
+                    className="group flex items-center gap-4 rounded-2xl border border-white/5 bg-zinc-950/50 p-6 shadow-xl backdrop-blur-xl transition-colors hover:border-amber-500/20 hover:bg-zinc-900/50"
+                >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 transition-colors group-hover:bg-amber-500/20">
+                        <Clapperboard className="h-5 w-5" strokeWidth={1.5} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-zinc-100">Giải trí</div>
+                        <div className="text-xs text-zinc-500">Khu vực riêng — cần mã truy cập.</div>
+                    </div>
+                    <ArrowUpRight className="h-4 w-4 shrink-0 text-zinc-600 transition-colors group-hover:text-amber-400" />
+                </a>
+            )}
 
             {/* Danger Zone */}
             {isOwner && !isSoftDeleted && (

@@ -7,7 +7,7 @@
 // Admin-gated fail-closed (nhất quán namespace MC; non-admin dùng /dashboard/profile). Đóng → /mc.
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, UserCircle, CreditCard, Bell, Trophy, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, UserCircle, CreditCard, Bell, CheckCircle2 } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { verifyProfileAdminAccess } from '@/lib/security'
 import { resolveActiveProfileId, getWorkspacePrisma } from '@/lib/prisma-workspace'
@@ -20,7 +20,7 @@ import NotificationSettings from '@/components/profile/NotificationSettings'
 
 export const dynamic = 'force-dynamic'
 
-const RANK_HEX: Record<string, string> = { S: '#FACC15', A: '#34D399', B: '#60A5FA', C: '#A1A1AA', D: '#F87171' }
+// [BO HANG S/A/B/C/D 2026-07-31] Bo bang mau hang RANK_HEX.
 
 export default async function MissionControlProfilePage({ params }: { params: Promise<{ workspaceId: string }> }) {
     const { workspaceId } = await params
@@ -32,22 +32,14 @@ export default async function MissionControlProfilePage({ params }: { params: Pr
     const user = await prisma.user.findUnique({ where: { id: session.user.id } })
     if (!user) redirect('/login')
 
-    // Chỉ số cá nhân READ-ONLY (workspace-scoped): số task hoàn tất + rank/lỗi kỳ mới nhất (KPI hệ thống).
+    // Chỉ số cá nhân READ-ONLY (workspace-scoped): số task hoàn tất.
+    // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ `rank` + `errorRate` (đọc từ MonthlyRank) và luôn cả truy
+    // vấn `wp.monthlyRank.findFirst` — bảng đó nay không còn được ghi, giữ lại chỉ hiện số đóng băng.
     let completedCount = 0
-    let rank: string | null = null
-    let errorRate: number | null = null
     const profileId = await resolveActiveProfileId(session.user.id, workspaceId, (session.user as { sessionProfileId?: string }).sessionProfileId)
     if (profileId) {
         const wp = getWorkspacePrisma(workspaceId, profileId)
-        const [cnt, mr] = await Promise.all([
-            wp.task.count({ where: { assigneeId: user.id, workspaceId, status: SALARY_COMPLETED_STATUS } }),
-            wp.monthlyRank.findFirst({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, select: { rank: true, errorRate: true } }),
-        ])
-        completedCount = cnt
-        if (mr && mr.rank && mr.rank !== 'UNRANKED') {
-            rank = mr.rank
-            errorRate = mr.errorRate != null ? Number(mr.errorRate) : null
-        }
+        completedCount = await wp.task.count({ where: { assigneeId: user.id, workspaceId, status: SALARY_COMPLETED_STATUS } })
     }
 
     const roleText = ((session.user as { role?: string }).role || user.role || 'USER').toUpperCase()
@@ -85,14 +77,7 @@ export default async function MissionControlProfilePage({ params }: { params: Pr
                             <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-zinc-500"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Task hoàn tất</span>
                             <span className="font-mono text-xl font-extrabold text-white">{completedCount}</span>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-zinc-900/60 px-4 py-3.5 flex flex-col gap-1">
-                            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-zinc-500"><Trophy className="w-3.5 h-3.5 text-amber-400" /> Xếp hạng</span>
-                            <span className="text-xl font-extrabold" style={{ color: rank ? (RANK_HEX[rank] ?? '#FFFFFF') : '#52525B' }}>{rank ?? '—'}</span>
-                        </div>
-                        <div className="rounded-2xl border border-white/8 bg-zinc-900/60 px-4 py-3.5 flex flex-col gap-1">
-                            <span className="text-[10.5px] font-bold uppercase tracking-wider text-zinc-500">Lỗi trung bình</span>
-                            <span className="font-mono text-xl font-extrabold" style={{ color: errorRate == null ? '#52525B' : errorRate <= 1 ? '#34D399' : '#F87171' }}>{errorRate == null ? '—' : errorRate.toLocaleString('vi-VN')}</span>
-                        </div>
+                        {/* [BỎ HẠNG S/A/B/C/D 2026-07-31] Bỏ hai ô "Xếp hạng" và "Lỗi trung bình". */}
                     </div>
                     <p className="text-[10.5px] text-zinc-600 -mt-4 px-1">
                         Chỉ số do hệ thống KPI tự đánh giá theo workspace — không sửa tay được · Vai trò: <b className="text-zinc-400">{roleText}</b>

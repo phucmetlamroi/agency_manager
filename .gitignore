@@ -42,12 +42,11 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# nested node_modules (electron/, mcp-server/) — root /node_modules above is anchored to root only
+# nested node_modules (mcp-server/) — root /node_modules above is anchored to root only
 **/node_modules/
 
-# desktop (Electron) + MCP server build artifacts (keep source, drop builds)
-/electron/dist/
-/electron/release/
+# MCP server build artifacts (keep source, drop builds)
+# [Desktop retired 2026-07] /electron/dist/ + /electron/release/ đã gỡ cùng bản desktop.
 /mcp-server/dist/
 /mcp-server/build/
 
@@ -62,3 +61,7 @@ playwright-report/
 test-results/
 
 audit-confirmed.json
+
+# Operational record of the 2026-07-27 folder-flatten migration: real production row ids.
+# Kept on disk as the undo reference, never committed.
+scripts/.flatten-rollback.jsonl

@@ -13,6 +13,8 @@ import { requireReviewAccess } from './access'
 import { getFolderScope, assertVersionInScope } from './folder-scope'
 import { apiError } from './errors'
 import { presignPutObject, presignGetObject, headObject } from './r2'
+import { limitDb } from './rate-limit-db'
+import { canonicalAttachmentImageMime } from './media-constants'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { annotationSchema, toAnnotationEnvelope, readAnnotationShapes } from './annotation'
 import {
@@ -57,7 +59,10 @@ function msToFrame(ms: number, fps: Fps): number {
 const attachmentInputSchema = z.object({
     attachmentId: z.string().uuid(),
     fileName: z.string().min(1).max(255),
-    mimeType: z.string().regex(/^image\//, 'image_only'),
+    // [AUDIT HT-020 fix] Cùng allowlist với initiateAttachment. Đây là đường ghi hàng
+    // CommentAttachment vào DB — nếu chỉ siết ở bước presign mà để hở schema này, client vẫn khai
+    // được mimeType tuỳ ý cho hàng dữ liệu, và /raw sẽ tin theo nó.
+    mimeType: z.string().refine((v) => canonicalAttachmentImageMime(v) !== null, 'image_only'),
     sizeBytes: z.number().int().positive().max(MAX_ATTACH_BYTES),
     width: z.number().int().positive().max(20000).optional(),
     height: z.number().int().positive().max(20000).optional(),
@@ -99,16 +104,22 @@ export const reactionSchema = z
 interface VersionCtx {
     version: ReviewVersion
     asset: ReviewAsset
-    access: { userId: string; isAdmin: boolean }
+    access: { userId: string; isAdmin: boolean; isGuest: boolean }
     isImage: boolean
 }
 
-async function resolveVersionCtx(versionId: string): Promise<VersionCtx> {
+/**
+ * @param allowGuest [Q3] Phễu này gác MỌI lối vào bình luận, nên KHÔNG mở nó cho khách
+ *   một cách đại trà. Chủ sản phẩm chốt mức "chỉ xem + bình luận": chỉ listComments và
+ *   createComment truyền true. Sửa/xoá/đánh dấu xong/thả cảm xúc/tải đính kèm giữ mặc
+ *   định false → khách bị verifyWorkspaceAccess chặn ngay, không cần thêm chốt nào.
+ */
+async function resolveVersionCtx(versionId: string, allowGuest = false): Promise<VersionCtx> {
     const version = await prisma.reviewVersion.findFirst({ where: { id: versionId, deletedAt: null } })
     if (!version) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
     const asset = await prisma.reviewAsset.findFirst({ where: { id: version.assetId, deletedAt: null } })
     if (!asset) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy asset.')
-    const access = await requireReviewAccess({ workspaceId: asset.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: asset.workspaceId, allowGuest })
     // [FR-03] editor chỉ đọc/ghi comment trên version trong phạm vi được giao — funnel này
     // gác MỌI entry point (list/create/edit/delete/resolve/reaction/attachment-raw). Out-of-scope
     // = không xem được → chặn cả đọc lẫn ghi + rò ảnh đính kèm R2.
@@ -120,10 +131,23 @@ async function resolveVersionCtx(versionId: string): Promise<VersionCtx> {
     return { version, asset, access, isImage: asset.mediaKind === 'IMAGE' }
 }
 
-async function resolveCommentCtx(commentId: string): Promise<{ comment: import('@prisma/client').ReviewComment } & VersionCtx> {
+/**
+ * @param allowGuest [Q3] Mặc định false — mọi đường SỬA/XOÁ/ĐÁNH DẤU/THẢ CẢM XÚC đi qua đây
+ *   phải chặn khách. Chỉ getAttachmentRawUrl (đường ĐỌC ảnh trong bình luận) truyền true, và
+ *   khi đó phải tự kiểm `comment.isInternal` — hàm này nhận commentId thẳng từ client nên
+ *   khách có thể đưa id của một bình luận nội bộ mà họ chưa từng nhìn thấy trong danh sách.
+ */
+async function resolveCommentCtx(
+    commentId: string,
+    allowGuest = false,
+): Promise<{ comment: import('@prisma/client').ReviewComment } & VersionCtx> {
     const comment = await prisma.reviewComment.findFirst({ where: { id: commentId, deletedAt: null } })
     if (!comment) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy bình luận.')
-    const ctx = await resolveVersionCtx(comment.versionId)
+    const ctx = await resolveVersionCtx(comment.versionId, allowGuest)
+    // Khách không được biết bình luận nội bộ tồn tại → 404, cùng câu với "không có", đúng §11.
+    if (ctx.access.isGuest && comment.isInternal) {
+        throw apiError(404, 'NOT_FOUND', 'Không tìm thấy bình luận.')
+    }
     return { comment, ...ctx }
 }
 
@@ -222,12 +246,17 @@ export interface ListCommentsOpts {
 }
 
 export async function listComments(versionId: string, opts: ListCommentsOpts = {}): Promise<ListCommentsResult> {
-    const { version, asset, access } = await resolveVersionCtx(versionId)
+    const { version, asset, access } = await resolveVersionCtx(versionId, true) // [Q3] khách được XEM bình luận
 
     const filterWhere: Prisma.ReviewCommentWhereInput = { versionId }
     if (opts.filter === 'unresolved') filterWhere.resolvedAt = null
     if (opts.filter === 'internal') filterWhere.isInternal = true
     if (opts.filter === 'public') filterWhere.isInternal = false
+    // [kiểm toán 2026-07 · phản biện] Khách CHỈ thấy bình luận công khai. Ràng buộc này đặt
+    // SAU các bộ lọc phía trên nên `?filter=internal` không lách qua được: nó ghi đè, không
+    // cộng thêm. Đây là bất biến chú thích đầu file đã tuyên bố ("guests only ever see false")
+    // và đường khách-qua-link share-comments.ts:177 đã thực thi — đường khách-nội-bộ thì chưa.
+    if (access.isGuest) filterWhere.isInternal = false
     if (opts.filter === 'mine') filterWhere.authorId = access.userId
     if (opts.authorId) filterWhere.authorId = opts.authorId
     if (opts.q) filterWhere.body = { contains: opts.q, mode: 'insensitive' }
@@ -243,7 +272,9 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
         filterWhere.deletedAt = null
         // …plus ids deleted after the mark, so the client can drop them from cache.
         const gone = await prisma.reviewComment.findMany({
-            where: { versionId, deletedAt: { gt: since } },
+            // Cùng ràng buộc khách như trên: đừng để danh sách "đã xoá" tiết lộ id của
+            // những bình luận nội bộ mà khách chưa từng được thấy.
+            where: { versionId, deletedAt: { gt: since }, ...(access.isGuest ? { isInternal: false } : {}) },
             select: { id: true },
         })
         deletedIds = gone.map((g) => g.id)
@@ -260,18 +291,39 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
     const items = await serializeComments(rows, version, access.userId)
 
     // Count of live comments on THIS version (excludes deleted; independent of filters).
-    const total = await prisma.reviewComment.count({ where: { versionId, deletedAt: null } })
+    // Với khách, đếm theo đúng tập khách được thấy — nếu không, con số cao hơn số dòng
+    // hiển thị sẽ tự nó tố cáo rằng có trao đổi nội bộ đang bị giấu.
+    const total = await prisma.reviewComment.count({
+        where: { versionId, deletedAt: null, ...(access.isGuest ? { isInternal: false } : {}) },
+    })
 
     const others = await prisma.reviewVersion.findMany({
         where: { assetId: asset.id, deletedAt: null, id: { not: versionId } },
         select: { id: true, versionNumber: true, commentCount: true },
         orderBy: { versionNumber: 'desc' },
     })
+    // [kiểm toán 2026-07 · phản biện] ReviewVersion.commentCount là bộ đếm phi chuẩn hoá,
+    // và nó tăng cho MỌI bình luận (dòng ~416, không rẽ nhánh isInternal). Với khách, con số
+    // đó là một kênh rò riêng: khách không đọc được nội dung nội bộ nữa, nhưng huy hiệu vẫn
+    // nói cho họ biết version kia đang có bao nhiêu trao đổi. Đếm lại theo đúng tập khách thấy.
+    let visibleCounts: Map<string, number> | null = null
+    if (access.isGuest && others.length > 0) {
+        const grouped = await prisma.reviewComment.groupBy({
+            by: ['versionId'],
+            where: { versionId: { in: others.map((o) => o.id) }, deletedAt: null, isInternal: false },
+            _count: { _all: true },
+        })
+        visibleCounts = new Map(grouped.map((g) => [g.versionId, g._count._all]))
+    }
 
     return {
         items,
         ...(deletedIds ? { deletedIds } : {}),
-        otherVersions: others.map((o) => ({ versionId: o.id, versionNumber: o.versionNumber, commentCount: o.commentCount })),
+        otherVersions: others.map((o) => ({
+            versionId: o.id,
+            versionNumber: o.versionNumber,
+            commentCount: visibleCounts ? (visibleCounts.get(o.id) ?? 0) : o.commentCount,
+        })),
         nextCursor: null,
         total,
     }
@@ -280,7 +332,8 @@ export async function listComments(versionId: string, opts: ListCommentsOpts = {
 // ─────────────────────────── create (+ reply) ───────────────────────────
 
 export async function createComment(versionId: string, input: CreateCommentInput): Promise<{ comment: CommentDto }> {
-    const { version, asset, access, isImage } = await resolveVersionCtx(versionId)
+    // [Q3] Đường GHI DUY NHẤT mở cho khách — chủ sản phẩm chốt mức "chỉ xem + bình luận".
+    const { version, asset, access, isImage } = await resolveVersionCtx(versionId, true)
     if (version.pipelineStatus !== ReviewPipelineStatus.READY) {
         throw apiError(409, 'STATE_INVALID', 'Phiên bản chưa sẵn sàng để bình luận.', { reason: 'not_ready' })
     }
@@ -299,8 +352,18 @@ export async function createComment(versionId: string, input: CreateCommentInput
         if (!parent || parent.versionId !== versionId || parent.parentId) {
             throw apiError(400, 'VALIDATION_ERROR', 'Bình luận gốc không hợp lệ.', { field: 'parentId' })
         }
+        // [kiểm toán 2026-07 · phản biện] Khách không được trả lời vào luồng nội bộ — nếu
+        // thừa kế, bình luận của khách sẽ chui vào đúng cuộc trao đổi họ không được thấy.
+        // Trả 404 chứ không phải 403: khách vốn không được biết bình luận đó tồn tại (§11).
+        if (access.isGuest && parent.isInternal) {
+            throw apiError(404, 'NOT_FOUND', 'Bình luận gốc không hợp lệ.', { field: 'parentId' })
+        }
         isInternal = parent.isInternal // server FORCES inheritance (ignores client value)
     }
+    // Mặc định của trường này là NỘI BỘ, nên nếu không ép thì mọi bình luận khách viết ra
+    // đều rơi vào diện nội bộ — vừa sai ý "khách bình luận để nhân viên đọc", vừa khiến
+    // chính khách không đọc lại được bình luận của mình sau khi bộ lọc trên có hiệu lực.
+    if (access.isGuest) isInternal = false
 
     // Timecode / range → ms. Only for video (images have no frames).
     let timecodeMs: number | null = null
@@ -391,7 +454,10 @@ export async function createComment(versionId: string, input: CreateCommentInput
     // depth — never notify an arbitrary uuid), exclude the author, and works for
     // INTERNAL comments too (a guest never sees internal comments, so mentioning an
     // internal teammate there is safe — AC2). Fire-and-forget.
-    if (input.mentions?.length && asset.taskId) {
+    // [kiểm toán 2026-07 · phản biện] Khách KHÔNG được cầm cần fan-out này. Nó nhận thẳng
+    // userId do client gửi và bắn thông báo tới nhân viên; mở cho khách là mở một đường
+    // nhắn tin tới nhân viên tuỳ ý, nằm ngoài mức "chỉ xem + bình luận" đã chốt.
+    if (input.mentions?.length && asset.taskId && !access.isGuest) {
         const mentionIds = [...new Set(input.mentions)].filter((id) => id !== access.userId)
         if (mentionIds.length) {
             void (async () => {
@@ -401,8 +467,27 @@ export async function createComment(versionId: string, input: CreateCommentInput
                     where: { profileId: task.profileId, userId: { in: mentionIds }, role: { in: ['OWNER', 'ADMIN', 'USER'] } },
                     select: { userId: true },
                 })
+                let recipientIds = staff.map((s) => s.userId)
+                // [kiểm toán 2026-07 · phản biện] Chú thích ngay trên kia ("khách không bao giờ
+                // thấy bình luận nội bộ nên nhắc tên ở đó là an toàn") đúng với khách-qua-LINK,
+                // nhưng SAI với khách của workspace: họ là tài khoản thật, thường mang
+                // ProfileAccess = USER, nên lọt đúng bộ lọc trên. Và `body` được gửi NGUYÊN VĂN
+                // 140 ký tự qua chuông, realtime và web-push — tức nội dung nội bộ đi thẳng tới
+                // khách bằng một đường vòng, dù listComments đã chặn. Cờ !access.isGuest phía
+                // trên chỉ kiểm NGƯỜI GỬI, không kiểm người nhận.
+                if (isInternal && recipientIds.length) {
+                    const guestRows = await prisma.workspaceMember.findMany({
+                        where: { workspaceId: asset.workspaceId, userId: { in: recipientIds }, role: 'GUEST' },
+                        select: { userId: true },
+                    })
+                    if (guestRows.length) {
+                        const guestIds = new Set(guestRows.map((g) => g.userId))
+                        recipientIds = recipientIds.filter((id) => !guestIds.has(id))
+                    }
+                }
+                if (!recipientIds.length) return
                 await notifyReview({
-                    recipientIds: staff.map((s) => s.userId),
+                    recipientIds,
                     excludeUserId: access.userId,
                     type: 'VIDEO_COMMENT_NEW',
                     title: 'Bạn được nhắc trong một bình luận review',
@@ -556,11 +641,21 @@ export async function initiateAttachment(input: {
     mimeType: string
 }): Promise<{ attachmentId: string; putUrl: string; expiresAt: string }> {
     const access = await requireReviewAccess()
-    // [AUDIT HT-020 fix] Accept raster images only. `image/svg+xml` passes the `image/` prefix
-    // but SVG can carry inline <script> → stored XSS when served/opened inline. Owner decision Q5:
-    // SVG is not needed for comment attachments, so reject it outright.
-    if (!/^image\//.test(input.mimeType) || /svg/i.test(input.mimeType)) {
-        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ đính kèm được ảnh (không hỗ trợ SVG).')
+    // [AUDIT SWEEP-2026-07-30 fix · NEW-attach-presign-unbounded] Đường NỘI BỘ này trước đây KHÔNG
+    // có một chốt tần suất nào: bất kỳ tài khoản MEMBER còn cookie hợp lệ đều mint được URL PUT ký
+    // sẵn ở tốc độ HTTP, mỗi URL sống 1 giờ và cho PUT tới trần single-PUT của R2. Không tạo bình
+    // luận thì object nằm lại R2 vĩnh viễn, không hàng DB nào trỏ tới nên janitor không thấy.
+    // Khoá theo NGƯỜI GỬI (khuôn nguyên văn ở api/integrations/scan-folder/route.ts).
+    const rl = await limitDb(`attach-init:${access.userId}`, 10, 60, { failClosed: true })
+    if (!rl.success) {
+        throw apiError(429, 'RATE_LIMITED', 'Bạn đính kèm quá nhanh. Thử lại sau một phút.')
+    }
+    // [AUDIT HT-020 fix] Vòng vá trước dùng "có tiền tố image/ VÀ không chứa chữ svg" — một danh
+    // sách CẤM. Nay dùng ALLOWLIST dùng chung với luồng upload bản dựng: chỉ 6 định dạng raster mà
+    // trình duyệt thật sự render trong <img>. Danh sách cấm chỉ chặn được cách viết ta nghĩ ra.
+    const mime = canonicalAttachmentImageMime(input.mimeType)
+    if (!mime) {
+        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ đính kèm được ảnh JPEG/PNG/WebP/GIF/AVIF/BMP (không hỗ trợ SVG).')
     }
     const size = Number(input.sizeBytes)
     if (!Number.isFinite(size) || size <= 0 || size > MAX_ATTACH_BYTES) {
@@ -569,7 +664,10 @@ export async function initiateAttachment(input: {
     const attachmentId = randomUUID()
     const key = attachmentKey(access.userId, attachmentId, input.fileName)
     const ttl = 60 * 60 // 1h to PUT
-    const putUrl = await presignPutObject(key, input.mimeType, ttl)
+    // ⚠️ Truyền `mime` vào đây chỉ để R2 có một giá trị mặc định hợp lý — nó KHÔNG ràng buộc được
+    // client (Content-Type không nằm trong chữ ký; xem presignPutObject). Chốt chặn thật nằm ở
+    // getAttachmentRawUrl bên dưới.
+    const putUrl = await presignPutObject(key, mime, ttl)
     return { attachmentId, putUrl, expiresAt: new Date(Date.now() + ttl * 1000).toISOString() }
 }
 
@@ -578,6 +676,40 @@ export async function getAttachmentRawUrl(attachmentId: string): Promise<string>
     const attach = await prisma.commentAttachment.findUnique({ where: { id: attachmentId } })
     if (!attach) throw apiError(404, 'NOT_FOUND', 'Không tìm thấy ảnh.')
     // Re-check access through comment → version → asset → workspace.
-    await resolveCommentCtx(attach.commentId)
-    return presignGetObject(attach.r2Key, { expiresIn: 15 * 60 })
+    // [Q3] Khách xem được ảnh đính kèm của những bình luận họ được thấy — nếu không, khung
+    // bình luận của khách sẽ toàn ảnh vỡ. resolveCommentCtx tự chặn bình luận nội bộ.
+    await resolveCommentCtx(attach.commentId, true)
+    // [AUDIT HT-020 fix] ĐÂY MỚI LÀ CHỖ CHẶN THẬT — xem chú thích ở presignPutObject.
+    //
+    // Kiểu tệp mà R2 đang lưu là do CLIENT đặt lúc PUT (Content-Type không được ký), nên nó không
+    // đáng tin: kẻ tấn công xin presign bằng 'image/png' rồi PUT kèm header
+    // `Content-Type: image/svg+xml` (hoặc text/html) là object nằm đó với kiểu tuỳ ý.
+    // Vòng vá trước của tôi quyết định inline-hay-tải-về dựa trên `attach.mimeType` trong DB —
+    // nhưng trường đó CŨNG do client khai lúc tạo bình luận, nên khai 'image/png' là qua hết.
+    //
+    // Nay LUÔN ép `ResponseContentType` (tham số này NẰM TRONG chữ ký) bằng một giá trị do MÁY CHỦ
+    // chọn, nên byte thật là gì cũng không đổi được cách trình duyệt hiểu:
+    //   · kiểu đã khai nằm trong allowlist → phục vụ đúng kiểu raster đó. Kể cả ruột là SVG,
+    //     trình duyệt KHÔNG bao giờ tự suy ngược sang SVG từ một kiểu ảnh đã khai (mimesniff cấm),
+    //     nên kết quả tệ nhất chỉ là một ảnh vỡ.
+    //   · ngoài allowlist (hàng cũ còn sót) → octet-stream + buộc tải về.
+    //
+    // ⚠️ `ResponseContentDisposition: attachment` đặt VÔ ĐIỀU KIỆN, không chỉ cho hàng cũ.
+    // Lý do: `ResponseContentType` chỉ cứu ta NẾU R2 có cài đặt tham số đó — mà tài liệu tương
+    // thích S3 của Cloudflare KHÔNG hề nhắc tới nó, và kiểu hỏng thường gặp của các lớp tương
+    // thích là LẶNG LẼ BỎ QUA tham số lạ. Nếu R2 bỏ qua, object vẫn được phục vụ bằng
+    // Content-Type kẻ tấn công đã lưu, và ta không hề biết: không lỗi, không log. Đúng cái hình
+    // hài của lỗ hổng gốc — một chốt chặn trông thì đúng nhưng dựa trên giả định chưa kiểm chứng
+    // về hệ thống của người khác. Content-Disposition thì ĐÃ được chứng minh chạy trên R2 (chính
+    // app này đang dựa vào nó ở /r/[slug]/download-url). Giữ cả hai: cái nào R2 hiểu cũng chặn.
+    //
+    // KHÔNG ảnh hưởng hiển thị: trình duyệt BỎ QUA Content-Disposition khi tải ảnh qua thẻ <img>,
+    // mà khung bình luận (ảnh nhỏ + lightbox) chỉ dùng <img src>. Chỉ khi ai đó dán thẳng URL
+    // /raw lên thanh địa chỉ thì tệp mới tải về thay vì mở — và đó CHÍNH LÀ đường tấn công.
+    const stored = canonicalAttachmentImageMime(attach.mimeType)
+    return presignGetObject(attach.r2Key, {
+        expiresIn: 15 * 60,
+        responseContentType: stored ?? 'application/octet-stream',
+        downloadFileName: attach.fileName,
+    })
 }

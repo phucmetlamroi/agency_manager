@@ -23,6 +23,7 @@
 
 import { prisma } from '@/lib/db'
 import { verifyWorkspaceAccess } from '@/lib/security'
+import { resolveActiveProfileId } from '@/lib/prisma-workspace'
 import { clientPathKey } from '@/lib/client-dedupe'
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -87,8 +88,34 @@ export async function getLastClientNote(
     workspaceId: string,
 ): Promise<InheritedNotePreview | null> {
     try {
-        const { user } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
-        const profileId = (user as any)?.sessionProfileId
+        const { user, userId } = await verifyWorkspaceAccess(workspaceId, 'ADMIN')
+        // [PHẢN BIỆN 2026-07-30 · R-1] ĐÂY LÀ ĐÚNG LỖI H1, BỊ BỎ SÓT Ở HÀM NÀY.
+        //
+        // Trước đây: cổng `verifyWorkspaceAccess` chấm quyền theo profile CỦA WORKSPACE trong tham
+        // số (nó tra `workspace.profileId` — security.ts:84-99), còn phạm vi dữ liệu bên dưới lấy
+        // từ claim `sessionProfileId` trong JWT. Hai nguồn khác nhau cho hai việc, trong cùng một
+        // hàm — y hệt 11 chỗ đã vá ở crm-actions.ts, và `Client` nằm trong `bypassModels` nên
+        // profileId là bộ lọc tenant DUY NHẤT của nó.
+        //
+        // Đường khai thác (đã dựng lại được từng mắt): nhân sự thường của agency A gọi
+        // createProfileForUser (ai cũng gọi được, hạn mức 5) → tự thành OWNER profile B → tạo
+        // workspace W_B → POST /api/profile/select trỏ claim về A → POST thẳng server action này
+        // với workspaceId = W_B. Cổng PASS vì họ là OWNER của B; dữ liệu lại quét toàn bộ workspace
+        // ACTIVE của A. `Client.id` là số tự tăng nên dò tuần tự clientId = dump tên khách + ghi chú
+        // nội bộ (`notes_vi`) của cả profile A.
+        //
+        // Hàm này đáng lẽ phải được vá cùng H1: chính commit 8dde6eb dẫn nó ra trong phần H2 làm
+        // đường đưa `notes_vi` về màn hình admin ("công tắc kế thừa ghi chú của Velox"), tức nó đã
+        // được ĐỌC mà không được nhận ra là mang cùng khiếm khuyết.
+        //
+        // Dùng đúng helper H1 đã chọn, không phát minh khuôn mới: `resolveActiveProfileId` chuyển
+        // sang profile của workspace khi người gọi có ProfileAccess ở đó, và GIỮ claim khi
+        // `workspace.profileId` là NULL (workspace legacy) nên không làm chết tính năng trên dữ liệu cũ.
+        const profileId = await resolveActiveProfileId(
+            userId,
+            workspaceId,
+            (user as any)?.sessionProfileId,
+        )
         if (!profileId) return null
 
         // All ACTIVE workspaces in the current profile

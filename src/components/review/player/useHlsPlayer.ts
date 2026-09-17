@@ -11,6 +11,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { hlsUrl } from '@/lib/review/player-api'
 import { frameToSeekTime, timeToFrame, type Fps } from '@/lib/review/timecode'
 import { usePlayerEnv } from './player-env'
+import {
+    REVIEW_PLAYBACK_DISABLED,
+    REVIEW_CLOSURE_MESSAGE,
+    REVIEW_CLOSURE_MESSAGE_EN,
+} from '@/lib/review/upload-maintenance'
 
 export interface QualityLevel {
     index: number // hls.js level index; -1 = auto
@@ -111,6 +116,13 @@ export function useHlsPlayer(opts: {
         if (!enabled || !versionId) return
         const video = videoRef.current
         if (!video) return
+        // [Tệp closure 2026-08-04] Xem trực tuyến đã tắt (mỗi lượt phát = tiền Mux).
+        // Short-circuit TRƯỚC khi xin token — một chỗ này phủ MỌI trình phát dùng hook
+        // (Tệp, task drawer, /r khách, So sánh). Server cũng chặn route token (phòng thủ kép).
+        if (REVIEW_PLAYBACK_DISABLED) {
+            setError(env.lang === 'en' ? REVIEW_CLOSURE_MESSAGE_EN : REVIEW_CLOSURE_MESSAGE)
+            return
+        }
         let cancelled = false
         setReady(false)
         setError(null)

@@ -5,7 +5,7 @@
 
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { Fragment, memo, useEffect, useMemo, useState } from 'react'
 import {
     Lock,
     Clock,
@@ -21,6 +21,7 @@ import {
     X,
 } from 'lucide-react'
 import { frameToSmpte, type Fps } from '@/lib/review/timecode'
+import { linkify } from '@/lib/linkify'
 import type { CommentDto } from '@/lib/review/comment-client'
 import { CommentComposer } from './CommentComposer'
 import { usePlayerEnv } from './player-env'
@@ -42,6 +43,60 @@ export interface CommentActions {
     playRange?: (c: CommentDto) => void
     /** [Lỗi 1] Leave range-loop mode (jumping to a point comment / a manual "click out"). */
     exitRange?: () => void
+}
+
+/**
+ * [Linkify] Nội dung bình luận — địa chỉ web dán vào tự thành link bấm được.
+ *
+ * Một component này phục vụ CẢ BA màn: trình xem nội bộ (ReviewPlayerShell), so sánh phiên bản
+ * (CompareView), và ứng dụng khách vãng lai trên link chia sẻ (GuestReviewApp). Nghĩa là nó phải
+ * chịu được nội dung do người CHƯA ĐĂNG NHẬP nhập vào.
+ *
+ * Ba điều bắt buộc, đừng gỡ cái nào:
+ *
+ *  • `rel="noopener"` — không có nó thì trang vừa mở được quyền điều khiển tab gốc qua
+ *    `window.opener` và có thể đổi nó thành trang đăng nhập giả.
+ *
+ *  • `rel="noreferrer"` — địa chỉ trang xem của khách chứa MÃ CHIA SẺ BÍ MẬT. Trình duyệt đời
+ *    mới mặc định chỉ gửi phần tên miền khi sang trang khác nên mã không lộ, nhưng `noreferrer`
+ *    khiến điều đó đúng bất kể cấu hình sau này có đổi. Rẻ, nên làm.
+ *
+ *  • Dựng thẻ React từ MẢNH DỮ LIỆU, tuyệt đối không `dangerouslySetInnerHTML`. React tự thoát
+ *    ký tự trong nút văn bản nên không có đường chèn mã. Lớp chặn giao thức `javascript:`/`data:`
+ *    nằm trong src/lib/linkify.ts.
+ *
+ * `stopPropagation` để bấm vào link không kích hoạt luôn hành vi của thẻ bình luận bao ngoài.
+ * `title` cho người ta rê chuột thấy đích thật trước khi bấm — hữu ích khi ai đó dán một địa chỉ
+ * trông giống trang quen nhưng thật ra không phải.
+ */
+function CommentBody({ text }: { text: string }) {
+    // Bảng bình luận vẽ lại theo thời gian chạy của video (để tô đậm bình luận đang tới), nên
+    // nhớ kết quả tách theo nội dung — tách lại mỗi khung hình là lãng phí thật, không phải lo xa.
+    const segments = useMemo(() => linkify(text), [text])
+
+    return (
+        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-white/85">
+            {segments.map((seg, i) =>
+                seg.type === 'link' ? (
+                    <a
+                        key={i}
+                        href={seg.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={seg.href}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-sky-300 underline decoration-sky-300/40 underline-offset-2 transition hover:text-sky-200 hover:decoration-sky-200"
+                    >
+                        {seg.value}
+                    </a>
+                ) : (
+                    // Fragment thay vì span: không thêm nút DOM thừa, giữ nguyên cách xuống dòng
+                    // và khoảng trắng mà `whitespace-pre-wrap` đang lo.
+                    <Fragment key={i}>{seg.value}</Fragment>
+                ),
+            )}
+        </p>
+    )
 }
 
 function relTime(iso: string, L: PlayerL10n): string {
@@ -218,7 +273,7 @@ function SingleComment({
                     )}
 
                     {/* body */}
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-white/85">{comment.body}</p>
+                    <CommentBody text={comment.body} />
 
                     {/* attachments (thumbnails → lightbox) */}
                     {comment.attachments.length > 0 && (

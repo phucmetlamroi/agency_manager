@@ -152,12 +152,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         for (const f of snap.folders) inScope.add(f.id)
     }
 
-    // Relative zip path of a folder, measured from the selected root (root itself = '').
+    /* [Báo cáo chủ sản phẩm 2026-08-03] "giải nén ra thì nó đệ quy file rất là sâu."
+       Khi khách tải CẢ THƯ MỤC thì `rootId` có mặt và đường dẫn đã đo từ thư mục đó — đúng.
+       Khi khách TICK CHỌN file thì `rootId` là null, nên vòng lặp dưới leo tận nóc thư viện và
+       mọi file mang theo cả cây `July 2026/Harrison/Alpine/…`. Với một lựa chọn nằm gọn trong
+       một thư mục thì toàn bộ cây đó là nhiễu — nó giống nhau ở mọi file nên chẳng phân biệt gì.
+
+       Đo từ TỔ TIÊN CHUNG SÂU NHẤT của những gì thực sự được đóng gói. Chọn trong một thư mục
+       => phẳng. Chọn vắt qua nhiều thư mục => phần cây còn KHÁC NHAU vẫn được giữ, vì lúc đó nó
+       mới là thứ tách bạch các file trùng tên. Đây thuần là cách ĐẶT TÊN trong zip; không đụng
+       tới tập file được phép tải. */
+    let zipBaseId: string | null = rootId
+    /** Chuỗi tổ tiên từ gốc thư viện xuống tới `folderId` (kể cả chính nó). */
+    const chainOf = (folderId: string): string[] => {
+        const out: string[] = []
+        let cur: string | null = folderId
+        let guard = 0
+        while (cur && guard++ < 32) {
+            out.unshift(cur)
+            cur = byId.get(cur)?.parentId ?? null
+        }
+        return out
+    }
+
+    // Relative zip path of a folder, measured from the zip base (base itself = '').
     const relPathOf = (folderId: string): string => {
         const segs: string[] = []
         let cur: string | null = folderId
         let guard = 0
-        while (cur && cur !== rootId && guard++ < 32) {
+        while (cur && cur !== zipBaseId && guard++ < 32) {
             const f = byId.get(cur)
             if (!f) break
             segs.unshift(sanitizeSegment(f.name))
@@ -171,6 +194,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
         ? snap.assets.filter((a) => pickedIds.has(a.id) || inScope.has(a.folderId))
         : snap.assets.filter((a) => inScope.has(a.folderId))
     if (picked.length === 0) return new NextResponse('Nothing to download', { status: 409 })
+
+    // Tổ tiên chung sâu nhất của tập đã chọn → gốc đo đường dẫn trong zip (xem chú thích ở
+    // relPathOf). Chỉ áp dụng cho nhánh tick-chọn; nhánh `folderId` đã có gốc rõ ràng rồi.
+    if (!rootId) {
+        let common: string[] | null = null
+        for (const a of picked) {
+            const chain = chainOf(a.folderId)
+            if (common === null) { common = chain; continue }
+            let i = 0
+            while (i < common.length && i < chain.length && common[i] === chain[i]) i++
+            common = common.slice(0, i)
+            if (common.length === 0) break
+        }
+        zipBaseId = common && common.length ? common[common.length - 1] : null
+    }
 
     // [Authz 2026-07] Two ceilings, not one. MAX_ZIP_FILES bounded the COUNT; nothing bounded
     // the BYTES, and archiver runs in STORE mode — so 40 untouched 4K masters is a ~200 GB read

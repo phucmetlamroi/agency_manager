@@ -35,7 +35,7 @@ const NP = {
     accent: "#8B5CF6",
     textPrimary: "#FFFFFF",
     textSecondary: "#A1A1AA",
-    textMuted: "#71717A",
+    textMuted: "#878790",
 }
 
 const MEDALS: Record<number, { grad: string; text: string; emoji: string }> = {

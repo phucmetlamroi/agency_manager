@@ -11,9 +11,11 @@
 
 import { prisma } from '@/lib/db'
 import { Prisma, ReviewMediaKind, ReviewPipelineStatus, ReviewState } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { requireReviewAccess, type ReviewAccessContext } from './access'
 import { getFolderScope, assertVersionInScope, assertAssetInScope, assertFolderPathMutable } from './folder-scope'
 import { apiError } from './errors'
+import { REVIEW_UPLOAD_MAINTENANCE, REVIEW_UPLOAD_MAINTENANCE_MESSAGE } from './upload-maintenance'
 import { inngest, REVIEW_EVENTS } from './inngest'
 import { reviewLog } from './logger'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
@@ -24,7 +26,8 @@ import {
     type MediaKind,
 } from './media-constants'
 import { buildR2Key, buildSystemKey, computePartSize, computePartCount } from './upload-helpers'
-import { ensureTaskFolderPath, type BreadcrumbItem } from './task-folder'
+import { ensureTaskFolderPath, assetNameIsAutoManaged, type BreadcrumbItem } from './task-folder'
+import { reviveSystemFolderChain, pathIds } from './folders'
 import { parseVideoTitle } from './parse-task-context'
 import {
     createMultipart,
@@ -38,9 +41,24 @@ import {
 } from './r2'
 import { mintPlaybackTokens } from './mux-jwt'
 import { buildMediaLinks } from './media-links'
+import { checkStorageCap, BillingError } from '@/lib/billing/entitlements'
 
 const UPLOAD_TTL_MS = 24 * 60 * 60 * 1000 // 24h presigned + session window
 const MAX_VERSION_RETRIES = 5
+
+/** [BILLING P6] Trần dung lượng gói (D5 — liveBytes). Chuyển BillingError sang `fail()` của
+ *  file này để route trả JSON lỗi đúng khuôn. Workspace mồ côi (profileId null, dữ liệu
+ *  legacy) thì KHÔNG đoán — cho qua, các gate khác vẫn đứng. Chưa cưỡng chế = no-op. */
+async function assertStorageWithinPlan(workspaceId: string, incomingBytes: bigint): Promise<void> {
+    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { profileId: true } })
+    if (!ws?.profileId) return
+    try {
+        await checkStorageCap(ws.profileId, incomingBytes)
+    } catch (e) {
+        if (e instanceof BillingError) fail(402, 'PLAN_LIMIT', e.message)
+        throw e
+    }
+}
 
 // ── Public types (mirror API-SPEC §2.1) ──────────────────────────────────────
 
@@ -93,18 +111,33 @@ function toPrismaKind(kind: MediaKind): ReviewMediaKind {
 async function ensureRootFolder(userId: string, workspaceId: string): Promise<string> {
     const systemKey = buildSystemKey({ workspaceId })
     const existing = await prisma.reviewFolder.findUnique({ where: { systemKey } })
-    if (existing) return existing.id
+    if (existing) {
+        // A trashed root squats the unique systemKey forever, so no replacement can be created
+        // and everything uploaded afterwards lands under a soft-deleted ancestor — invisible in
+        // Tệp. Revive before handing it out (see reviveSystemFolderChain).
+        if (existing.deletedAt) await reviveSystemFolderChain(existing.id)
+        return existing.id
+    }
     try {
+        // [audit 2026-07-27 · HIGH] The row used to be committed with the placeholder path '/' and
+        // patched by a SECOND, non-transactional statement. Between the two, the root was visible
+        // to every concurrent reader with a path that matches NOTHING (`path LIKE '/%'` prefix
+        // logic, ancestor walks, folder-scope) — and if the process died in that window the
+        // workspace was left with a permanently broken root that the unique systemKey prevents
+        // replacing. Generate the id first so the row is correct the instant it exists, exactly as
+        // ensureWorkspaceRoot in folders.ts already does.
+        const id = randomUUID()
         const created = await prisma.reviewFolder.create({
-            data: { workspaceId, systemKey, name: 'Team', path: '/', depth: 0, createdById: userId },
+            data: { id, workspaceId, systemKey, name: 'Team', path: `/${id}/`, depth: 0, createdById: userId },
         })
-        // Materialized path must include own id: "/{id}/".
-        await prisma.reviewFolder.update({ where: { id: created.id }, data: { path: `/${created.id}/` } })
         return created.id
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
             const row = await prisma.reviewFolder.findUnique({ where: { systemKey } })
-            if (row) return row.id
+            if (row) {
+                if (row.deletedAt) await reviveSystemFolderChain(row.id)
+                return row.id
+            }
         }
         throw e
     }
@@ -125,6 +158,11 @@ function partUrlsFor(r2Key: string, r2UploadId: string, partsTotal: number, mime
 // ── initiate ─────────────────────────────────────────────────────────────────
 
 export async function initiateUpload(input: InitiateInput): Promise<InitiateResult> {
+    // [Tệp maintenance 2026-08-04] Chốt THẬT của toàn bộ đường upload — mọi cửa
+    // (uploads/initiate, task-upload/initiate, share-document) đều đi qua đây.
+    // 503 để client nào retry cũng chỉ nhận lại đúng thông báo bảo trì.
+    if (REVIEW_UPLOAD_MAINTENANCE) fail(503, 'MAINTENANCE', REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+
     // 1. content validation (independent of scope)
     if (!input.fileName || input.fileName.length > 255) {
         fail(400, 'VALIDATION_ERROR', 'Tên tệp phải từ 1–255 ký tự.')
@@ -165,16 +203,29 @@ export async function initiateUpload(input: InitiateInput): Promise<InitiateResu
             // (không folderId) tạo asset của chính editor nên nhánh else không chặn.
             assertFolderPathMutable(await getFolderScope({ userId: access.userId, workspaceId, isAdmin: access.isAdmin }), folder.path)
             folderId = folder.id
-            const asset = await prisma.reviewAsset.create({
-                data: {
-                    folderId,
-                    workspaceId,
-                    clientId: folder.clientId,
-                    taskId: folder.taskId,
-                    name: stripExt(input.fileName),
-                    mediaKind: toPrismaKind(kind),
-                    createdById: access.userId,
-                },
+            // [audit 2026-07-27 · LOW] The read above and this create used to be two independent
+            // round-trips, so an admin trashing the folder in between produced a LIVE asset under a
+            // TRASHED parent: deleteItems snapshots its subtree inside its own tx and never sees a row
+            // created afterwards. The upload then ran to completion — R2 stored the object, Mux billed
+            // the encode — for an asset that appears nowhere in /team (its parent is filtered out) and
+            // whose folder 404s. It also pins that folder's purge forever. Re-read the folder inside a
+            // transaction under the same advisory lock moveItems uses, so a concurrent delete either
+            // loses the row it is sweeping or is serialized behind us.
+            const asset = await prisma.$transaction(async (tx) => {
+                await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${workspaceId}, 0))`
+                const stillLive = await tx.reviewFolder.count({ where: { id: folderId, deletedAt: null } })
+                if (stillLive === 0) fail(404, 'NOT_FOUND', 'Thư mục vừa bị xóa — hãy chọn thư mục khác.')
+                return tx.reviewAsset.create({
+                    data: {
+                        folderId,
+                        workspaceId,
+                        clientId: folder.clientId,
+                        taskId: folder.taskId,
+                        name: stripExt(input.fileName),
+                        mediaKind: toPrismaKind(kind),
+                        createdById: access.userId,
+                    },
+                })
             })
             assetId = asset.id
         } else {
@@ -211,6 +262,12 @@ export async function initiateUpload(input: InitiateInput): Promise<InitiateResu
         })
         versionNumber = (maxV._max.versionNumber ?? 0) + 1
     }
+
+    // [BILLING P6] Trần dung lượng GÓI (D5 — liveBytes) — điểm hợp lưu của cả hai nhánh
+    // folder/asset, workspaceId đã resolve và authz đã qua. Advisory theo sizeBytes khai báo
+    // (presigned PUT không ghim Content-Length — [C1] ở complete mới đo bytes THẬT, và mức
+    // vượt tối đa chỉ là một file). checkStorageCap tự cho qua khi chưa cưỡng chế.
+    await assertStorageWithinPlan(workspaceId, input.sizeBytes)
 
     // 4. create the version row (race-safe on @@unique([assetId, versionNumber]))
     const partSize = computePartSize(input.sizeBytes)
@@ -341,7 +398,13 @@ async function replaySession(sessionId: string): Promise<InitiateResult> {
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     const v = session.version
-    await requireReviewAccess({ workspaceId: v.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: v.workspaceId })
+    // [audit 2026-07 S1-4] initiateUpload gọi hàm này ngay khi trúng idempotencyKey và trả về
+    // TRƯỚC các assertion phạm vi phía dưới — kèm URL presign R2 mới. Không có chốt này, ai
+    // biết khoá của người khác sẽ nhận được quyền ghi vào file của họ.
+    if (!access.isAdmin && v.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     const done = session.completedAt != null || session.abortedAt != null
     const parts = done ? [] : await partUrlsFor(session.r2Key, session.r2UploadId, session.partsTotal, v.mimeType)
@@ -470,7 +533,21 @@ export async function completeUpload(
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     const version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Một phiên tải lên thuộc về NGƯỜI khởi tạo nó, không phải
+    // "bất kỳ thành viên workspace nào" — requireReviewAccess ở trên chỉ hỏi được câu thứ hai.
+    // Ranh giới là version.uploaderId: gán lúc initiate từ phiên đăng nhập, BẤT BIẾN (chỉ có
+    // 2 chỗ ghi trong toàn repo, cả hai đều lúc tạo), đã nằm sẵn trong `include` nên KHÔNG
+    // tốn thêm truy vấn.
+    //
+    // CỐ Ý KHÔNG dùng folder-scope ở đây, dù đó là lớp phân quyền chuẩn của module. Asset của
+    // một lần kéo-thả vào GỐC Tệp không có taskId, và thư mục gốc mang systemKey nên bị loại
+    // khỏi cả ba nguồn của getFolderScope -> assertVersionInScope('write') sẽ 403 CHÍNH CHỦ,
+    // và 403 đó rơi SAU khi cả file đã đẩy xong lên R2. uploaderId hẹp hơn, đúng ngữ nghĩa hơn,
+    // và không có âm tính giả nào.
+    if (!access.isAdmin && version.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     if (session.abortedAt) fail(409, 'STATE_INVALID', 'Phiên tải lên đã bị hủy.')
 
@@ -536,6 +613,42 @@ export async function completeUpload(
         fail(413, 'FILE_TOO_LARGE', 'Tệp vượt quá dung lượng cho phép.', { maxBytes: capForKind(version.mediaKind).toString() })
     }
 
+    // [BILLING P1.3] Ghi ĐÈ sizeBytes bằng byte THẬT vừa đo được từ R2.
+    //
+    // Trước bản vá này cột sizeBytes chỉ chứa con số do TRÌNH DUYỆT khai lúc initiate: presigned
+    // PUT/parts không ghim Content-Length (chính comment [C1] ngay trên tự khai điều đó), nên sửa
+    // một dòng trong yêu cầu là khai 1MB cho tệp 4GB. Chốt [C1] CÓ đo byte thật — nhưng chỉ để
+    // TỪ CHỐI tệp vượt trần rồi vứt kết quả đi, cột vẫn giữ nguyên số khai.
+    //
+    // Số khai đó chính là thứ mọi hạn mức dung lượng theo gói sẽ cộng vào. Không vá thì hạn mức
+    // GB chỉ là trang trí: người khai gian vượt trần vẫn tải lên thoải mái, còn người trung thực
+    // thì bị chặn đúng hạn. Luồng đính kèm bình luận đã làm đúng từ lâu (comments.ts, share-
+    // comments.ts đều dùng `BigInt(head.size || …)`); đây là áp cùng cách vào luồng video.
+    //
+    // KHÔNG để lỗi ghi làm hỏng cả lần tải lên: tệp đã nằm đúng chỗ trên R2 và đã qua trần rồi,
+    // đánh sập nó chỉ vì lệch sổ sách là đánh đổi sai. Nhưng cũng KHÔNG nuốt im lặng — ghi log
+    // để đối soát tìm lại được. `stored` rỗng (hiếm: R2 vừa báo hoàn tất mà chưa thấy vật thể)
+    // thì giữ nguyên số khai, tức suy biến về đúng hành vi cũ.
+    if (stored) {
+        const realBytes = BigInt(stored.size)
+        if (realBytes !== version.sizeBytes) {
+            reviewLog('warn', 'upload.complete.size_mismatch', {
+                versionId: version.id,
+                declaredBytes: version.sizeBytes.toString(),
+                actualBytes: realBytes.toString(),
+            })
+            await prisma.reviewVersion
+                .updateMany({ where: { id: version.id }, data: { sizeBytes: realBytes } })
+                .catch((e) =>
+                    reviewLog('error', 'upload.complete.size_writeback_failed', {
+                        versionId: version.id,
+                        actualBytes: realBytes.toString(),
+                        error: String(e),
+                    }),
+                )
+        }
+    }
+
     // R2 object is final — mark the session (bookkeeping + the gate driveCompletion relies on),
     // then drive the state machine. driveCompletion is idempotent, so a retry after a crash here
     // (session marked done, version still UPLOADED) self-heals on the next complete/poll call.
@@ -557,7 +670,11 @@ export async function abortUpload(uploadSessionId: string): Promise<{ aborted: t
     // Returning the same shape for "gone" and "not yours" also denies an enumeration oracle.
     if (!session) return { aborted: true }
     const version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Chỉ người khởi tạo (hoặc admin workspace) mới hủy được. Trả về ĐÚNG
+    // shape của nhánh "không tìm thấy" ở trên — giữ trọn lời hứa chống dò id đã ghi trong
+    // comment của hàm, thay vì để 403 lộ ra "phiên này có thật".
+    if (!access.isAdmin && version.uploaderId !== access.userId) return { aborted: true }
 
     if (session.abortedAt) return { aborted: true }
     // Only an in-flight upload (version still UPLOADING) may be discarded. Once a complete has
@@ -604,7 +721,13 @@ export async function getUploadStatus(uploadSessionId: string): Promise<UploadSt
     })
     if (!session) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên tải lên.')
     let version = session.version
-    await requireReviewAccess({ workspaceId: version.workspaceId })
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [audit 2026-07 S1-4] Ràng theo người khởi tạo như complete/abort. Đây KHÔNG phải phép đọc
+    // vô hại: hàm mint token phát Mux đã ký, trả nguyên VersionDto (tên file, dung lượng, danh
+    // tính người upload), và tự gọi driveCompletion — tức có cả tác dụng phụ ghi.
+    if (!access.isAdmin && version.uploaderId !== access.userId) {
+        fail(403, 'FORBIDDEN', 'Bạn không có quyền trên phiên tải lên này.')
+    }
 
     // Self-heal the crash window: if a complete finalized R2 (completedAt set) but died before
     // driving the transition, the version is stuck UPLOADED. The client's 3s poller only stops on
@@ -652,9 +775,35 @@ export async function initiateTaskUpload(input: {
     sizeBytes: bigint
     mimeType: string
     idempotencyKey?: string | null
+    /** [foldering 2026-07-27] How many files the user dropped in THIS single action.
+     *
+     *  This one number decides the whole shape, because it is the only unambiguous signal we have:
+     *    1  → "here is the (next) cut of this task's video". Asset is named from the TASK title, so
+     *         the existing (taskId, name) match turns a later upload into v2 — the feedback→revise
+     *         loop, untouched. Lands FLAT in the client/brand folder: no wrapper.
+     *    N>1 → "here are N siblings" (a multi-hook set). Each file becomes its OWN asset named from
+     *         its FILENAME, and they are grouped into the per-task video folder.
+     *
+     *  Naming from the task title is exactly why N files used to collapse into one asset with N
+     *  versions: every file resolved to the same name and hit the auto-version match. Removing the
+     *  wrapper folder alone would NOT have fixed that — the folder was never the blocker. */
+    batchSize?: number
+    /** [owner request 2026-07-27] Force this upload onto a SPECIFIC existing deliverable.
+     *
+     *  Name matching is a good default but it is a guess, and on a multi-hook task a one-character
+     *  difference in a filename silently mints a new video instead of adding v2 — the editor only
+     *  finds out afterwards. When the uploader has picked the target in the confirm strip, that
+     *  choice is authoritative and no guessing happens at all. */
+    targetAssetId?: string
 }): Promise<TaskInitiateResult> {
+    // [Tệp maintenance 2026-08-04] Chặn NGAY TRƯỚC mọi side-effect (ensureTaskFolderPath
+    // tạo cây thư mục trước khi gọi initiateUpload — để lọt tới đó là bảo trì xong vẫn
+    // còn rác thư mục rỗng).
+    if (REVIEW_UPLOAD_MAINTENANCE) fail(503, 'MAINTENANCE', REVIEW_UPLOAD_MAINTENANCE_MESSAGE)
+
     const kind = mediaKindFromMime(input.mimeType, input.fileName)
     if (kind !== 'VIDEO') fail(415, 'UNSUPPORTED_MEDIA_TYPE', 'Chỉ nhận file video ở mục bàn giao.')
+    const isBatch = (input.batchSize ?? 1) > 1
 
     const task = await prisma.task.findFirst({
         where: { id: input.taskId },
@@ -675,44 +824,163 @@ export async function initiateTaskUpload(input: {
         fail(403, 'FORBIDDEN', 'Bạn không có quyền bàn giao bản dựng cho task ngoài phạm vi được giao.')
     }
 
+    // [BILLING P6] Cửa upload thứ hai (bàn giao theo task) — cùng trần dung lượng gói với
+    // initiateUpload; thiếu một cửa là gate kia thành trang trí.
+    await assertStorageWithinPlan(workspaceId, input.sizeBytes)
+
     const parsed = parseVideoTitle(task.title, task.client?.name ?? '')
     const clientIdStr = task.clientId != null ? String(task.clientId) : null
 
-    const { videoFolder, breadcrumb } = await ensureTaskFolderPath({
-        workspaceId,
-        rootName: task.workspace?.name ?? 'Team',
-        taskId: task.id,
-        clientId: clientIdStr,
-        parsed,
-        createdById: access.userId,
-    })
+    // [audit 2026-07-27 · LOW] ensureTaskFolderPath used to run unconditionally, BEFORE anything
+    // checked whether this deliverable already exists. When it did, the new version landed on that
+    // asset wherever it currently lives — the auto-version match keys on (taskId, name) with no
+    // folderId constraint — while a brand-new, permanently EMPTY auto folder chain was materialised
+    // on every such upload. Resolve it lazily instead: only an upload that actually creates an asset
+    // needs the chain.
+    let ensured: Awaited<ReturnType<typeof ensureTaskFolderPath>> | null = null
+    const ensureChain = () =>
+        ensureTaskFolderPath({
+            workspaceId,
+            rootName: task.workspace?.name ?? 'Team',
+            taskId: task.id,
+            clientId: clientIdStr,
+            parsed,
+            createdById: access.userId,
+            groupInFolder: isBatch,
+        })
 
-    // Auto-version: same task + same (case-insensitive) video name ⇒ a new version on the stack.
+    // [foldering 2026-07-27] Asset identity. Single upload keeps naming from the TASK, so the
+    // (taskId, name) match below still turns the next upload into v2 — the revise loop is untouched.
+    // A batch names each file from ITSELF, so N hooks become N sibling assets instead of N versions
+    // of one, and re-dropping the same filename later still versions THAT hook correctly.
+    const baseAssetName = isBatch ? stripExt(input.fileName) : parsed.video
+
+    // Auto-version: same task + same (case-insensitive) asset name ⇒ a new version on the stack.
     // ReviewAsset has no unique on (taskId, name), so serialize concurrent uploads to the SAME
-    // deliverable with a transaction-scoped advisory lock on the (unique) video folder → the
-    // find-or-create is atomic and can't fork the stack into two assets. Also scoped by workspaceId
-    // (defence-in-depth against denormalization drift).
-    const resolved = await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${videoFolder.id}, 0))`
-        const existing = await tx.reviewAsset.findFirst({
-            where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: parsed.video, mode: 'insensitive' } },
-            orderBy: { createdAt: 'asc' },
+    // deliverable with a transaction-scoped advisory lock. The lock key is (task, asset-name), not
+    // the folder: since flat uploads now share one client folder across many tasks, a folder-keyed
+    // lock would serialize every unrelated upload for that client.
+    // Scoped by workspaceId (defence-in-depth against denormalization drift).
+    //
+    // The retry loop exists because flat mode moved assets into a SHARED folder, where the DB's
+    // partial index UNIQUE ("folderId", lower("name")) WHERE "deletedAt" IS NULL can now be hit by a
+    // DIFFERENT task whose title parses to the same video name. A P2002 aborts the surrounding
+    // Postgres transaction, so the retry has to re-run the whole tx with the next suffix rather than
+    // catch inside it.
+    // Sentinel for "the tx needs to create, but the folder chain was never resolved". Only reachable
+    // when the cheap pre-check below saw an existing asset that vanished before the lock was taken.
+    class NeedFolderChain extends Error {}
+
+    // An explicitly chosen target short-circuits every guess below. Validated against THIS task so a
+    // caller cannot stack a version onto someone else's deliverable by passing an arbitrary id.
+    if (input.targetAssetId) {
+        const target = await prisma.reviewAsset.findFirst({
+            where: { id: input.targetAssetId, taskId: task.id, workspaceId, deletedAt: null },
             select: { id: true },
         })
-        if (existing) return { assetId: existing.id, createdNewAsset: false }
-        const asset = await tx.reviewAsset.create({
-            data: {
-                folderId: videoFolder.id,
-                workspaceId,
-                clientId: clientIdStr,
-                taskId: task.id,
-                name: parsed.video,
-                mediaKind: ReviewMediaKind.VIDEO,
-                createdById: access.userId,
-            },
+        if (!target) fail(404, 'NOT_FOUND', 'Video được chọn không thuộc task này hoặc đã bị xóa.')
+        const init = await initiateUpload({
+            fileName: input.fileName,
+            sizeBytes: input.sizeBytes,
+            mimeType: input.mimeType,
+            target: { kind: 'asset', assetId: target.id },
+            idempotencyKey: input.idempotencyKey,
         })
-        return { assetId: asset.id, createdNewAsset: true }
-    })
+        return {
+            status: init.status,
+            body: {
+                ...init.body,
+                createdNewAsset: false,
+                folderPath: (await breadcrumbForAsset(target.id)) ?? [],
+            },
+        }
+    }
+
+    let resolved: { assetId: string; createdNewAsset: boolean } | null = null
+    for (let attempt = 0; attempt < MAX_VERSION_RETRIES; attempt++) {
+        const assetName = attempt === 0 ? baseAssetName : `${baseAssetName} (${attempt + 1})`
+        const lockKey = `${task.id}:${assetName.toLowerCase()}`
+        // Unlocked pre-check, purely to decide whether the folder chain is needed. The authoritative
+        // answer is the locked lookup inside the tx; being wrong here costs one retry, not an error.
+        if (!ensured) {
+            const pre = await prisma.reviewAsset.findFirst({
+                where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: assetName, mode: 'insensitive' } },
+                select: { id: true },
+            })
+            if (!pre) ensured = await ensureChain()
+        }
+        try {
+            resolved = await prisma.$transaction(async (tx) => {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
+                const existing = await tx.reviewAsset.findFirst({
+                    where: { taskId: task.id, workspaceId, deletedAt: null, name: { equals: assetName, mode: 'insensitive' } },
+                    orderBy: { createdAt: 'asc' },
+                    select: { id: true },
+                })
+                if (existing) return { assetId: existing.id, createdNewAsset: false }
+
+                // [owner request 2026-07-27] Matching purely on the name broke the revise loop the
+                // moment a task was RENAMED: the next upload found nothing under the new name and
+                // started a SECOND deliverable instead of adding v2 — the stack forked in two, which
+                // is exactly what naming-from-the-task is supposed to prevent.
+                //
+                // For a single-file upload, when the task holds EXACTLY ONE live deliverable, that
+                // one IS the stack whatever it is currently called. More than one means a multi-hook
+                // set, where each hook has its own identity, so name matching stays authoritative.
+                if (!isBatch) {
+                    const solo = await tx.reviewAsset.findMany({
+                        where: { taskId: task.id, workspaceId, deletedAt: null },
+                        select: { id: true, name: true },
+                        take: 2, // only need to know "exactly one"
+                    })
+                    if (solo.length === 1) {
+                        const asset = solo[0]
+                        // Keep the name in sync with the task — but never overwrite one a PERSON
+                        // chose. The gate is recency, not presence, so "Reset về tên Task" can hand
+                        // the name back to automatic sync without erasing the rename from history.
+                        if (asset.name !== assetName) {
+                            if (await assetNameIsAutoManaged(tx, asset.id)) {
+                                // A P2002 here (a sibling in the shared client folder already owns
+                                // this name) aborts the tx and the outer loop retries with " (2)".
+                                await tx.reviewAsset.update({
+                                    where: { id: asset.id },
+                                    data: { name: assetName, rowVersion: { increment: 1 } },
+                                })
+                            }
+                        }
+                        return { assetId: asset.id, createdNewAsset: false }
+                    }
+                }
+
+                if (!ensured) throw new NeedFolderChain()
+                const asset = await tx.reviewAsset.create({
+                    data: {
+                        folderId: ensured.videoFolder.id,
+                        workspaceId,
+                        clientId: clientIdStr,
+                        taskId: task.id,
+                        name: assetName,
+                        mediaKind: ReviewMediaKind.VIDEO,
+                        createdById: access.userId,
+                    },
+                })
+                return { assetId: asset.id, createdNewAsset: true }
+            })
+            break
+        } catch (e) {
+            if (e instanceof NeedFolderChain) {
+                // Resolve the chain and re-run THIS attempt (same name). Cannot recur: `ensured` is
+                // now set, so the throw above is unreachable on the repeat.
+                ensured = await ensureChain()
+                attempt--
+                continue
+            }
+            // Name taken in this folder by an asset belonging to ANOTHER task → try "name (2)".
+            // Anything else is a real failure.
+            if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e
+        }
+    }
+    if (!resolved) fail(409, 'STATE_INVALID', 'Không đặt được tên cho bản dựng — thử đổi tên file rồi tải lại.')
     const { assetId, createdNewAsset } = resolved
 
     const init = await initiateUpload({
@@ -730,7 +998,32 @@ export async function initiateTaskUpload(input: {
             .catch(() => {})
     }
 
-    return { status: init.status, body: { ...init.body, createdNewAsset, folderPath: breadcrumb } }
+    // [audit 2026-07-27 · LOW] Report where the bytes ACTUALLY landed, not the chain we ensured.
+    // The auto-version match keys on (taskId, name) with no folderId constraint, so a deliverable
+    // that an admin moved into a curated folder still receives its next version there — while the
+    // tray announced "Đã lưu vào Team / ForTesting / Video 10000", a folder that is now empty. The
+    // editor navigates there, finds nothing, and re-uploads or reports the file lost. Derive the
+    // breadcrumb from the asset's own folder path; fall back to the ensured chain only if that read
+    // fails, since a wrong-but-present path still beats none.
+    const folderPath = (await breadcrumbForAsset(assetId)) ?? ensured?.breadcrumb ?? []
+
+    return { status: init.status, body: { ...init.body, createdNewAsset, folderPath } }
+}
+
+/** Breadcrumb of the folder an asset currently lives in, root → parent, using the materialized path. */
+async function breadcrumbForAsset(assetId: string): Promise<BreadcrumbItem[] | null> {
+    const asset = await prisma.reviewAsset
+        .findUnique({ where: { id: assetId }, select: { folder: { select: { path: true } } } })
+        .catch(() => null)
+    const path = asset?.folder?.path
+    if (!path) return null
+    const ids = pathIds(path)
+    if (!ids.length) return null
+    const rows = await prisma.reviewFolder.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+    const nameById = new Map(rows.map((r) => [r.id, r.name]))
+    // A missing id means the chain is broken; the ensured breadcrumb is the better answer then.
+    if (ids.some((id) => !nameById.has(id))) return null
+    return ids.map((id) => ({ id, name: nameById.get(id)! }))
 }
 
 // ── janitor reconcile (P1.6) ─────────────────────────────────────────────────
@@ -871,7 +1164,12 @@ export async function getVersionPlaybackTokens(versionId: string): Promise<Playb
         select: { id: true, workspaceId: true, pipelineStatus: true, mediaKind: true, muxPlaybackId: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [kiểm toán 2026-07 · Q3] Khách được XEM. listVersions đã mở nên player của khách dựng
+    // được metadata, nhưng nếu đường này còn đòi MEMBER thì HLS xin token bị 403 và khách
+    // nhìn vào một khung đen — tức tính năng hỏng đúng ngay mục đích của nó. Đây là token
+    // PHÁT (Mux, 6h, streaming), không phải file gốc; phạm vi vẫn do assertVersionInScope
+    // bên dưới quyết, và khách không bao giờ là isAdmin nên scope luôn bị giới hạn theo task.
+    const access = await requireReviewAccess({ workspaceId: version.workspaceId, allowGuest: true })
     // [FR-03] editor chỉ mint playback token cho version trong phạm vi được giao.
     await assertVersionInScope(
         await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),
@@ -902,10 +1200,19 @@ const DOWNLOAD_TTL_SEC = 15 * 60 // short-lived presigned R2 GET for the origina
 export async function getVersionDownloadUrl(versionId: string): Promise<DownloadUrlResult> {
     const version = await prisma.reviewVersion.findFirst({
         where: { id: versionId, deletedAt: null },
-        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true },
+        select: { id: true, workspaceId: true, pipelineStatus: true, r2Key: true, fileName: true, mediaKind: true },
     })
     if (!version) fail(404, 'NOT_FOUND', 'Không tìm thấy phiên bản.')
-    const access = await requireReviewAccess({ workspaceId: version.workspaceId })
+    // [kiểm toán 2026-07 · Q3] Đường này gánh HAI việc khác hẳn nhau: hiển thị ảnh trong
+    // player (player-env cắm fetchImageUrl = fetchDownloadUrl) và tải file GỐC về máy.
+    // Khách được "chỉ xem", nên chỉ mở đúng việc thứ nhất: ẢNH thì cho qua vì không có nó
+    // thì không xem được gì; VIDEO và mọi loại khác giữ MEMBER, bởi với video khách đã có
+    // đường xem riêng là playback token (luồng Mux), còn file gốc là bản master — cho tải
+    // là vượt quá mức chủ sản phẩm chốt.
+    const access = await requireReviewAccess({
+        workspaceId: version.workspaceId,
+        allowGuest: version.mediaKind === ReviewMediaKind.IMAGE,
+    })
     // [FR-03] editor chỉ tải version trong phạm vi được giao.
     await assertVersionInScope(
         await getFolderScope({ userId: access.userId, workspaceId: version.workspaceId, isAdmin: access.isAdmin }),

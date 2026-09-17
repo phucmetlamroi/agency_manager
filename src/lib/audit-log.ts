@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { headers } from 'next/headers'
+import { getRequestIpOrNull } from '@/lib/request-ip'
 
 /**
  * Audit log helper for security-sensitive workspace events.
@@ -55,6 +56,8 @@ export type AuditAction =
     | 'auth.password_changed'
     | 'payroll.bonus_calculated'
     | 'payroll.bonus_reverted'
+    // [AUDIT SWEEP-2026-07-30 · N13] Một kênh đẩy thông báo đổi chủ (xem push-actions.ts).
+    | 'push.subscription_rebound'
     | 'payroll.locked'
     | 'payroll.unlocked'
     | 'bonus_config.updated'
@@ -117,6 +120,14 @@ export type AuditAction =
     | 'share_link.revoked'      // link revoked — effective immediately
     | 'share_link.accessed'     // public page opened with a valid token (page-level, not per action)
     | 'share_link.invoice_downloaded' // client pulled an invoice PDF through their share link
+    // [BILLING P3] Thu phí Velox↔người dùng qua SePay (docs/billing/SCHEMA-DE-XUAT.md)
+    | 'billing.order_created'    // profile admin bấm nâng gói → SubscriptionOrder PENDING
+    | 'billing.order_paid'       // webhook SePay khớp lệnh → order PAID + subscription kích hoạt
+    | 'billing.payment_unmatched' // tiền vào không khớp order nào → chờ đối soát tay
+    | 'billing.code_created'     // global admin phát hành RedemptionCode
+    | 'billing.code_revoked'     // global admin thu hồi code
+    | 'billing.code_redeemed'    // profile nhập code → subscription tạo/gia hạn
+    | 'billing.override_granted' // global admin cấp ngoại lệ seats/storage (D4)
     // [Video Review] Frame.io-style review portal on Cloudflare Stream
     | 'video.version_uploaded'   // editor uploaded a new cut (V1/V2/V3) → VideoVersion row
     | 'video.review_approved'    // client approved a version via the token portal
@@ -155,15 +166,20 @@ export async function audit(opts: AuditOpts): Promise<void> {
         // Best-effort capture of request metadata.
         let ip = opts.ipAddress ?? null
         let ua = opts.userAgent ?? null
-        if (ip === undefined || ua === undefined) {
+        // [AUDIT HT-002 fix] This guard used to read `=== undefined`, but the two lines above
+        // already collapse undefined → null, so it was never true and the whole capture block
+        // below was dead: audit rows only ever got an IP when a caller passed one explicitly.
+        // Compare against null so the fallback actually runs.
+        if (ip === null || ua === null) {
             try {
-                const h = await headers()
-                if (ip === null || ip === undefined) {
-                    ip = h.get('x-forwarded-for')?.split(',')[0]?.trim()
-                        ?? h.get('x-real-ip')
-                        ?? null
+                if (ip === null) {
+                    // [AUDIT HT-002 fix] Was x-forwarded-for[0], which the caller controls — a
+                    // forged header wrote an attacker-chosen IP into the audit trail and could
+                    // pin activity on an innocent address.
+                    ip = await getRequestIpOrNull()
                 }
-                if (ua === null || ua === undefined) {
+                if (ua === null) {
+                    const h = await headers()
                     ua = h.get('user-agent') ?? null
                 }
             } catch {

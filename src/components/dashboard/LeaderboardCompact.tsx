@@ -56,7 +56,11 @@ export default function LeaderboardCompact({
         <div className="relative">
             <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-title font-semibold text-foreground">Xếp hạng tuần này</h3>
-                <Link href={detailHref} className="text-body-sm text-primary-accent">
+                {/* inline-flex + min-h-6: as a bare inline link this measured 93.5x22 on the mobile
+                    dashboard — under the WCAG 2.2 SC 2.5.8 24px floor. The standard's "inline"
+                    exception does not apply: this is a standalone action in a header row, not a
+                    link inside a sentence. */}
+                <Link href={detailHref} className="inline-flex min-h-6 items-center text-body-sm text-primary-accent">
                     Xem chi tiết →
                 </Link>
             </div>

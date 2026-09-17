@@ -1,22 +1,39 @@
 import { getWorkspacePrisma } from "@/lib/prisma-workspace"
 import { unstable_cache } from "next/cache"
-import { SALARY_PENDING_STATUSES } from "@/lib/task-statuses"
+import { SALARY_PENDING_STATUSES, SALARY_COMPLETED_STATUS } from "@/lib/task-statuses"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import RefreshLeaderboardButton from "./RefreshLeaderboardButton"
-import { Trophy, ChevronDown } from "lucide-react"
+import { Trophy } from "lucide-react"
 
 // Caching leaderboard for 15 minutes (900 seconds)
 // To avoid continuous live queries which overload CPU DB
 export const getLeaderboardData = unstable_cache(
     async (workspaceId: string, profileId?: string) => {
         const workspacePrisma = getWorkspacePrisma(workspaceId, profileId)
-        // Fetch completed tasks aggregation by assignee
-        // Included 'Revision' to match Analytics logic and removed hardcoded Month filter
-        // to respect Workspace context isolation.
+
+        // [FIX 2026-08-24] HAI lỗi chồng nhau khiến ngôi đầu bảng sai người.
+        //
+        // (1) XẾP SAI THƯỚC ĐO. Trước đây khoá sắp xếp là `revenue` — chỉ gồm
+        //     'Hoàn tất' + 'Revision'. Nhưng lương editor tính trên CẢ các trạng
+        //     thái salaryPending. Một người có 25 task đang ở 'Đã nộp video
+        //     (nội bộ)' (9,6 triệu tiền công) bị xem như chưa làm gì, tụt xuống
+        //     hạng 4, trong khi bảng tự nhận là xếp theo thu nhập.
+        //     `tentativeRevenue` ĐÃ được tính sẵn ở dưới nhưng KHÔNG ai dùng để
+        //     sắp xếp — biến chết. Nay nó thành khoá chính.
+        //
+        // (2) CỘNG TRÙNG 'Revision'. 'Revision' vừa nằm trong mảng cứng
+        //     ['Hoàn tất','Revision'] ở trên, vừa có salaryPending=true nên cũng
+        //     nằm trong SALARY_PENDING_STATUSES. Cộng hai vế lại là tiền công của
+        //     mọi task Revision bị đếm HAI LẦN. Đủ để đảo thứ hạng thật: JaCo Bao
+        //     (750k Revision) bị thổi lên trên Phúc Phạm dù thực tế thấp hơn.
+        //
+        // Nay chia đôi dứt khoát theo đúng bảng thuộc tính lương, KHÔNG giao nhau:
+        //   completed = SALARY_COMPLETED_STATUS  ('Hoàn tất')
+        //   pending   = SALARY_PENDING_STATUSES  (đã bao gồm 'Revision')
         const completedTasksAggregate = await workspacePrisma.task.groupBy({
             by: ['assigneeId'],
             where: {
-                status: { in: ['Hoàn tất', 'Revision'] },
+                status: SALARY_COMPLETED_STATUS,
                 assigneeId: { not: null }
             },
             _count: { id: true },
@@ -29,6 +46,7 @@ export const getLeaderboardData = unstable_cache(
                 status: { in: SALARY_PENDING_STATUSES },
                 assigneeId: { not: null }
             },
+            _count: { id: true },
             _sum: { value: true }
         })
 
@@ -54,67 +72,44 @@ export const getLeaderboardData = unstable_cache(
             select: { id: true, username: true, displayName: true, nickname: true, avatarUrl: true }
         })
 
-        // Combine data and calculate Error Rate & Rank
+        // [BỎ HẠNG S/A/B/C/D 2026-07-31] Bảng vàng nay xếp THUẦN THEO DOANH THU.
+        //
+        // Trước đây chỗ này là bản sao THỨ BA của phép chấm hạng tự tính, và khác hai chỗ kia ở
+        // một điểm QUAN TRỌNG: nó KHÔNG chỉ hiển thị mà còn dùng để SẮP XẾP. Khoá chính là
+        // `incomeScore = doanh thu - điểm phạt`, rồi phá hoà bằng errorRate và rankScore. Tức là
+        // ở đây điểm phạt CÓ THẬT SỰ kéo tụt thứ hạng của người ta — khác với bảng thưởng, nơi
+        // điểm phạt chưa bao giờ đụng tới.
+        //
+        // Nay bỏ hết theo quyết định của chủ dự án: xếp theo doanh thu, phá hoà bằng số task rồi
+        // tên — CHÍNH XÁC cùng vị ngữ với `calculateMonthlyBonus`, nên bảng vàng và bảng thưởng
+        // từ nay không thể xếp khác thứ tự nhau nữa.
         const rawData = users.map(u => {
-            const taskCount = completedTasksAggregate.find(t => t.assigneeId === u.id)?._count.id || 0
-            const revenue = Number(completedTasksAggregate.find(t => t.assigneeId === u.id)?._sum.value || 0)
-            const totalPenalty = errorLogsAggregate.find((e: any) => e.userId === u.id)?._sum.calculatedScore || 0
+            const done = completedTasksAggregate.find(t => t.assigneeId === u.id)
+            const pend = pendingTasksAggregate.find((p: any) => p.assigneeId === u.id)
 
-            const pendingRevenue = Number(pendingTasksAggregate.find((p: any) => p.assigneeId === u.id)?._sum.value || 0)
-            const tentativeRevenue = revenue + pendingRevenue
-            // Sync with Analytics logic: if 0 tasks but errors exist, highlight it
-            const errorRate = taskCount > 0 ? Number((totalPenalty / taskCount).toFixed(2)) : (totalPenalty > 0 ? totalPenalty : 0)
-
-            let rank = 'S'
-            if (taskCount >= 8) {
-                 if (errorRate < 0.3) rank = 'S'
-                 else if (errorRate < 0.6) rank = 'A'
-                 else if (errorRate < 1.0) rank = 'B'
-                 else if (errorRate < 1.5) rank = 'C'
-                 else rank = 'D'
-            } else if (taskCount > 0) {
-                 if (errorRate < 1.0) rank = 'N/A'
-                 else rank = 'D'
-            } else if (totalPenalty > 0) {
-                 rank = 'D'
-            } else {
-                 rank = 'N/A'
-            }
-
-            // Calculate Score for sorting.
-            // Better rank, higher revenue, lower error rate
-            let rankScore = 0
-            if (rank === 'S') rankScore = 5
-            if (rank === 'A') rankScore = 4
-            if (rank === 'B') rankScore = 3
-            if (rank === 'C') rankScore = 2
-            if (rank === 'D') rankScore = 1
-
-            const incomeScore = Math.max(0, tentativeRevenue - totalPenalty)
+            const revenue = Number(done?._sum.value || 0)          // lương ĐÃ chốt
+            const pendingRevenue = Number(pend?._sum.value || 0)   // lương ĐANG chờ
+            const tentativeRevenue = revenue + pendingRevenue      // tổng tiền công — hai vế KHÔNG giao nhau
 
             return {
                 id: u.id,
                 // [L17] Nice display name (never email): displayName → nickname → username handle.
                 username: (u as any).displayName?.trim() || (u as any).nickname?.trim() || u.username,
-                taskCount,
-                errorRate,
+                // Đếm MỌI task có tiền công, không chỉ task đã chốt — nếu không thì
+                // phá hoà lại quay về đúng thước đo sai vừa bỏ ở trên.
+                taskCount: (done?._count.id || 0) + ((pend as any)?._count?.id || 0),
                 revenue,
                 pendingRevenue,
                 tentativeRevenue,
-                rank,
-                rankScore,
-                incomeScore,
                 avatarUrl: u.avatarUrl
             }
         })
 
-        // Sort by Net Income (desc) -> Error Rate (asc) -> Rank -> Revenue -> Task Count
+        // TỔNG tiền công (giảm) → số task (giảm) → tên (tăng, cho ổn định).
         return rawData.sort((a, b) => {
-            if (b.incomeScore !== a.incomeScore) return b.incomeScore - a.incomeScore
-            if (a.errorRate !== b.errorRate) return a.errorRate - b.errorRate
-            if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore
-            if (b.revenue !== a.revenue) return b.revenue - a.revenue
-            return b.taskCount - a.taskCount
+            if (Math.abs(b.tentativeRevenue - a.tentativeRevenue) > 0.01) return b.tentativeRevenue - a.tentativeRevenue
+            if (b.taskCount !== a.taskCount) return b.taskCount - a.taskCount
+            return a.username.localeCompare(b.username, 'vi')
         }).slice(0, 10) // Top 10
     },
     ['leaderboard-v2'],
@@ -187,9 +182,16 @@ export default async function Leaderboard({ workspaceId }: { workspaceId: string
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[rgba(139,92,246,0.15)] text-[11px] font-medium text-[#A1A1AA] select-none">
-                        Tuần này
-                        <ChevronDown className="w-3 h-3 text-[#A1A1AA]/70" />
+                    {/* [FIX 2026-08-24] Trước ghi "Tuần này" kèm mũi tên xổ xuống —
+                        SAI cả hai: truy vấn KHÔNG lọc ngày (gộp toàn bộ workspace),
+                        và cái mũi tên gợi ý một bộ lọc không hề tồn tại (đây là
+                        <span>, bấm không ra gì). Nhãn nói sai về chính con số nó
+                        đang khoe, nên nói thẳng: xếp theo tổng tiền công. */}
+                    <span
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[rgba(139,92,246,0.15)] text-[11px] font-medium text-[#A1A1AA] select-none"
+                        title="Tổng tiền công của mọi task trong workspace này: đã chốt + đang chờ"
+                    >
+                        Theo tiền công
                     </span>
                     <RefreshLeaderboardButton isAdmin={isWorkspaceAdmin} />
                 </div>

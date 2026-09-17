@@ -16,6 +16,7 @@ import { Prisma, ReviewPipelineStatus, type GuestSession, type ReviewVersion } f
 import { prisma } from '@/lib/db'
 import { apiError } from './errors'
 import { headObject, presignGetObject, presignPutObject } from './r2'
+import { canonicalAttachmentImageMime } from './media-constants'
 import { recordActivity, REVIEW_ACTIVITY } from './activity'
 import { annotationSchema, toAnnotationEnvelope, readAnnotationShapes } from './annotation'
 import { serializeComment, toUserRef, type CommentAttachmentDto, type CommentDto, type CommentReactionDto } from './dto'
@@ -33,7 +34,8 @@ const MAX_ATTACH_BYTES = 10 * 1024 * 1024
 const attachmentInputSchema = z.object({
     attachmentId: z.string().uuid(),
     fileName: z.string().min(1).max(255),
-    mimeType: z.string().regex(/^image\//, 'image_only'),
+    // [AUDIT HT-020 fix] Cùng allowlist với nhánh nhân viên — xem media-constants.ts.
+    mimeType: z.string().refine((v) => canonicalAttachmentImageMime(v) !== null, 'image_only'),
     sizeBytes: z.number().int().positive().max(MAX_ATTACH_BYTES),
     width: z.number().int().positive().max(20000).optional(),
     height: z.number().int().positive().max(20000).optional(),
@@ -480,8 +482,12 @@ export async function initiateGuestAttachment(
     input: { fileName: string; sizeBytes: number | string; mimeType: string },
 ): Promise<{ attachmentId: string; putUrl: string; expiresAt: string }> {
     if (!share.allowComments) throw apiError(403, 'FORBIDDEN', 'Comments are turned off for this link.')
-    if (!/^image\//.test(input.mimeType)) {
-        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Only images can be attached.')
+    // [AUDIT HT-020 fix] ĐÂY LÀ NHÁNH KỊCH BẢN KHAI THÁC DÙNG, và là nhánh vòng vá trước bỏ sót:
+    // nhân viên đã bị chặn SVG còn khách thì không, dù khách chỉ cần một link chia sẻ có
+    // allowComments là đủ để presign PUT `image/svg+xml` rồi đính vào bình luận công khai.
+    const mime = canonicalAttachmentImageMime(input.mimeType)
+    if (!mime) {
+        throw apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Only JPEG/PNG/WebP/GIF/AVIF/BMP images can be attached (SVG is not supported).')
     }
     const size = Number(input.sizeBytes)
     if (!Number.isFinite(size) || size <= 0 || size > MAX_ATTACH_BYTES) {
@@ -490,7 +496,7 @@ export async function initiateGuestAttachment(
     const attachmentId = randomUUID()
     const key = guestAttachmentKey(guest.id, attachmentId, input.fileName)
     const ttl = 60 * 60
-    const putUrl = await presignPutObject(key, input.mimeType, ttl)
+    const putUrl = await presignPutObject(key, mime, ttl)
     return { attachmentId, putUrl, expiresAt: new Date(Date.now() + ttl * 1000).toISOString() }
 }
 
@@ -504,5 +510,16 @@ export async function getGuestAttachmentRawUrl(share: ShareWithItems, attachment
         throw apiError(404, 'NOT_FOUND', 'Not found.')
     }
     await assertVersionInShare(share, attach.comment.versionId) // 404 if outside this share
-    return presignGetObject(attach.r2Key, { expiresIn: 15 * 60 })
+    // [AUDIT HT-020 fix] Cùng cơ chế chặn thật như nhánh nhân viên (xem getAttachmentRawUrl trong
+    // comments.ts): LUÔN ép ResponseContentType — tham số được ký — nên kiểu tệp lúc phục vụ do
+    // máy chủ quyết, không phải do header client gửi lúc PUT. Đây chính là nhánh mà kịch bản khai
+    // thác của finding dùng.
+    // Cả hai lớp, vô điều kiện — xem chú thích dài ở getAttachmentRawUrl (comments.ts) về việc vì
+    // sao không được đặt cược vào riêng ResponseContentType trên R2.
+    const stored = canonicalAttachmentImageMime(attach.mimeType)
+    return presignGetObject(attach.r2Key, {
+        expiresIn: 15 * 60,
+        responseContentType: stored ?? 'application/octet-stream',
+        downloadFileName: attach.fileName,
+    })
 }

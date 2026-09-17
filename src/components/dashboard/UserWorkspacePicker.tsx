@@ -96,7 +96,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                     size={14}
                     className="transition-transform duration-200"
                     style={{
-                        color: "#71717A",
+                        color: "#878790",
                         transform: open ? "rotate(180deg)" : "rotate(0deg)",
                     }}
                 />
@@ -122,7 +122,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                             <p
                                 className="px-2.5 pb-2 pt-1.5 text-[10px] font-bold uppercase tracking-[0.08em]"
                                 style={{
-                                    color: "#71717A",
+                                    color: "#878790",
                                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                                 }}
                             >
@@ -132,7 +132,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                             {workspaces.length === 0 ? (
                                 <p
                                     className="px-2.5 py-4 text-center text-sm"
-                                    style={{ color: "#71717A" }}
+                                    style={{ color: "#878790" }}
                                 >
                                     Chưa có workspace nào
                                 </p>
@@ -181,7 +181,7 @@ export default function UserWorkspacePicker({ workspaceId, workspaces, canCreate
                                                 {ws.description && (
                                                     <span
                                                         className="truncate text-[11px] w-full"
-                                                        style={{ color: "#71717A" }}
+                                                        style={{ color: "#878790" }}
                                                     >
                                                         {ws.description}
                                                     </span>

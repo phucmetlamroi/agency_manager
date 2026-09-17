@@ -84,7 +84,7 @@ export default async function ProfileMembersPage({ params }: { params: Promise<{
                 <h2 className="title-gradient" style={{ marginBottom: 4 }}>
                     Thành viên tổ chức
                 </h2>
-                <p style={{ color: '#71717A', fontSize: 13 }}>
+                <p style={{ color: '#878790', fontSize: 13 }}>
                     Quản lý thành viên trong <strong style={{ color: '#A1A1AA' }}>{profile.name}</strong>
                 </p>
             </div>

@@ -12,9 +12,13 @@
 
 import { initBotId } from 'botid/client/core'
 
-initBotId({
-    protect: [
-        // Signup endpoint — match phạm vi cũ của Cloudflare Turnstile
-        { path: '/api/auth/signup', method: 'POST' },
-    ],
-})
+// The BotID client depends on rewrites injected by withBotId(). Those rewrites
+// only exist on Vercel, so keep the instrumentation inert when self-hosted.
+if (process.env.NEXT_PUBLIC_BOTID_ENABLED === '1') {
+    initBotId({
+        protect: [
+            // Signup endpoint — match phạm vi cũ của Cloudflare Turnstile
+            { path: '/api/auth/signup', method: 'POST' },
+        ],
+    })
+}

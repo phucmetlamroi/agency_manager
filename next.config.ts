@@ -3,8 +3,14 @@ import createNextIntlPlugin from "next-intl/plugin";
 import { withBotId } from "botid/next/config";
 
 const withNextIntl = createNextIntlPlugin();
+const botIdEnabled = process.env.VERCEL === '1' && !process.env.ELECTRON_DESKTOP;
 
 const nextConfig: NextConfig = {
+  // BotID is a Vercel-only service. Inline this build-time flag so the client
+  // instrumentation stays inert on Railway/Droplet/self-host deployments.
+  env: {
+    NEXT_PUBLIC_BOTID_ENABLED: botIdEnabled ? '1' : '0',
+  },
   images: {
     remotePatterns: [
       {
@@ -182,8 +188,6 @@ const nextConfig: NextConfig = {
 const resolvedConfig = withNextIntl(nextConfig) as NextConfig;
 // [Hosting-portable] BotId relies on Vercel Edge — only wrap when actually ON Vercel
 // (process.env.VERCEL is set there). On Railway / self-host, ship the plain config; the
-// signup path's checkBotId() safely returns isBot=false off-Vercel (the existing
-// rate-limit + disposable-email guards still apply).
-export default !process.env.VERCEL
-  ? resolvedConfig
-  : withBotId(resolvedConfig);
+// signup path skips checkBotId() off-Vercel while retaining the existing rate-limit,
+// honeypot, HIBP, and disposable-email guards.
+export default botIdEnabled ? withBotId(resolvedConfig) : resolvedConfig;

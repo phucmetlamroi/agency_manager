@@ -9,6 +9,7 @@
     "lint": "eslint",
     "postinstall": "prisma generate && node scripts/maybe-db-push.mjs",
     "build:mcp": "cd mcp-server && npm run build",
+    "test:signup": "node --test tests/auth/signup.test.mjs",
     "test:invite-security": "tsx scripts/test-invite-security.ts",
     "test:client-invariant": "tsx scripts/test-client-name-invariant.ts",
     "test:status-meta": "tsx scripts/test-status-meta-snapshot.ts",

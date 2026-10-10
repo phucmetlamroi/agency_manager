@@ -187,7 +187,7 @@ const nextConfig: NextConfig = {
 // next-intl webpack alias).
 const resolvedConfig = withNextIntl(nextConfig) as NextConfig;
 // [Hosting-portable] BotId relies on Vercel Edge — only wrap when actually ON Vercel
-// (process.env.VERCEL is set there). On Railway / self-host, ship the plain config; the
-// signup path skips checkBotId() off-Vercel while retaining the existing rate-limit,
-// honeypot, HIBP, and disposable-email guards.
+// (process.env.VERCEL is set there). On Railway / self-host / Electron, ship the plain
+// config; the signup path skips checkBotId() off-Vercel while retaining the existing
+// rate-limit, honeypot, HIBP, and disposable-email guards.
 export default botIdEnabled ? withBotId(resolvedConfig) : resolvedConfig;

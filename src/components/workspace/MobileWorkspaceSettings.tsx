@@ -30,7 +30,6 @@ import Link from 'next/link'
 import {
     Settings, Plug, Building2, TriangleAlert, Trash2, RotateCcw, Loader2,
     CloudUpload, HardDrive, Link2, Unlink, ExternalLink, ShieldCheck,
-    Clapperboard, ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -53,12 +52,10 @@ import {
 } from '@/components/ui/accordion'
 import { roleLabel } from '@/lib/display-labels'
 import { cn } from '@/lib/utils'
-// [P4.7 review HIGH] Reuse the SAME desktop panels so Bảng giá + StudyPlace aren't lost on
-// mobile (they have no other entry point). M11 optimizes the settings shell; these sub-panels
-// render as-is — accessible, if not fully mobile-polished (their polish is out of M11 scope).
+// [P4.7 review HIGH] Reuse the SAME desktop panel so Bảng giá isn't lost on mobile (it has
+// no other entry point). M11 optimizes the settings shell; the sub-panel renders as-is —
+// accessible, if not fully mobile-polished (its polish is out of M11 scope).
 import PricingRulesPanel from '@/components/settings/PricingRulesPanel'
-import StudyPlaceBoard from '@/components/study-place/StudyPlaceBoard'
-import type { StudyPlaceProgressDTO } from '@/lib/study-place'
 
 /* ── Types (mirror WorkspaceSettingsPanel props để page truyền cùng bộ) ── */
 type IntegrationRow = {
@@ -96,7 +93,6 @@ type Props = {
     /** Nhận để giữ cùng chữ ký với panel — tab Bảng giá không thuộc phạm vi M11 mobile. */
     pricingRules?: PricingRuleRow[]
     clients?: ClientOption[]
-    studyProgress?: unknown[]
 }
 
 type TabId = 'tong-quan' | 'ket-noi' | 'to-chuc'
@@ -140,7 +136,6 @@ export default function MobileWorkspaceSettings({
     integrations = [],
     pricingRules = [],
     clients = [],
-    studyProgress = [],
 }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -390,22 +385,6 @@ export default function MobileWorkspaceSettings({
                         )}
                     </div>
 
-                    {/* [Giải trí] Lối vào kho phim (parity với WorkspaceSettingsPanel).
-                        Tính năng ẨN — sau card này còn một cửa mã truy cập nữa. */}
-                    <Link
-                        href="/entertainment"
-                        className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card p-4 active:bg-accent/50"
-                    >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
-                            <Clapperboard className="h-5 w-5" strokeWidth={1.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <div className="text-body font-bold">Giải trí</div>
-                            <div className="text-caption text-muted-foreground">Khu vực riêng — cần mã truy cập.</div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </Link>
-
                     {/* ── VÙNG NGUY HIỂM (LUÔN CUỐI, ≥24px cách card trên) ── */}
                     {isOwner && !isSoftDeleted && (
                         <div className="mt-6 space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
@@ -516,9 +495,6 @@ export default function MobileWorkspaceSettings({
                     {/* [P4.7 review HIGH] Bảng giá — reuse desktop PricingRulesPanel so mobile
                         admins keep access (no other route surfaces it). */}
                     <PricingRulesPanel workspaceId={workspaceId} rules={pricingRules} clients={clients} />
-
-                    {/* [P4.7 review HIGH] StudyPlace — reuse desktop board (only entry point). */}
-                    <StudyPlaceBoard workspaceId={workspaceId} initialProgress={studyProgress as StudyPlaceProgressDTO[]} />
                 </div>
             )}
 

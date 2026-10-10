@@ -6,7 +6,6 @@ import WorkspaceSettingsPanel from '@/components/workspace/WorkspaceSettingsPane
 import MobileWorkspaceSettings from '@/components/workspace/MobileWorkspaceSettings'
 import { isMobileDevice } from '@/lib/device'
 import { dedupeClientsByPath } from '@/lib/client-dedupe'
-import { getStudyPlaceProgress } from '@/actions/study-place-actions'
 
 export default async function AdminSettingsPage({
     params,
@@ -99,8 +98,6 @@ export default async function AdminSettingsPage({
           )
         : []
 
-    const studyProgress = await getStudyPlaceProgress(workspaceId)
-
     const serializedWorkspace = {
         id: workspace.id,
         name: workspace.name,
@@ -125,7 +122,6 @@ export default async function AdminSettingsPage({
                 integrations={integrations}
                 pricingRules={pricingRules}
                 clients={clients}
-                studyProgress={studyProgress}
             />
         )
     }
@@ -144,7 +140,6 @@ export default async function AdminSettingsPage({
                 integrations={integrations}
                 pricingRules={pricingRules}
                 clients={clients}
-                studyProgress={studyProgress}
             />
         </div>
     )

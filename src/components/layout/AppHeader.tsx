@@ -29,7 +29,7 @@ export default function AppHeader({ user, workspaceId, workspaceRole, navAccess,
         <>
             <header
                 className={cn(
-                    'sticky top-0 z-nav glass-2 rounded-none border-x-0 border-t-0 pt-[env(safe-area-inset-top)] transition-transform duration-300 will-change-transform',
+                    'sticky top-[var(--maint-banner-h,0px)] z-nav glass-2 rounded-none border-x-0 border-t-0 pt-[env(safe-area-inset-top)] transition-transform duration-300 will-change-transform',
                     hidden ? '-translate-y-full' : 'translate-y-0'
                 )}
             >

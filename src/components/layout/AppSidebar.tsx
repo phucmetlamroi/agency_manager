@@ -215,7 +215,8 @@ export function AppSidebar({ user, workspaceId, onCollapsedChange, viewRole = 'A
         <TooltipProvider delayDuration={0}>
             <aside
                 className={cn(
-                    "fixed left-0 top-0 flex flex-col h-screen flex-shrink-0 z-40 transition-all duration-300 ease-in-out",
+                    // [Bảo trì] --maint-banner-h do MaintenanceBanner đặt (không có banner → 0px, y hệt cũ).
+                    "fixed left-0 top-[var(--maint-banner-h,0px)] flex flex-col h-[calc(100vh_-_var(--maint-banner-h,0px))] flex-shrink-0 z-40 transition-all duration-300 ease-in-out",
                     collapsed ? "w-[72px]" : "w-[261px]"
                 )}
                 style={{
